@@ -163,7 +163,7 @@ class Assistant(CosmosModal):
             return
         command = self.request.get("source_command_rect")
         if not pane or not command:
-            self.defer_close("无法定位原位命令区域")
+            self.defer_close("Cannot locate the source command area")
             return
         rect = Rect(**command)
         roles = assistant_roles(getattr(self.app, "role_colors", DEFAULT))
@@ -202,7 +202,7 @@ class Assistant(CosmosModal):
             self.view.measured_width,
         )
         if not plan:
-            self.defer_close("空间不足，已返回原生编辑")
+            self.defer_close("Not enough space; returned to native editing")
             return
         if (
             self.controller.error

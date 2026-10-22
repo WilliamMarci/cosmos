@@ -74,7 +74,7 @@ class AgentBridge:
                 await rpc.call(
                     "notifications.publish",
                     {
-                        "text": "无法定位原位命令区域；请重新加载 Bash 集成",
+                        "text": "Cannot locate the source command area; reload the Bash integration",
                         "source": "terminal_agent",
                     },
                 )

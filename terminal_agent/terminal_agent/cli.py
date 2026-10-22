@@ -31,7 +31,7 @@ def main():
         parser.error('requires an interactive terminal')
     try:
         if not args.shell:
-            print('独立预览：不会修改父 Bash 编辑区。原生模式请 source shell/agent.bash 后按 Ctrl-X Ctrl-A。', file=sys.stderr)
+            print('Standalone preview: the parent Bash input is unchanged. For native editing, source shell/agent.bash and press Ctrl-X Ctrl-A.', file=sys.stderr)
         config = load(args.config)
         backend = Demo() if args.demo else OpenCode(config)
         cursor = min(len(args.shell_line), max(0, args.shell_point))

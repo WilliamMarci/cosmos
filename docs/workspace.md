@@ -1,5 +1,7 @@
 # 终端工作区
 
+程序内置界面、占位文字及提示使用英语；用户输入、文件内容和终端应用自身的语言保持原样。
+
 唯一 UI 入口为根目录 `./cosmos [session] [--debug]`，执行 Python `cosmos_tui`。`dev/cosmos-textual` 是兼容跳转；Rust 二进制无参数及 attach/workspace 转到同一个 Python UI。旧 Rust panel/native/view 界面已停用。协调服务与管理 CLI 暂留 Rust，源码工作区使用 `target/release/cosmos`，构建包使用 `bin/cosmos`。
 
 ## 会话与显示

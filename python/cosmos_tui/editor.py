@@ -79,7 +79,7 @@ class CellEditor(Widget, can_focus=True):
         fg, bg = roles.get("text"), roles.get("surface")
         style = Style(color=fg, bgcolor=bg)
         if not self.value:
-            text = clip("描述命令…", self.size.width)
+            text = clip("Describe a command…", self.size.width)
             segments = []
             for index, match in enumerate(clusters(text)):
                 cursor = (
