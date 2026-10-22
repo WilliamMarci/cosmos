@@ -87,6 +87,8 @@ def leader_key(key, character):
         "-": "minus",
         "?": "question_mark",
         ".": "full_stop",
+        ",": "comma",
+        " ": "space",
         "+": "plus",
         "=": "equals_sign",
         "/": "slash",

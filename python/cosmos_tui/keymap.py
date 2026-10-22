@@ -72,13 +72,16 @@ for name, label, keys, target in [
     ("close", "Close viewer", ["q", "escape"], "q"),
     ("zoom_in", "Zoom in", ["plus", "equals_sign"], "+"),
     ("zoom_out", "Zoom out", ["minus"], "-"),
-    ("fit", "Fit", ["0"], "0"),
+    ("fit", "Fit page", ["0", "space"], "0"),
     ("thumbnails", "Toggle thumbnails", ["t"], "t"),
-    ("previous", "Previous page / image", ["left_square_bracket"], "["),
-    ("next", "Next page / image", ["right_square_bracket"], "]"),
+    ("previous", "Previous page / image", ["left_square_bracket", "comma"], "["),
+    ("next", "Next page / image", ["right_square_bracket", "full_stop"], "]"),
     ("search", "Search PDF", ["slash"], "/"),
     ("help", "Viewer help", ["question_mark"], "?"),
-    *[(d, "Pan " + d, [d], d) for d in ("up", "down", "left", "right")],
+    *[
+        (d, "Pan " + d, [d, k], d)
+        for d, k in (("up", "k"), ("down", "j"), ("left", "h"), ("right", "l"))
+    ],
 ]:
     register("viewer." + name, "viewer", label, keys, target)
 for context in ("palette", "switch", "menu", "help", "about", "key_settings"):
@@ -134,6 +137,8 @@ def help_rows(context, settings):
         "percent_sign": "%",
         "vertical_line": "|",
         "full_stop": ".",
+        "comma": ",",
+        "space": "Space",
         "question_mark": "?",
         "minus": "-",
         "plus": "+",
