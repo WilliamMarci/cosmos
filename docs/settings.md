@@ -20,13 +20,14 @@ Shortcut settings show the action name on the left and its actual current bindin
 The editor uses one row per alternative binding, with two explicit fields:
 
 - A direct chord such as `ctrl+x` belongs in the first field; the second is empty. `+` joins keys pressed together.
-- A Leader sequence uses `leader` in the first field and e.g. `p` in the second. The arrow denotes first press, then next press.
+- A Leader sequence uses `leader`, `leader2` or `leader3` in the first field and e.g. `p` in the second. The arrow denotes first press, then next press.
+- L1/L2/L3 buttons select a prefix preset. Defaults are Ctrl+B / Ctrl+A / Ctrl+M; Settings → Keybindings → General & menus configures the presets, including Off for the additional two.
 - `+` button adds an alternative row; `✓` / Enter saves; `↺` restores defaults. All empty rows also restore defaults.
 - Comma is no longer an alternative/stage delimiter. A literal `,` in a field is normalized to `comma`; the same applies to `.`, `+` and `?`.
 
-The keyboard preview follows both fields and distinguishes first/next press. General custom prefixes such as Ctrl+M followed by X are not registered by this editor; two-stage runtime bindings currently require the configured Leader. Conflicts and incomplete sequences are reported inline.
+The keyboard preview follows both fields and distinguishes first/next press. Ctrl+M followed by X can be stored as `leader3+x`. Arbitrary unnamed multi-stage sequences are not supported; select one of the three presets. Additional prefixes are reserved only when at least one action uses them. Legacy terminals may encode Ctrl+M as Enter: plain Enter is preserved, and Leader3 requires a distinct Ctrl+M key report or a different configured chord. Conflicts and incomplete sequences are reported inline.
 
-The saved configuration remains an array of normalized bindings, e.g. `['leader+p', 'ctrl+g']`. This change is in the editor presentation, not a new RPC format. See ui-api.md for the configuration contract.
+The saved configuration remains an array of normalized bindings, e.g. `['leader+p', 'leader2+x', 'leader3+x', 'ctrl+g']`. This change is in the editor presentation, not a new RPC format. See ui-api.md for the configuration contract.
 
 ## Internal row interface
 

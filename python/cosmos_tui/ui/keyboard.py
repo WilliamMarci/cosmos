@@ -86,7 +86,9 @@ class KeyboardPreview(Static):
     def drawing(self):
         palette = self.app.role_colors
         first, second = key_phases(
-            self.keys, getattr(self.app, "settings", {}).get("leader", "C-b")
+            self.keys,
+            getattr(self.app, "settings", {}).get("leader", "C-b"),
+            getattr(self.app, "settings", {}),
         )
         text = Text()
         glyphs = dict(
@@ -121,13 +123,16 @@ class KeyboardPreview(Static):
         )
 
 
-def key_phases(bindings, leader="C-b"):
+def key_phases(bindings, leader="C-b", settings=None):
+    from cosmos_tui.input.keymap import leader_chords, prefix_name
+
+    chords = leader_chords(settings or {"leader": leader})
     first, second = set(), set()
     for binding in bindings:
         value = binding.strip().replace("Leader ", "leader+")
-        if value.startswith("leader+"):
-            first.update(physical_keys(["ctrl+" + leader[-1]]))
-            second.update(physical_keys([value[len("leader+") :]]))
+        if prefix_name(value):
+            first.update(physical_keys([chords.get(prefix_name(value), "off")]))
+            second.update(physical_keys([value.partition("+")[2]]))
         else:
             strokes = value.split()
             if strokes:

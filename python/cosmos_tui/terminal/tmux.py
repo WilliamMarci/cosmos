@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import re
 import shlex
@@ -37,6 +38,7 @@ class Tmux:
         if not re.fullmatch(r"[A-Za-z0-9_-]+", session):
             raise ValueError("invalid session name")
         self.session = session
+        self.session_id = None
         self.argv = [
             os.getenv("COSMOS_TMUX", "tmux"),
             "-L",
@@ -117,6 +119,39 @@ class Tmux:
             limit=1024 * 1024,
         )
         await self._response()
+        self.session_id = (
+            await self.cli("display-message", "-p", "-t", self.session, "#{session_id}")
+        ).strip()
+        await self.install_bell_hook()
+
+    async def install_bell_hook(self):
+        # One stable hook slot per Cosmos tmux server, not one publisher/client.
+        binary = os.getenv("COSMOS_BINARY", str(PROJECT_ROOT / "target/release/cosmos"))
+        environment = ["env"]
+        for name in ("HOME", "XDG_RUNTIME_DIR", "XDG_STATE_HOME", "XDG_CONFIG_HOME"):
+            environment += ["-u", name]
+        environment += [
+            f"{name}={os.environ[name]}"
+            for name in ("HOME", "XDG_RUNTIME_DIR", "XDG_STATE_HOME", "XDG_CONFIG_HOME")
+            if name in os.environ
+        ]
+        payload = json.dumps(
+            {
+                "text": "Terminal bell · window #{hook_window}",
+                "source": "terminal:#{hook_window}",
+                "level": "info",
+                "session_id": "#{hook_session}",
+            }
+        )
+        command = (
+            shlex.join(environment + [binary, "rpc", "notifications.publish", payload])
+            + " >/dev/null 2>&1"
+        )
+        await self.cli(
+            "set-hook", "-g", "alert-bell[900]", "run-shell -b " + shlex.quote(command)
+        )
+        await self.cli("set-window-option", "-g", "monitor-bell", "on")
+        await self.cli("set-option", "-g", "bell-action", "any")
 
     async def _response(self):
         token = None
@@ -209,6 +244,7 @@ class Tmux:
         await self.request(f"switch-client -t {sid}")
         await self.request(f"select-window -t {sid}:{wid}")
         self.session = window["session"]
+        self.session_id = window["session_id"]
         self.size = None
 
     async def snapshot(self, window=None):

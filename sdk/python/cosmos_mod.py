@@ -41,9 +41,10 @@ class Cosmos:
         return self.call('mods.ready', {'id': self.owner,
                                        'token': os.environ['COSMOS_MOD_TOKEN']})
 
-    def notify(self, text, actionable=False, actions=None):
+    def notify(self, text, actionable=False, actions=None, *, level="info", ttl_ms=None, persistent=False, session_id=None):
         return self.call('notifications.publish', {'text': text, 'source': self.owner,
-                                                  'actionable': actionable, 'actions': actions or []})
+                                                  'actionable': actionable, 'actions': actions or [], 'level': level,
+                                                  'ttl_ms': ttl_ms, 'persistent': persistent, 'session_id': session_id})
 
     def publish(self, topic, data):
         return self.call('events.publish', {'owner': self.owner,

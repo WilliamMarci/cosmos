@@ -81,7 +81,7 @@ impl State {
                     return Err("incompatible protocol major".into());
                 }
                 Ok(
-                    json!({"protocol_major":protocol::MAJOR,"protocol_minor":3,"service_epoch":self.epoch,"capabilities":["settings","notifications","mod-lifecycle","actions","events","ui-model","surface-input","tmux-inventory","ui-components-v1","keybindings","menu-registration-v1"],"presentation":"Cosmos-owned character surfaces and workspace; isolated terminal backend"}),
+                    json!({"protocol_major":protocol::MAJOR,"protocol_minor":4,"service_epoch":self.epoch,"capabilities":["settings","notifications","mod-lifecycle","actions","events","ui-model","surface-input","tmux-inventory","ui-components-v1","keybindings","menu-registration-v1","notification-stack-v1","leader-presets-v1"],"presentation":"Cosmos-owned character surfaces and workspace; isolated terminal backend"}),
                 )
             }
             "events.publish" => {
@@ -190,7 +190,12 @@ impl State {
             "notifications.publish" => {
                 let mut next = self.notices.clone();
                 let mut request = p.clone();
-                if request["ttl_ms"].is_null() {
+                if request["ttl_ms"].is_null()
+                    && !request["actionable"].as_bool().unwrap_or(false)
+                    && !request["actions"]
+                        .as_array()
+                        .is_some_and(|actions| !actions.is_empty())
+                {
                     request["ttl_ms"] = json!(self.config.notification_timeout_ms);
                 }
                 let result = next.publish(&request, self.config.notification_history)?;

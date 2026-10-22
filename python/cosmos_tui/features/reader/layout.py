@@ -177,7 +177,12 @@ class Reader:
                         width=1,
                     )
             except (OSError, ValueError, RuntimeError):
-                pass
+                draw.rectangle(
+                    (x * cw + 2, y * ch + 2, (x + w) * cw - 3, (y + h) * ch - 3),
+                    fill=palette["bg"],
+                    outline=palette["mute"],
+                    width=1,
+                )
             if index == selected:
                 draw.rectangle(
                     (x * cw, y * ch, (x + w) * cw - 1, (y + h) * ch - 1),

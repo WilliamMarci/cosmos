@@ -77,6 +77,8 @@ class AgentBridge:
                     {
                         "text": "Cannot locate the source command area; reload the Bash integration",
                         "source": "terminal_agent",
+                        "level": "warning",
+                        "session_id": getattr(self.app.backend, "session_id", None),
                     },
                 )
                 writer.write(

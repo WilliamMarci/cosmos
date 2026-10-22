@@ -4,7 +4,7 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Static
 from cosmos_tui.core import rpc
-from cosmos_tui.input.keymap import bindings, validate
+from cosmos_tui.input.keymap import bindings, validate, prefix_name, LEADERS
 from cosmos_tui.input.shortcuts import CosmosInput, CosmosModal
 from cosmos_tui.ui.chrome import Frame, MiniAction
 from cosmos_tui.ui.keyboard import KeyboardPreview, key_legend
@@ -30,9 +30,8 @@ class KeyBindingEditor(CosmosModal):
         self.ready = False
 
     def fields(self, value):
-        first, second = (
-            ("leader", value[7:]) if value.startswith("leader+") else (value, "")
-        )
+        prefix = prefix_name(value)
+        first, second = (prefix, value.partition("+")[2]) if prefix else (value, "")
         index = self.count
         self.count += 1
         suffix = "" if index == 0 else f"-{index}"
@@ -41,9 +40,7 @@ class KeyBindingEditor(CosmosModal):
                 first, id="key-value" + suffix, placeholder="First press / chord"
             )
             yield Static(" → ", classes="phase-arrow")
-            yield CosmosInput(
-                second, id="key-next" + suffix, placeholder="Next press (Leader only)"
-            )
+            yield CosmosInput(second, id="key-next" + suffix, placeholder="Next press")
 
     def compose(self):
         with Frame(id="key-editor") as frame:
@@ -53,7 +50,7 @@ class KeyBindingEditor(CosmosModal):
                 markup=False,
             )
             yield Static(
-                f"Leader = {self.app.settings.get('leader', 'C-b').replace('C-', 'Ctrl+')} · ↺ restores defaults.",
+                "L1 / L2 / L3 select Leader presets · ↺ restores defaults.",
                 markup=False,
             )
             with Vertical(id="binding-fields"):
@@ -61,6 +58,9 @@ class KeyBindingEditor(CosmosModal):
                     yield from self.fields(value)
             yield Static("", id="key-error", markup=False)
             with Horizontal(id="key-buttons"):
+                yield MiniAction("L1", id="key-leader")
+                yield MiniAction("L2", id="key-leader2")
+                yield MiniAction("L3", id="key-leader3")
                 yield MiniAction("+", id="key-add")
                 yield MiniAction("↺", id="key-reset")
                 yield MiniAction("✓", id="key-save")
@@ -78,14 +78,14 @@ class KeyBindingEditor(CosmosModal):
             second = self.query_one("#key-next" + suffix, CosmosInput).value.strip()
             if not first and not second:
                 continue
-            if first.lower() == "leader":
+            if first.lower() in LEADERS:
                 if not second:
                     raise ValueError("Leader requires a next press")
-                values.append("leader+" + aliases.get(second, second))
+                values.append(first.lower() + "+" + aliases.get(second, second))
             else:
                 if second:
                     raise ValueError(
-                        "Two-stage bindings currently require Leader as the first press"
+                        "Use leader, leader2 or leader3 as the first press"
                     )
                 values.append(aliases.get(first, first))
         return values
@@ -107,7 +107,7 @@ class KeyBindingEditor(CosmosModal):
                 overrides[self.command.id] = values
             else:
                 overrides.pop(self.command.id, None)
-            validate(overrides)
+            validate(overrides, settings)
             settings["keybindings"] = overrides
             await rpc.call("settings.replace", settings)
             self.app.settings = settings
@@ -117,7 +117,12 @@ class KeyBindingEditor(CosmosModal):
 
     async def on_mini_action_pressed(self, event):
         event.stop()
-        if event.button.id == "key-add":
+        if event.button.id.startswith("key-leader"):
+            suffix = getattr(self, "_binding_suffix", "")
+            field = self.query_one("#key-value" + suffix, CosmosInput)
+            field.value = event.button.id[4:]
+            self.query_one("#key-next" + suffix, CosmosInput).focus()
+        elif event.button.id == "key-add":
             from textual.containers import Horizontal
 
             # Build the same two-field row without delimiter parsing.
@@ -128,9 +133,7 @@ class KeyBindingEditor(CosmosModal):
             await row.mount(
                 CosmosInput(id="key-value" + suffix, placeholder="First press / chord"),
                 Static(" → ", classes="phase-arrow"),
-                CosmosInput(
-                    id="key-next" + suffix, placeholder="Next press (Leader only)"
-                ),
+                CosmosInput(id="key-next" + suffix, placeholder="Next press"),
             )
             row.query_one(CosmosInput).focus()
         else:
@@ -151,6 +154,13 @@ class KeyBindingEditor(CosmosModal):
         if self.ready:
             self.fit()
 
+    def on_descendant_focus(self, event):
+        widget = event.widget
+        if isinstance(widget, CosmosInput) and widget.id:
+            self._binding_suffix = widget.id.replace("key-value", "").replace(
+                "key-next", ""
+            )
+
     def on_input_changed(self, event):
         if not self.ready:
             return
@@ -158,7 +168,7 @@ class KeyBindingEditor(CosmosModal):
         if (
             event.input.id
             and event.input.id.startswith("key-value")
-            and event.value.lower() != "leader"
+            and event.value.lower() not in LEADERS
         ):
             suffix = event.input.id[len("key-value") :]
             self.query_one("#key-next" + suffix, CosmosInput).value = ""

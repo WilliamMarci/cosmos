@@ -13,6 +13,8 @@ pub struct Config {
     pub viewer_prefetch: bool,
     pub status_visible: bool,
     pub leader: String,
+    pub leader2: String,
+    pub leader3: String,
     pub notification_history: usize,
     pub notifications_enabled: bool,
     pub notification_timeout_ms: u64,
@@ -31,6 +33,8 @@ impl Default for Config {
             viewer_prefetch: true,
             status_visible: true,
             leader: "C-b".into(),
+            leader2: "C-a".into(),
+            leader3: "C-m".into(),
             notification_history: 200,
             notifications_enabled: true,
             notification_timeout_ms: 5000,
@@ -59,6 +63,15 @@ impl Config {
         }
         if !["C-b", "C-a"].contains(&self.leader.as_str()) {
             return Err("foundation currently supports C-b or C-a".into());
+        }
+        for value in [&self.leader2, &self.leader3] {
+            if value != "off"
+                && !(value.len() == 3
+                    && value.starts_with("C-")
+                    && value.as_bytes()[2].is_ascii_lowercase())
+            {
+                return Err("additional leaders must be C-a..C-z or off".into());
+            }
         }
         if !(1..=10000).contains(&self.notification_history) {
             return Err("notification_history must be 1..10000".into());

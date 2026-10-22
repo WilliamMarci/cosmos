@@ -105,15 +105,15 @@ class RuntimeController(Controller):
                 lines[pane.id] = list(decode_grid(tuple(pane.lines)))
                 if pane.viewer:
                     try:
-                        frame = await app.reader_ui.prepare(pane)
-                        if frame is None:
-                            return
+                        frame = app.reader_ui.loading.frame(pane)
                         lines[pane.id] = frame.lines
                         if reader_visible and not app.views:
                             cover = getattr(app.screen, "cover_reader_image", None)
                             image = cover(frame.image, pane) if cover else frame.image
                             images.append((pane.id, image, pane.x, pane.y))
                     except Exception as error:
+                        frame = app.reader_ui.loading.placeholder(pane, str(error))
+                        lines[pane.id] = frame.lines
                         app.message = str(error)
             if app.search is not None:
                 app.message = "/" + app.search
@@ -123,6 +123,44 @@ class RuntimeController(Controller):
             ):
                 app.screen.place()
             await app.assistant_ui.refresh(panes, terminal)
+            notices = await rpc.call("notifications.active", {"client": app.client})
+            for host in (app._workspace_screen, app.screen):
+                if host:
+                    for notice in host.query(NoticeToast):
+                        notice.present_notices(
+                            notices,
+                            app.size.width,
+                            app.size.height,
+                            app.role_colors,
+                            status_rows=int(app.settings.get("status_visible", True)),
+                            pane_width=app.active().width
+                            if app.active()
+                            else app.size.width,
+                        )
+            covers = [
+                run.rect
+                for notice in app.screen.query(NoticeToast)
+                if notice.display and notice.frame
+                for run in notice.frame.runs
+                if not run.text
+            ]
+            images = [
+                (
+                    key,
+                    app.graphics.cover(
+                        key,
+                        image,
+                        x,
+                        y,
+                        app.reader_ui.cell_pixels(),
+                        covers,
+                        app.role_colors["base"],
+                    ),
+                    x,
+                    y,
+                )
+                for key, image, x, y in images
+            ]
             app.graphics.commit(
                 images if app.graphics.enabled and reader_visible else []
             )
@@ -140,16 +178,6 @@ class RuntimeController(Controller):
                 app.call_after_refresh(app.flush_graphics)
             await app.status.refresh()
             await app.ime.refresh()
-            notices = await rpc.call("notifications.active", {"client": app.client})
-            for host in (app._workspace_screen, app.screen):
-                if host:
-                    for notice in host.query(NoticeToast):
-                        notice.present_notice(
-                            notices[-1] if notices else None,
-                            app.size.width,
-                            app.size.height,
-                            app.role_colors,
-                        )
             pane = app.active()
             # Modal inputs own the physical cursor. Polling a hidden shell must not
             # relocate its cursor into the switcher / restart input cursor painting.
@@ -185,7 +213,7 @@ class RuntimeController(Controller):
             pass
         app.exit({"reason": reason, "session": app.backend.session})
 
-    async def action_error(self, command, error):
+    async def action_error(self, command, error, *, session_id=None):
         app = self.app
         # A rejected user operation is not a fatal frontend exception.
         text = " ".join(str(error).split())[:240] or "Operation failed"
@@ -194,7 +222,15 @@ class RuntimeController(Controller):
         try:
             await rpc.call(
                 "notifications.publish",
-                {"text": text, "source": "workspace", "ttl_ms": 5000},
+                {
+                    "text": text,
+                    "source": "workspace",
+                    "ttl_ms": 5000,
+                    "level": "error",
+                    "session_id": session_id
+                    if session_id is not None
+                    else getattr(app.backend, "session_id", None),
+                },
             )
         except (OSError, RuntimeError):
             logging.getLogger(__name__).warning("could not publish operation error")

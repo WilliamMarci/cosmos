@@ -72,20 +72,30 @@ class WorkspaceController(Controller):
         if key == "N":
             notices = await rpc.call("notifications.active", {"client": app.client})
             if notices:
-                notice = notices[-1]
-                choices = [(a["id"], a["label"]) for a in notice.get("actions", [])] + [
-                    ("__dismiss__", "×  Dismiss here")
-                ]
+                choices = []
+                for notice in reversed(notices):
+                    label = notice["text"][:40]
+                    choices.extend(
+                        (
+                            f"{notice['id']}:{action['id']}",
+                            label + " · " + action["label"],
+                        )
+                        for action in notice.get("actions", [])
+                    )
+                    choices.append(
+                        (f"{notice['id']}:__dismiss__", label + " · Dismiss here")
+                    )
 
                 def choose(action):
                     if action:
+                        notification, _, selected = action.partition(":")
                         app.run_worker(
                             app.on_notice_toast_action(
-                                NoticeToast.Action(notice["id"], action)
+                                NoticeToast.Action(int(notification), selected)
                             )
                         )
 
-                app.pop_windows.actions("Notification", choices, choose)
+                app.pop_windows.actions("Notifications", choices, choose)
             return
         if key == "full_stop":
             if isinstance(app.screen, Assistant):

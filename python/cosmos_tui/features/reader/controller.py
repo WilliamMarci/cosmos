@@ -9,6 +9,7 @@ from pathlib import Path
 
 from cosmos_tui.core.controller import Controller
 from cosmos_tui.features.reader.layout import Reader
+from cosmos_tui.features.reader.loading import LoadingFrames
 from cosmos_tui.features.reader.media import Media
 from cosmos_tui.features.reader.jump import PageJump
 from cosmos_tui.features.search.bar import BottomSearch
@@ -21,6 +22,7 @@ class ReaderController(Controller):
     def __init__(self, app):
         super().__init__(app)
         self.media = Media()
+        self.loading = LoadingFrames(self)
         self.reader = Reader(self.media)
         self.frames = {}
         self.pages = {}
@@ -150,6 +152,7 @@ class ReaderController(Controller):
         )
 
     def clear_cache(self):
+        self.loading.clear()
         self.prefetch_token = None
         self.prefetch_request = None
         self.media.release()
@@ -160,6 +163,7 @@ class ReaderController(Controller):
         self.searches.clear()
 
     async def close(self):
+        await self.loading.close()
         self.clear_cache()
         if self.prefetch_task:
             self.prefetch_task.cancel()
@@ -218,6 +222,7 @@ class ReaderController(Controller):
 
     def sync_visible(self, panes):
         visible = {p.id for p in panes if p.viewer}
+        self.loading.prune(visible)
         for pid in list(self.frames):
             if pid not in visible:
                 self.frames.pop(pid, None)

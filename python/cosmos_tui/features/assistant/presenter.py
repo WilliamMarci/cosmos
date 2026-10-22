@@ -145,6 +145,7 @@ class Assistant(CosmosModal):
         yield CellEditor(id="assistant-input")
 
     def on_mount(self):
+        self.origin_session = getattr(getattr(self.app, "backend", None), "session_id", None)
         self.registry.activate(self.owner)
         field = self.query_one(CellEditor)
         field.assign(
@@ -220,7 +221,7 @@ class Assistant(CosmosModal):
             and not getattr(self, "_notified_error", False)
         ):
             self._notified_error = True
-            self.run_worker(self.notify(self.controller.error))
+            self.run_worker(self.notify(self.controller.error, level="error"))
         self.layout_data = plan
         editor.styles.width = max(1, plan.editor.width)
         editor.styles.offset = plan.editor.x, plan.editor.y
@@ -236,11 +237,16 @@ class Assistant(CosmosModal):
             self.run_worker(self.notify(message))
             self.call_after_refresh(self.finish, "edit")
 
-    async def notify(self, text):
+    async def notify(self, text, *, level="warning"):
         try:
             await rpc.call(
                 "notifications.publish",
-                {"text": " ".join(text.split())[:240], "source": "terminal_agent"},
+                {
+                    "text": " ".join(text.split())[:240],
+                    "source": "terminal_agent",
+                    "level": level,
+                    "session_id": getattr(self, "origin_session", None),
+                },
             )
         except (OSError, RuntimeError, TimeoutError):
             logging.getLogger(__name__).warning("assistant notification unavailable")

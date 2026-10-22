@@ -174,6 +174,32 @@ class Palette(CosmosModal):
                 if key in options:
                     label, values, default = options[key]
                     rows[index] = choice(label, key, values, default)
+        if self.menu == "keys:General & menus" or (self.menu == "keys" and query):
+            rows += [
+                choice(
+                    name.title(),
+                    name,
+                    [("off", "Off")]
+                    + [
+                        ("C-" + ch, "Ctrl+" + ch.upper())
+                        for ch in "abcdefghijklmnopqrstuvwxyz"
+                    ],
+                    default,
+                )
+                for name, default in (("leader2", "C-a"), ("leader3", "C-m"))
+            ]
+        if self.menu == "notifications":
+            rows.append(
+                choice(
+                    "Default timeout",
+                    "notification_timeout_ms",
+                    [
+                        (n, f"{n // 1000}s")
+                        for n in (1000, 3000, 5000, 10000, 30000, 60000)
+                    ],
+                    5000,
+                )
+            )
         if self.menu == "mods":
             rows += [
                 dict(
@@ -285,6 +311,7 @@ class Palette(CosmosModal):
             else:
                 settings = await rpc.call("settings.get")
                 settings[row["key"]] = value
+                keymap.validate(settings.get("keybindings", {}), settings)
                 await rpc.call("settings.replace", settings)
                 actual = await rpc.call("settings.get")
                 if actual.get(row["key"]) != value:

@@ -93,13 +93,13 @@ stdout/stderr 各有独立日志，单次启动各保留前 1 MiB，超过后继
 
 `cosmos panel` 是 Rust 兼容面板入口；Python 工作区的 Leader p 在自己的 UI 层打开紧凑操作面板。箭头/Ctrl-N/P 选择，文字过滤，Enter 执行，Esc 返回，? 调出帮助；无常驻快捷键提示。深浅主题共用角色表，中文宽度按显示列裁切。
 
-`settings.get/replace` 读写完整 TOML 配置。新增 notifications_enabled、notification_timeout_ms；通知页面提供显示开关。主题改变立即作用于面板。终端状态栏、Leader 通过 Display/Keys 菜单的 Apply 操作或 `settings.apply` 更新已有 Tmux 服务；此时 p 仍为当前面板键，不是全功能键位编辑器。
+`settings.get/replace` 读写完整 TOML 配置。新增 notifications_enabled、notification_timeout_ms；通知页面提供显示开关。主题改变立即作用于面板。设置控件写入并读回确认；Python 客户端动态读取配置，快捷键编辑器支持三组 Leader 预设与动作绑定。`settings.apply` 仍可更新已有 Tmux 服务的基础设置。
 
 Guard 在正常退出、错误返回和 SIGTERM/SIGINT 时恢复终端模式与光标，并释放客户端。无法捕获的 SIGKILL 不在终端模式恢复保证内。
 
 ## 7. 通知与动作
 
-`notifications.publish {text,source?,actionable?,ttl_ms?}`。普通通知默认 5 秒，设置可修改；需要处理的无自动过期。`notifications.active {client}` 返回当前应显示的，`notifications.list {client}` 返回有界历史。显示开关不删除历史。
+`notifications.publish {text,source?,level?,session_id?,actionable?,actions?,ttl_ms?,persistent?}`。普通通知默认 5 秒，设置可修改；需要处理的缺省常驻，显式正期限可覆盖。`notifications.active {client}` 返回当前应显示的，`notifications.list {client}` 返回有界历史。显示开关不删除历史。
 
 `dismiss {id,client}` 仅影响此客户端。`resolve {id}` 是服务级标记处理，不执行外部副作用。`claim {id,token}` 原子认领待处理事项；重复认领拒绝。`complete {id,token}` 需匹配；处理失败可 `release {id,token}` 重新开放。这里只保证认领状态互斥，不承诺外部动作恰好执行一次。
 
@@ -129,3 +129,5 @@ Python 工作区通过 Cosmos 合成器在右下角显示紧凑通知，不抢�
 协议 minor 3 的 menu-registration-v1 能力支持 actions 中的 surfaces、contexts、group。surfaces 为非空列表，元素仅 start/actions，默认两者；contexts 为非空字符串列表，默认 workspace，允许 * 或合法标识符，最多 32 项；group 可选，非空可打印字符串，最多 256 字节，默认 Mod id。开始菜单按 Mod 分组，Actions 根据当前上下文过滤。contexts 是 UI 可见范围，不是权限沙箱。
 
 actions.list 和 state.snapshot.actions 返回这些字段及 enabled。动作启动已声明的受管程序并附加 args，不执行任意 Shell 字符串；运行中 Mod 的启动动作暂不显示，竞态以 actions.invoke 的最终校验为准。注册及调用沿用 mods.register 和 actions.invoke；SDK 提供 register_manifest(manifest)、actions()。修改运行中 Mod 的 manifest 需先停止它。旧 action 不带新字段时使用默认值。
+
+完整通知字段、栈呈现与作用域见 notifications.md；设置控件与 Leader 预设见 settings.md。

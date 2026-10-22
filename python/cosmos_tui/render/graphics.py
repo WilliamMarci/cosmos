@@ -30,8 +30,36 @@ class Graphics:
         )
         self.images = {}
         self.sources = {}
+        self.masks = {}
         self.pending = ""
         self.next = (os.getpid() * 1024) & 0xFFFFFFFF
+
+    def cover(self, key, source, x, y, cell, rectangles, color):
+        from PIL import ImageDraw
+
+        cw, ch = cell
+        regions = []
+        for rect in rectangles:
+            left, top = max(0, (rect.x - x) * cw), max(0, (rect.y - y) * ch)
+            right, bottom = (
+                min(source.width, (rect.x + rect.width - x) * cw),
+                min(source.height, (rect.y + rect.height - y) * ch),
+            )
+            if left < right and top < bottom:
+                regions.append((left, top, right - 1, bottom - 1))
+        if not regions:
+            self.masks.pop(key, None)
+            return source
+        regions = tuple(regions)
+        previous = self.masks.get(key)
+        if previous and previous[0] is source and previous[1:3] == (regions, color):
+            return previous[3]
+        image = source.copy()
+        draw = ImageDraw.Draw(image)
+        for rect in regions:
+            draw.rectangle(rect, fill=color)
+        self.masks[key] = source, regions, color, image
+        return image
 
     def commit(self, images):
         wanted = {}
@@ -66,6 +94,9 @@ class Graphics:
         for key, (_, image_id) in self.images.items():
             if key not in wanted:
                 self.pending += f"\x1b_Ga=d,d=I,i={image_id},q=2\x1b\\"
+        for key in list(self.masks):
+            if key not in wanted:
+                self.masks.pop(key, None)
         self.images = wanted
         self.sources = sources
 

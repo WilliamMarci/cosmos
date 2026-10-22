@@ -54,10 +54,33 @@ class PopWindows:
 class NotificationEvents:
     """Actions emit notifications.action; publishers decide what a choice means."""
 
-    async def publish(self, text, *, source="core", actions=()):
+    def __init__(self, app=None):
+        self.app = app
+
+    async def publish(
+        self,
+        text,
+        *,
+        source="core",
+        actions=(),
+        level="info",
+        ttl_ms=None,
+        persistent=False,
+        session_id=None,
+    ):
         return await rpc.call(
             "notifications.publish",
-            dict(text=text, source=source, actions=list(actions)),
+            dict(
+                text=text,
+                source=source,
+                actions=list(actions),
+                level=level,
+                ttl_ms=ttl_ms,
+                persistent=persistent,
+                session_id=session_id
+                if session_id is not None
+                else getattr(getattr(self.app, "backend", None), "session_id", None),
+            ),
         )
 
 

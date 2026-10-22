@@ -11,10 +11,18 @@ pub fn now_ms() -> u64 {
         .unwrap()
         .as_millis() as u64
 }
+fn default_level() -> String {
+    "info".into()
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Notice {
     pub id: u64,
     pub text: String,
+    #[serde(default = "default_level")]
+    pub level: String,
+    #[serde(default)]
+    pub session_id: Option<String>,
     pub actionable: bool,
     pub resolved: bool,
     pub source: String,
@@ -43,6 +51,33 @@ impl Center {
         if text.len() > 4096 || text.chars().any(char::is_control) {
             return Err("invalid notification text".into());
         }
+        let level = p["level"].as_str().unwrap_or("info");
+        if !["info", "success", "warning", "error", "progress"].contains(&level) {
+            return Err("invalid notification level".into());
+        }
+        let session_id = match p.get("session_id") {
+            None | Some(Value::Null) => None,
+            Some(value) => {
+                let id = value
+                    .as_str()
+                    .map(|s| s.trim_start_matches('$').to_owned())
+                    .or_else(|| value.as_u64().map(|n| n.to_string()))
+                    .ok_or("invalid notification session_id")?;
+                let number = id
+                    .parse::<u64>()
+                    .map_err(|_| "invalid notification session_id")?;
+                Some(format!("${number}"))
+            }
+        };
+        let ttl = match p.get("ttl_ms") {
+            None | Some(Value::Null) => None,
+            Some(value) => Some(
+                value
+                    .as_u64()
+                    .ok_or("ttl_ms must be a non-negative integer")?,
+            ),
+        };
+        let persistent = p["persistent"].as_bool().unwrap_or(false);
         let actions = p["actions"].as_array().cloned().unwrap_or_default();
         if actions.len() > 3 {
             return Err("at most three notification actions".into());
@@ -70,7 +105,9 @@ impl Center {
             let i = self
                 .entries
                 .iter()
-                .position(|n| !n.actionable || n.resolved)
+                .position(|n| {
+                    !n.actionable || n.resolved || n.expires_ms.is_some_and(|t| t <= now_ms())
+                })
                 .ok_or("pending notification capacity reached")?;
             self.entries.remove(i);
         }
@@ -83,14 +120,16 @@ impl Center {
         self.entries.push(Notice {
             id: self.next,
             text: text.into(),
+            level: level.into(),
+            session_id,
             source: source.into(),
             actionable,
             resolved: false,
             created_ms: now,
-            expires_ms: if actionable {
+            expires_ms: if persistent || ttl == Some(0) || actionable && ttl.is_none() {
                 None
             } else {
-                Some(now + p["ttl_ms"].as_u64().unwrap_or(5000).clamp(100, 60000))
+                Some(now + ttl.unwrap_or(5000).clamp(100, 86400000))
             },
             dismissed: HashSet::new(),
             claim: None,
@@ -117,7 +156,11 @@ impl Center {
             .ok_or("notification not found")?;
         match method {
             "notifications.act" => {
-                if n.resolved || n.claim.is_some() || !n.actionable {
+                if n.resolved
+                    || n.claim.is_some()
+                    || !n.actionable
+                    || n.expires_ms.is_some_and(|t| t <= now_ms())
+                {
                     return Err("notification action already handled or claimed".into());
                 }
                 let action = p["action"].as_str().ok_or("missing action")?;
@@ -181,6 +224,42 @@ impl Center {
 #[cfg(test)]
 mod action_tests {
     use super::*;
+
+    #[test]
+    fn levels_deadlines_persistence_and_client_dismissal() {
+        let mut center = Center::default();
+        center
+            .publish(&json!({"text":"default", "session_id":"$12"}), 10)
+            .unwrap();
+        assert_eq!(center.entries[0].session_id.as_deref(), Some("$12"));
+        assert_eq!(center.entries[0].level, "info");
+        assert_eq!(
+            center.entries[0].expires_ms.unwrap() - center.entries[0].created_ms,
+            5000
+        );
+        center
+            .publish(
+                &json!({"text":"persistent", "level":"warning", "ttl_ms":0}),
+                10,
+            )
+            .unwrap();
+        assert!(center.entries[1].expires_ms.is_none());
+        center.publish(&json!({"text":"timed action", "level":"error", "ttl_ms":100, "actions":[{"id":"ok","label":"OK"}]}),10).unwrap();
+        assert!(center.entries[2].expires_ms.is_some());
+        center.entries[0].expires_ms = Some(now_ms() - 1);
+        assert_eq!(center.list("desktop", true).as_array().unwrap().len(), 2);
+        center
+            .change("notifications.dismiss", &json!({"id":2,"client":"desktop"}))
+            .unwrap();
+        assert_eq!(center.list("desktop", true).as_array().unwrap().len(), 1);
+        assert_eq!(center.list("phone", true).as_array().unwrap().len(), 2);
+        assert!(center
+            .publish(&json!({"text":"bad", "level":"unknown"}), 10)
+            .is_err());
+        assert!(center
+            .publish(&json!({"text":"bad", "ttl_ms":-1}), 10)
+            .is_err());
+    }
 
     #[test]
     fn action_is_persisted_and_only_selected_once() {

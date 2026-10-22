@@ -45,9 +45,13 @@ class InputRouter(Controller):
                 elif command.target == "ime_width":
                     await app.ime.toggle_width()
                 return
-            leader = "ctrl+a" if app.settings["leader"] == "C-a" else "ctrl+b"
-            if event.key == leader:
-                await self.action_leader(leader)
+            names = tuple(
+                name
+                for name, chord in keymap.active_leader_chords(app.settings).items()
+                if event.key == chord
+            )
+            if names:
+                await self.action_leader(event.key, names)
                 return
             if not app.prefix and self.key_context() == "workspace":
                 direct = keymap.resolve(
@@ -59,7 +63,18 @@ class InputRouter(Controller):
             if app.prefix:
                 key = leader_key(event.key, event.character)
                 context = self.key_context()
-                command = keymap.resolve(context, "leader+" + key, app.settings)
+                command = next(
+                    (
+                        command
+                        for name in getattr(app, "prefix_names", ("leader",))
+                        if (
+                            command := keymap.resolve(
+                                context, name + "+" + key, app.settings
+                            )
+                        )
+                    ),
+                    None,
+                )
                 if command:
                     if command.context.startswith("assistant") and isinstance(
                         app.screen, Assistant
@@ -167,19 +182,27 @@ class InputRouter(Controller):
         if action == "leader_key":
             return app.prefix
         if action == "leader":
-            return parameters[0] == (
-                "ctrl+a" if app.settings["leader"] == "C-a" else "ctrl+b"
-            )
+            return parameters[0] in keymap.active_leader_chords(app.settings).values()
         return True
 
-    async def action_leader(self, key):
+    async def action_leader(self, key, names=None):
         app = self.app
         logging.getLogger(__name__).debug("action_leader %s", key)
-        if app.prefix:
+        if app.prefix and key == getattr(app, "prefix_chord", key):
             app.prefix = False
             await app.backend.send(key)
         else:
             app.prefix = True
+            app.prefix_chord = key
+            app.prefix_names = (
+                names
+                or tuple(
+                    name
+                    for name, chord in keymap.active_leader_chords(app.settings).items()
+                    if chord == key
+                )
+                or ("leader",)
+            )
 
     async def on_key(self, event: events.Key):
         app = self.app

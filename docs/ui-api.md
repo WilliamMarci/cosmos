@@ -74,19 +74,19 @@ CellSurface 将 frame 接到唯一 compositor；它自己不写 stdout。按下�
 {"method":"notifications.publish","params":{"source":"my-mod","text":"Continue?","actions":[{"id":"yes","label":"yes"},{"id":"no","label":"no"}]}}
 ```
 
-返回 `{id}`。actions 最多 3 项，id 唯一且长度 1..64 字节，label 非空、最多 64 字节，均禁止控制字符。显示标签按三个字符格裁切；使用短标签。带动作的通知自动 actionable 并保留，直到处理或按已有接口解决。
+返回 `{id}`。actions 最多 3 项，id 唯一且长度 1..64 字节，label 非空、最多 64 字节，均禁止控制字符。显示标签按三个字符格裁切；使用短标签。带动作的通知自动 actionable；缺省常驻，也可显式设正 ttl_ms 到期。
 
 `notifications.act {id,action,client}` 选择已声明的动作。已处理、已被 claim 或动作不存在时拒绝。成功返回 `{resolved:true,action,source}`，服务持久保存 selected_action 并广播 `notifications.action {id,action,source,client}` 和 notifications.changed。其他客户端同步移除已处理通知；普通关闭只调用 notifications.dismiss，影响当前客户端。
 
 发布者通过 events.poll 订阅 notifications.action，根据 source/id/action 执行业务；服务不 eval action、不运行 Shell，不保证外部业务恰好执行一次。需要恢复处理时查询 notifications.list 中的 selected_action，而非只依赖内存事件。原有 claim/complete 接口仍保留，不能同时 act 一个已 claim 的通知。
 
-SDK `api.notify(text, actionable=False, actions=None)` 返回通知 ID 对象。右下角显示 1 行、三个字符格动作按钮；空间不足时仅保留关闭按钮，可用配置中的 Notification actions（默认 Leader N）打开紧凑动作菜单。
+SDK `api.notify(text, actionable=False, actions=None)` 返回通知 ID 对象。右下角固定宽度堆栈，默认 1 行、长文最多 2 行，三个字符格动作按钮；空间不足时仅保留关闭按钮，可用配置中的 Notification actions（默认 Leader N）打开紧凑动作菜单。
 
 ## 按键注册与设置
 
 Cosmos 动作在 keymap.COMMANDS 注册：稳定 id、context、label、默认 keys 和 target。注册 ID 不可重复。实际分发、设置列表与上下文帮助使用同一注册表。工作区 Leader 动作可用于通用上下文；助手、查看器和菜单各有自己的按键作用域。独立修饰/锁定键不消耗前缀、不发给子 PTY。
 
-设置在 Cosmos → Settings → Keybindings 中修改；使用归一化名称，如 `leader+quotation_mark`、`ctrl+g`、`up`。编辑器将第一次/第二次按键分栏，每行是一个别名，通过 + 按钮添加；逗号不再分隔阶段或别名，literal , 转为 comma。留空或重置恢复默认；两阶段目前只支持配置的 Leader。保存时检查未知动作、空键和同作用域冲突。配置字段示例：
+设置在 Cosmos → Settings → Keybindings 中修改；使用归一化名称，如 `leader+quotation_mark`、`ctrl+g`、`up`。编辑器将第一次/第二次按键分栏，每行是一个别名，通过 + 按钮添加；逗号不再分隔阶段或别名，literal , 转为 comma。留空或重置恢复默认；两阶段支持配置的 leader/leader2/leader3 预设。保存时检查未知动作、空键和同作用域冲突。配置字段示例：
 
 ```toml
 reduced_motion = false
@@ -168,3 +168,5 @@ settings.get / settings.replace 的根配置增加 viewer_cache_mb（整数 16�
 Settings → Input → Mouse mode is local to one UI connection; it is not part of settings.get/settings.replace or the Mod RPC contract. Auto/Cell/Pixel selection does not modify Kitty image rendering. See mouse.md for mode negotiation, startup arguments and lifecycle.
 
 设置列表的轮询值与分阶段编辑器、导航及内部 SettingRow 消息见 settings.md；配置字段与 RPC 形态不变。
+
+通知级别、逐条期限、固定宽度、上标 session_id、SDK 扩展参数和终端响铃桥的完整契约见 notifications.md。

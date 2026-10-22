@@ -80,3 +80,9 @@ PaneInputSurface 在应用输入显示时裁掉来源阅读图像底部的对应
 terminal/mouse.py owns client-local mouse policy, DEC 1016 probing and a pinned Textual Linux input adapter. App owns the requested mouse_mode, and Settings → Input delegates to set_mouse_mode without settings.replace. The parser's cell/pixel conversion follows the selected driver mode even after in-band resize reports. CLI --mouse-mode configures the UI instance through runtime/bootstrap; graphics detection remains independent.
 
 ui/settings.SettingRow 负责设置项名称/值/三角命中与灰色键位提示，feature/settings/Palette 负责配置写入、读回校验、客户端作用域和层级导航。CosmosModal 在构造时显式设置透明 background/background-tint，Frame 与其输入/列表统一语义 base 色；禁用默认 focus tint，使用 Textual 实际的 -highlight 类名。切换界面主题时同步 Frame 与列表颜色。
+
+features/reader/loading.LoadingFrames owns non-blocking per-pane decode jobs and waiting/error surfaces; runtime always obtains reader lines from this presenter and never falls back to captured terminal text for a viewer. Background source probes preserve external-file reload behavior. Notification rectangles are masked out of Kitty images in the shared graphics owner so a white PDF cannot make overlay text unreadable.
+
+Notifications remain service-backed: Rust owns level/session metadata, independent expiry and synchronized actions; NoticeToast composes one/two-line fixed-width cards as a stack in UIFrame. Tmux installs one server hook for BEL publishing. Client prefix capture uses referenced Leader2/3 presets, and keyboard help/editor use the same configured chord mapping.
+
+Notification origin is a stable optional session_id ($N), independent of notification ID. UI publishers capture the source session for deferred reader/assistant errors; BEL obtains hook_session from Tmux. The stack tags the origin in superscript without filtering delivery, and fixes all card widths to the client's current pane-derived width.

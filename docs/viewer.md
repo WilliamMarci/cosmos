@@ -44,3 +44,9 @@ Settings → Reader 提供缓存预算、相邻页预读开关和 Clear this cli
 位置数据通过 pane 的 @cosmos_viewer Base64 JSON 保存；包含 path、page、zoom、pan、query，Python 另使用 thumbnails 布尔值、navigation（thumbnails/outline）、active_match（当前页内匹配下标）、outline_index/outline_scroll/nav_focus。额外状态字段由当前 Python 界面维护，并非独立的公共 RPC 字段承诺。page 从 1 起；pan 是源像素偏移。调用者应通过 RPC 打开/关闭，不直接发送图形 ANSI。事件包括 viewer.changed 与 viewer.cache.cleared。
 
 后端路径及实际参数校验以 viewer.rs 中的请求处理为准；Mod 不因自己能够写该请求就获得模型侧执行权限。格式扩展、缓存调度和阅读设计讨论保留在 design/。
+
+## Waiting and errors
+
+features/reader/loading.py schedules decoding/composition per visible pane, so the runtime tick continues while a PDF/image is slow. An uncached page shows a gray framed surface with a Braille spinner at the lower right of that reading pane. Missing thumbnails have gray framed placeholders. A failure retains an error surface and publishes one error event for that failure state; it never substitutes the underlying terminal capture. Terminal content returns only when reading is explicitly closed.
+
+Unchanged frames are reused. A background probe every 0.5 seconds retains source-file reload detection; failed sources are probed at a slower rate and repeated identical failures do not republish the notification. Cache clear/closed panes cancel pending presenter tasks and release their frame references. Native decoding remains subject to the existing output/timeout budgets.

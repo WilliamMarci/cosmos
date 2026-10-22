@@ -1,7 +1,6 @@
-"""Shared notification-event presenter, with service-synchronized action choices."""
+"""Compact right-aligned notification stack: one row, at most two per notice."""
 
 from textual.message import Message
-
 from cosmos_tui.ui.cell_surface import CellSurface
 from cosmos_tui.ui.cells import (
     CellRun,
@@ -14,11 +13,17 @@ from cosmos_tui.ui.cells import (
 )
 from cosmos_tui.ui.zones import Zone
 
+COLORS = dict(
+    error="#e06c75",
+    warning="#e8a662",
+    info="#62a0e6",
+    success="#8dbf7a",
+    progress="#56b6c2",
+)
+
 
 class NoticeToast(CellSurface):
-    DEFAULT_CSS = (
-        "NoticeToast { layer: notices; position: absolute; max-width: 60; height: 1; }"
-    )
+    DEFAULT_CSS = "NoticeToast { layer: notices; position: absolute; max-width: 60; }"
 
     class Action(Message):
         def __init__(self, notification, action):
@@ -29,34 +34,95 @@ class NoticeToast(CellSurface):
         registry = UIRegistry()
         registry.attach("notification", Zone.NOTIFICATION, self.choose)
         super().__init__(registry, "notification", **kwargs)
+        self.notices = {}
         self.notification = None
         self.display = False
 
     def choose(self, action):
-        if self.notification:
-            self.post_message(self.Action(self.notification["id"], action))
+        notification, _, selected = action.partition(":")
+        if notification.isdigit() and int(notification) in self.notices:
+            self.post_message(self.Action(int(notification), selected))
 
     def present_notice(self, notice, width, height, palette):
-        self.notification = notice
-        self.display = bool(notice)
-        if not notice:
+        self.present_notices([notice] if notice else [], width, height, palette)
+
+    def present_notices(
+        self, notices, width, height, palette, *, status_rows=1, pane_width=None
+    ):
+        self.notices = {notice["id"]: notice for notice in notices}
+        self.notification = notices[-1] if notices else None
+        self.display = bool(notices) and width > 1 and height > status_rows
+        if not self.display:
             return
-        actions = [(a["id"], a["label"]) for a in notice.get("actions", [])] + [
-            ("__dismiss__", "×")
-        ]
-        max_width = min(width, 60)
-        shown = actions if max_width >= 3 * len(actions) + 4 else actions[-1:]
-        text = clip(notice["text"], max(0, max_width - 3 * len(shown) - 1))
-        total = min(max_width, cell_width(text) + 1 + 3 * len(shown))
-        x, y = width - total, max(0, height - 2)
-        runs = [CellRun(Rect(x, y, total), text, palette["fg"], palette["base"])]
-        hits = []
-        for i, (action, label) in enumerate(shown):
-            rect = Rect(x + total - 3 * len(shown) + i * 3, y, 3)
-            label = clip(label, 3)
-            left = max(0, (3 - cell_width(label)) // 2)
-            runs.append(
-                CellRun(rect, " " * left + label, palette["accl"], palette["base"])
+        available = max(2, min(width, 60, pane_width or width))
+        bottom = height - status_rows
+        runs, hits = [], []
+        left = width
+        for notice in reversed(notices):
+            actions = [(a["id"], a["label"]) for a in notice.get("actions", [])] + [
+                ("__dismiss__", "×")
+            ]
+            actions = actions if available >= 3 * len(actions) + 4 else actions[-1:]
+            if available < 5:
+                actions = actions[-1:]
+            button_width = 3 * len(actions) if available >= 5 else 1
+            text_width = max(0, available - button_width - 2)
+            session = str(notice.get("session_id") or "").removeprefix("$")
+            tag = (
+                session.translate(str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹"))
+                if session.isdigit()
+                else ""
             )
-            hits.append(HitRegion(action, rect))
-        self.present(UIFrame(Rect(x, y, total), tuple(runs), tuple(hits)))
+            text = (tag + " " if tag else "") + notice["text"]
+            first = clip(text, text_width)
+            remaining = text[len(first) :] if text_width else ""
+            second = clip(remaining, text_width)
+            if len(second) < len(remaining) and text_width > 1:
+                second = clip(second, text_width - 1) + "…"
+            rows = 2 if remaining else 1
+            if rows > bottom:
+                if bottom < 1:
+                    break
+                rows, second = 1, ""
+                first = clip(first, max(0, text_width - 1)) + "…"
+            content_width = max(cell_width(first), cell_width(second))
+            total = available
+            x, y = width - total, bottom - rows
+            left = min(left, x)
+            level = COLORS.get(notice.get("level", "info"), COLORS["info"])
+            for row, value in enumerate((first, second)[:rows]):
+                runs.append(
+                    CellRun(Rect(x, y + row, total), "", palette["fg"], palette["base"])
+                )
+                runs.append(CellRun(Rect(x, y + row, 1), "▐", level, palette["base"]))
+                if content_width:
+                    runs.append(
+                        CellRun(
+                            Rect(x + 2, y + row, content_width),
+                            value,
+                            palette["fg"],
+                            palette["base"],
+                        )
+                    )
+            for index, (action, label) in enumerate(actions):
+                rect = Rect(
+                    x + total - button_width + index * 3,
+                    y + rows - 1,
+                    min(3, button_width - index * 3),
+                )
+                if rect.width <= 0:
+                    continue
+                label = clip(label, rect.width)
+                label = " " * max(0, (rect.width - cell_width(label)) // 2) + label
+                runs.append(CellRun(rect, label, palette["accl"], palette["base"]))
+                hits.append(HitRegion(f"{notice['id']}:{action}", rect))
+            bottom = y
+            if not bottom:
+                break
+        self.present(
+            UIFrame(
+                Rect(left, bottom, width - left, height - status_rows - bottom),
+                tuple(runs),
+                tuple(hits),
+            )
+        )

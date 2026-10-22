@@ -181,6 +181,33 @@ register(
 register("history_search.choose", "history_search", "Search", ["enter"], "enter")
 
 
+LEADERS = {"leader": "C-b", "leader2": "C-a", "leader3": "C-m"}
+
+
+def leader_chords(settings):
+    return {
+        name: value.replace("C-", "ctrl+")
+        for name, default in LEADERS.items()
+        if (value := settings.get(name, default)) != "off"
+    }
+
+
+def active_leader_chords(settings):
+    used = {
+        prefix_name(key) for command in COMMANDS for key in bindings(command, settings)
+    }
+    return {
+        name: chord
+        for name, chord in leader_chords(settings).items()
+        if name == "leader" or name in used
+    }
+
+
+def prefix_name(key):
+    name = key.partition("+")[0]
+    return name if name in LEADERS and "+" in key else None
+
+
 def bindings(command, settings):
     return tuple(settings.get("keybindings", {}).get(command.id, command.keys))
 
@@ -190,7 +217,7 @@ def resolve(context, key, settings):
         c
         for c in COMMANDS
         if c.context in (context, "global")
-        or key.startswith("leader+")
+        or prefix_name(key)
         and c.context == "workspace"
     ]
     return next((c for c in matches if key in bindings(c, settings)), None)
@@ -200,7 +227,8 @@ def default_reserved(context, key):
     return any(c.context == context and key in c.keys for c in COMMANDS)
 
 
-def validate(overrides):
+def validate(overrides, settings=None):
+    chords = leader_chords(settings or {})
     unknown = set(overrides) - {c.id for c in COMMANDS}
     if unknown:
         raise ValueError("Unknown commands: " + ", ".join(sorted(unknown)))
@@ -209,10 +237,12 @@ def validate(overrides):
         for key in overrides.get(c.id, c.keys):
             if not key or any(ch.isspace() for ch in key):
                 raise ValueError("Use normalized keys such as leader+p or ctrl+g")
-            scope = "leader" if key.startswith("leader+") else c.context
-            if (scope, key) in seen:
-                raise ValueError(f"{key} conflicts with {seen[scope, key]}")
-            seen[scope, key] = c.id
+            prefix = prefix_name(key)
+            scope = "prefix:" + chords.get(prefix, prefix) if prefix else c.context
+            checked_key = key.partition("+")[2] if prefix else key
+            if (scope, checked_key) in seen:
+                raise ValueError(f"{key} conflicts with {seen[scope, checked_key]}")
+            seen[scope, checked_key] = c.id
     global_keys = {
         key: owner for (scope, key), owner in seen.items() if scope == "global"
     }
@@ -236,14 +266,12 @@ def display_binding(key, settings):
         "right_square_bracket": "]",
         "question_mark": "?",
     }
-    if key.startswith("leader+"):
-        leader = (
-            settings.get("leader", "C-b")
-            .replace("C-", "Ctrl+")
-            .upper()
-            .replace("CTRL", "Ctrl")
-        )
-        return leader + " → " + display_binding(key[7:], settings)
+    prefix = prefix_name(key)
+    if prefix:
+        leader = leader_chords(settings).get(prefix, "off").replace("ctrl+", "Ctrl+")
+        if leader.startswith("Ctrl+"):
+            leader = "Ctrl+" + leader[5:].upper()
+        return leader + " → " + display_binding(key.partition("+")[2], settings)
     return "+".join(names.get(part, part) for part in key.split("+"))
 
 
@@ -267,8 +295,8 @@ def help_rows(context, settings):
     def show(key):
         parts = key.split("+")
         return (
-            ("Leader " + names.get(parts[-1], parts[-1]))
-            if key.startswith("leader+")
+            (parts[0].title() + " " + names.get(parts[-1], parts[-1]))
+            if prefix_name(key)
             else "+".join(names.get(p, p) for p in parts)
         )
 

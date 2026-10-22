@@ -72,7 +72,7 @@ class Cosmos(App, inherit_bindings=False):
         self.ui_registry = UIRegistry()
         self.session_windows = SessionWindows(self.backend)
         self.pop_windows = PopWindows(self)
-        self.notification_events = NotificationEvents()
+        self.notification_events = NotificationEvents(self)
         self.powerline = PowerlineSlot()
 
         self.runtime = RuntimeController(self)
@@ -138,8 +138,8 @@ class Cosmos(App, inherit_bindings=False):
     async def detach(self, reason="detach"):
         return await self.runtime.detach(reason)
 
-    async def action_error(self, command, error):
-        return await self.runtime.action_error(command, error)
+    async def action_error(self, command, error, *, session_id=None):
+        return await self.runtime.action_error(command, error, session_id=session_id)
 
     async def on_event(self, event):
         return await self.inputs.on_event(event)
