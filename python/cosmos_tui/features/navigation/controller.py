@@ -43,6 +43,7 @@ class NavigationController(Controller):
                 available = {
                     "switch",
                     "detach",
+                    "new_session",
                     "split_horizontal",
                     "split_vertical",
                     "next_pane",
@@ -123,7 +124,11 @@ class NavigationController(Controller):
                 ),
             ]
             for command in keymap.COMMANDS:
-                if command.id in ("workspace.switch", "workspace.agent"):
+                if command.id in (
+                    "workspace.switch",
+                    "workspace.agent",
+                    "workspace.new_session",
+                ):
                     rows.append(
                         dict(
                             id=command.id,

@@ -1,6 +1,8 @@
 """CLI parsing is independent of the terminal renderer and coordinator startup."""
 
 import argparse
+import asyncio
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -8,6 +10,13 @@ import sys
 
 from cosmos_tui.core.metadata import VERSION
 from cosmos_tui.core.paths import PROJECT_ROOT
+
+
+def positive_integer(value):
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return number
 
 
 def parser():
@@ -33,6 +42,57 @@ def parser():
     )
     attach.add_argument(
         "--log-file", help="diagnostic log file (default: XDG state cosmos/logs/ui.log)"
+    )
+    session_group = commands.add_parser(
+        "session", help="manage retained sessions and export history"
+    )
+    session_commands = session_group.add_subparsers(
+        dest="session_command", required=True
+    )
+    for name, container in (("new", commands), ("new", session_commands)):
+        new = container.add_parser(
+            name, help="create a new session; fail if it already exists"
+        )
+        new.add_argument("session", help="new session name")
+        new.add_argument(
+            "--detached",
+            "-d",
+            action="store_true",
+            help="create without opening the UI",
+        )
+        new.add_argument("--cwd", help="initial working directory")
+    for name, container in (("sessions", commands), ("list", session_commands)):
+        listing = container.add_parser(
+            name, help="list retained sessions without starting a service"
+        )
+        listing.add_argument(
+            "--json", action="store_true", help="machine-readable output"
+        )
+    for name, container in (("history", commands), ("history", session_commands)):
+        history = container.add_parser(
+            name, help="export retained output from a session's panes"
+        )
+        history.add_argument("session", nargs="?", default="main")
+        history.add_argument("--pane", help="export only this pane ID, such as %%0")
+        history.add_argument(
+            "--lines",
+            type=positive_integer,
+            help="last N retained physical lines per pane",
+        )
+        history.add_argument(
+            "--ansi", action="store_true", help="retain ANSI color escapes"
+        )
+        history.add_argument(
+            "--json", action="store_true", help="include pane metadata as JSON"
+        )
+        history.add_argument(
+            "--output", "-o", help="write UTF-8 output to a file instead of stdout"
+        )
+    session_commands.add_parser(
+        "attach",
+        parents=[attach],
+        add_help=False,
+        help="create or reconnect to a session",
     )
     for name, help_text in {
         "daemon": "run the coordinator in the foreground",
@@ -85,7 +145,36 @@ def main(argv=None):
         print((PROJECT_ROOT / "shell/completions/cosmos.bash").read_text(), end="")
         return
     try:
-        if args.command == "attach":
+        operation = args.session_command if args.command == "session" else args.command
+        if operation in ("new", "sessions", "list", "history"):
+            from cosmos_tui.terminal import sessions
+
+            if operation == "new":
+                asyncio.run(sessions.create(args.session, args.cwd))
+                if args.detached:
+                    print(args.session)
+                    return
+                args.debug, args.log_level, args.log_file = False, "WARNING", None
+                operation = "attach"
+            elif operation in ("sessions", "list"):
+                rows = asyncio.run(sessions.listing())
+                if args.json:
+                    print(json.dumps(rows, indent=2))
+                else:
+                    for row in rows:
+                        print(f"{row['name']}\t{row['windows']} window(s)")
+                return
+            else:
+                rows = asyncio.run(
+                    sessions.history(args.session, args.pane, args.lines, args.ansi)
+                )
+                output = sessions.format_history(rows, args.json)
+                if args.output:
+                    Path(args.output).expanduser().write_text(output, encoding="utf-8")
+                else:
+                    print(output, end="")
+                return
+        if operation == "attach":
             from cosmos_tui.runtime.bootstrap import run
 
             run(args)
@@ -94,5 +183,5 @@ def main(argv=None):
             os.environ.get("COSMOS_BINARY", PROJECT_ROOT / "target/release/cosmos")
         )
         raise SystemExit(subprocess.call([str(binary), *argv]))
-    except (OSError, RuntimeError, TimeoutError) as error:
+    except (OSError, RuntimeError, TimeoutError, ValueError) as error:
         cli.exit(1, f"cosmos: {error}\n")

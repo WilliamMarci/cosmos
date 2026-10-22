@@ -132,6 +132,34 @@ class NavigationTests(unittest.IsolatedAsyncioTestCase):
                     )
                 )
 
+    async def test_new_session_action_creates_and_selects_without_replacing_old_pane(
+        self,
+    ):
+        from cosmos_tui.features.navigation.session_prompt import NewSession
+
+        with (
+            patch("cosmos_tui.core.rpc.call", AsyncMock(return_value=snapshot())),
+            patch(
+                "cosmos_tui.features.navigation.session_prompt.create", AsyncMock()
+            ) as create,
+        ):
+            app = Probe()
+            window = dict(session="research", session_id="$1", window_id="@1")
+            app.backend.inventory = AsyncMock(return_value=[window])
+            app.backend.select_window = AsyncMock()
+            async with app.run_test(size=(80, 24)) as pilot:
+                await pilot.press("ctrl+p")
+                self.assertIn(
+                    "New session", [row["label"] for row in app.screen.entries]
+                )
+                await pilot.press(*"new session", "enter")
+                self.assertIsInstance(app.screen, NewSession)
+                await pilot.press(*"research", "enter")
+                create.assert_awaited_once_with("research")
+                app.backend.select_window.assert_awaited_once_with(window)
+                self.assertIs(app.screen, app._workspace_screen)
+                self.assertEqual(app.active().id, "%0")
+
     async def test_status_click_opens_grouped_launcher_and_about(self):
         with patch("cosmos_tui.core.rpc.call", AsyncMock(return_value=snapshot())):
             app = Probe()

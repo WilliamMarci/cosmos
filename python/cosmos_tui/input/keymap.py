@@ -60,6 +60,7 @@ for name, label, keys, target in [
         "workspace." + name, "workspace", label, ["leader+" + k for k in keys], target
     )
 register("global.actions", "global", "Context actions", ["ctrl+p"], "actions")
+register("workspace.new_session", "workspace", "New session", [], "new_session")
 register("global.start", "global", "Start menu", ["leader+space"], "start")
 for name, label, keys, target in [
     ("generate", "Generate command", ["enter"], "submit"),

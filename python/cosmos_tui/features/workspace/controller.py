@@ -6,6 +6,7 @@ from cosmos_tui.features.assistant.presenter import Assistant
 from cosmos_tui.features.navigation.about import About
 from cosmos_tui.features.navigation.menus import ActionDrawer, StartMenu
 from cosmos_tui.features.navigation.switcher import Switcher
+from cosmos_tui.features.navigation.session_prompt import NewSession
 from cosmos_tui.features.notifications.toast import NoticeToast
 from cosmos_tui.features.search.bar import BottomSearch
 from cosmos_tui.features.settings.keybindings import KeyBindingEditor
@@ -73,6 +74,9 @@ class WorkspaceController(Controller):
         if key == "full_stop":
             if isinstance(app.screen, Assistant):
                 app.screen.action_actions()
+            return
+        if key == "new_session":
+            app.push_screen(NewSession())
             return
         if key == "s":
             app.push_screen(Switcher())

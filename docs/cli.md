@@ -45,3 +45,24 @@ cosmos completion bash > ~/.local/share/bash-completion/completions/cosmos
 ```
 
 Completion covers commands, subcommands, options, log levels, file paths and common RPC methods. It does not start a coordinator or enumerate live Mod IDs or sessions. Bash is the currently supported shell; other shells are not advertised.
+
+## Sessions and history
+
+```bash
+cosmos session list                       # also: cosmos sessions
+cosmos session new research               # create, then open the UI
+cosmos new research --detached --cwd ~/work
+cosmos session attach research            # also: cosmos attach research
+cosmos history research                   # also: cosmos session history research
+cosmos history research --pane %0 --lines 200
+cosmos history research --output research.txt
+cosmos history research --json --output research.json
+```
+
+New session names use letters, digits, `_` and `-`. `new` refuses an existing name; `attach` reconnects or creates when absent. `--detached` creates without starting a UI or coordinator. Listing and history also work without a coordinator and do not start one. The selected Cosmos Tmux socket is shared with the UI, separate from ordinary tmux.
+
+History defaults to **all retained output plus the current screen, for every pane in the named session**, including windows that are not selected. Multiple panes have identifying headers; `--json` emits records with `session`, `window`, `pane_index`, `pane`, and `text`. `--pane` restricts to one exact pane ID in that session. `--lines N` takes the final N physical lines per pane; wrapped rows remain separate. `--ansi` preserves color escape sequences; default output is plain text. `--output` writes UTF-8 and replaces an existing destination file.
+
+This is a snapshot of tmux's retained terminal output, not a command audit log, Bash history, or an archive of previous Cosmos launches. Evicted scrollback and closed panes cannot be exported. Live programs may continue producing output while panes are captured; the export is not an atomic cross-pane snapshot. A missing session is an error; an empty session list prints nothing (`[]` with `--json`).
+
+The new commands, nested session operations and export options are included in Bash completion. Session names and live Mod IDs are not enumerated by completion.

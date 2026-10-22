@@ -56,3 +56,7 @@ Leader p 打开设置 Panel，只包含显示、键位、通知、Mod 管理与 
 ## 底端内容搜索
 
 PDF 与终端历史共用 features/search/bar.BottomSearch，两行紧凑底栏（标题线与输入行）覆盖在状态栏上方；状态栏隐藏时贴底，不改变终端尺寸。参考 ZhihuViewer 的输入/结果状态/前后匹配/关闭结构，使用 Cosmos 主题。Enter 执行搜索后保持底栏，Esc 关闭并回到原应用；已提交结果保留。终端历史还支持底栏前后按钮及 F3/Shift+F3；PDF 目前只对当前页匹配高亮，没有跨页跳转。Switch 与设置的列表过滤不属于内容搜索，仍位于对应列表。
+
+## New session
+
+`Ctrl+P` → **New session**, or the Cosmos start menu → **New session**, opens a compact bottom prompt. Enter a name and press Enter to create and switch to it; Escape cancels. Existing sessions remain running. A duplicate or invalid name is reported in the prompt. The action is registered as `workspace.new_session` in keybinding settings, without a default key assignment. CLI equivalents are documented in [cli.md](cli.md).
