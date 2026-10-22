@@ -18,6 +18,20 @@ def short_path(path, depth, maximum):
     return path
 
 
+def transition(style, before, after, direction="right"):
+    """Join actual neighboring background colors, including gradient endpoints."""
+    if style == "none":
+        return Text()
+    if style == "capsule":
+        glyph = "" if direction == "left" else ""
+    elif style == "powerline":
+        glyph = "" if direction == "left" else ""
+    else:
+        glyph = "│" if style == "vertical" else "╲" if direction == "left" else "╱"
+    foreground, background = (after, before) if direction == "left" else (before, after)
+    return Text(glyph, style=Style(color=foreground, bgcolor=background))
+
+
 class StatusBar(Static):
     start_width = 8
 
@@ -82,14 +96,20 @@ class StatusBar(Static):
         light = app.settings.get("theme", "dark") == "light"
         session_bg = "#d0d4dc" if light else "#292d38"
         path_bg = "#bfc5cf" if light else "#363c48"
-        separator = dict(powerline="", slash="╱", vertical="│", none="").get(
-            app.settings.get("status_separator", "powerline"), ""
-        )
+        separator_style = app.settings.get("status_separator", "powerline")
+        separator = "" if separator_style == "none" else " "
+        alignment = app.settings.get("status_path_align", "right")
 
-        def divide(before, after):
-            return Text(separator, style=Style(color=before, bgcolor=after))
+        def divide(before, after, direction="right"):
+            return transition(separator_style, before, after, direction)
 
-        left = start + divide(palette["base"], session_bg)
+        start_end = start.get_style_at_offset(app.console, len(start) - 1).bgcolor
+        start_begin = start.get_style_at_offset(app.console, 0).bgcolor
+        if separator_style == "capsule":
+            start = divide(palette["base"], start_begin, "left") + start
+            self.start_width = min(width, start.cell_len)
+            self.hits[0] = (0, self.start_width, "start")
+        left = start + divide(start_end, session_bg)
         left += Text(f" {index}", style=Style(color="#e8a662", bgcolor=session_bg))
         left += Text(f" {name} ", style=Style(color=palette["fg"], bgcolor=session_bg))
         left += divide(session_bg, palette["base"])
@@ -120,12 +140,23 @@ class StatusBar(Static):
         )
         path_text = Text(style=base)
         if path:
-            path_text = divide(palette["base"], path_bg)
+            direction = "left" if alignment in ("right", "center") else "right"
+            before = palette["base"]
+            if alignment == "left":
+                if separator:
+                    left = left[:-1]
+                before = session_bg
+            path_text = divide(before, path_bg, direction)
             path_text += Text(
                 " " + path + " ", style=Style(color=palette["fg"], bgcolor=path_bg)
             )
-            path_text += divide(path_bg, palette["base"])
-        alignment = app.settings.get("status_path_align", "right")
+            path_text += divide(
+                path_bg,
+                palette["bg"] if alignment == "right" else palette["base"],
+                "right"
+                if alignment == "center" or separator_style == "capsule"
+                else direction,
+            )
         if alignment == "left":
             left += path_text
         elif alignment == "right":

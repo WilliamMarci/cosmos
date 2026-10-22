@@ -141,7 +141,7 @@ class Palette(CosmosModal):
                     "status_separator",
                     [
                         (v, v.title())
-                        for v in ("powerline", "slash", "vertical", "none")
+                        for v in ("powerline", "capsule", "slash", "vertical", "none")
                     ],
                     "powerline",
                 ),

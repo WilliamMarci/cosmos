@@ -47,6 +47,6 @@ Settings → Status bar provides left/right choice controls for these shared fie
 - `status_path_depth`: recent path components, default 3; 0 shows all, configuration permits 0–32.
 - `status_path_max_length`: path/branch block content width in terminal cells, default 40, range 8–240. The bar reduces this further when space is tight.
 - `status_path_align`: left, center, or right (default). The center block shares available space with registered Mod widgets.
-- `status_separator`: powerline (default ``), slash (`╱`), vertical (`│`), or none. Select another style if the terminal font lacks Powerline glyphs.
+- `status_separator`: powerline (default ``), capsule (`` / ``), slash (`╱` / `╲`), vertical (`│`), or none. Left-aligned blocks point right (``); right-aligned blocks point left (``). Center blocks use outward edges. Capsule blocks use rounded outer edges. Every seam uses the immediate left/right background colors; the COSMOS gradient contributes its nearest endpoint, including explicit solid mode colors. Select another style if the terminal font lacks Powerline glyphs.
 
 These fields are validated and persisted through settings.replace. Existing configuration files load the defaults. Upgrading a running coordinator requires a restart before the fields can be saved.

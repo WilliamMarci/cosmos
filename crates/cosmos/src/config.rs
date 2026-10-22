@@ -60,7 +60,8 @@ impl Config {
         if self.status_path_depth > 32
             || !(8..=240).contains(&self.status_path_max_length)
             || !["left", "center", "right"].contains(&self.status_path_align.as_str())
-            || !["powerline", "slash", "vertical", "none"].contains(&self.status_separator.as_str())
+            || !["powerline", "capsule", "slash", "vertical", "none"]
+                .contains(&self.status_separator.as_str())
         {
             return Err("invalid status bar path or separator settings".into());
         }

@@ -140,6 +140,55 @@ class StatusTests(unittest.IsolatedAsyncioTestCase):
                     if align == "right":
                         self.assertGreater(path_x, 60)
 
+    async def test_direction_gradient_endpoint_and_capsule_colors(self):
+        from cosmos_tui.features.status.bar import transition
+
+        for kind, pair in (("powerline", ("", "")), ("capsule", ("", ""))):
+            for direction, glyph in zip(("left", "right"), pair):
+                seam = transition(kind, "#112233", "#445566", direction)
+                self.assertEqual(seam.plain, glyph)
+                style = seam.style
+                self.assertEqual(
+                    style.color.name, "#445566" if direction == "left" else "#112233"
+                )
+                self.assertEqual(
+                    style.bgcolor.name, "#112233" if direction == "left" else "#445566"
+                )
+        app = Probe()
+        async with app.run_test(size=(100, 30)):
+            bar = app.query_one("#status", StatusBar)
+            for align in ("left", "right", "center"):
+                app.settings.update(
+                    status_path_align=align, status_separator="powerline"
+                )
+                bar.present(
+                    label="COSMOS",
+                    index=1,
+                    name="bash",
+                    path="/tmp",
+                    branch="",
+                    clock="12:00",
+                )
+                seam = bar._content.get_style_at_offset(app.console, len(" COSMOS "))
+                self.assertEqual(seam.color.name, "#103027")
+                self.assertEqual(seam.bgcolor.name, "#292d38")
+                path_x = bar._content.plain.index(" /tmp ")
+                self.assertEqual(
+                    bar._content.plain[path_x - 1], "" if align == "left" else ""
+                )
+            app.settings["status_separator"] = "capsule"
+            bar.present(
+                label="COSMOS",
+                index=1,
+                name="bash",
+                path="/tmp",
+                branch="",
+                clock="12:00",
+            )
+            self.assertTrue(bar._content.plain.startswith(""))
+            self.assertIn(" /tmp ", bar._content.plain)
+            self.assertEqual(bar._content.cell_len, 100)
+
     def test_config_priority_and_selected_schema(self):
         with (
             tempfile.TemporaryDirectory() as directory,
