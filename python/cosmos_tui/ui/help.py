@@ -7,6 +7,7 @@ from textual.widgets import Static
 from cosmos_tui.input.shortcuts import CosmosModal
 from cosmos_tui.ui.chrome import Frame
 from cosmos_tui.ui.styles import DARK
+from cosmos_tui.ui.keyboard import KeyboardPreview
 
 
 class Help(CosmosModal):
@@ -29,3 +30,16 @@ class Help(CosmosModal):
         with Frame(id="help-frame") as frame:
             frame.set_heading(self.heading, "workspace.help")
             yield Static(text, id="help-content")
+            yield KeyboardPreview(
+                [part for key, _ in self.items for part in key.split(" / ")]
+            )
+
+    def on_mount(self):
+        self.fit_keyboard()
+
+    def on_resize(self):
+        if self.is_mounted:
+            self.fit_keyboard()
+
+    def fit_keyboard(self):
+        self.query_one(KeyboardPreview).fit(minimum_height=(len(self.items) + 15) * 10 // 9 + 1)

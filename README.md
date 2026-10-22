@@ -64,7 +64,7 @@ Socket、PTY 和 Tmux 测试需正常本机权限；测试使用隔离状态与�
 
 默认客户端自行绘制终端 grid、光标、窗格、状态栏、面板、通知和 Mod。Tmux 作为持续会话与终端解析后端，通过持久控制连接提供已解析画面；普通工作区不使用 Tmux popup。`cosmos native` 保留旧界面回退。
 
-完整说明与兼容边界见 [自有工作区](docs/workspace.md)。图片/PDF 查看器已接入，见 [查看器](docs/viewer.md)。输入法、Yazi 和 Agent 尚未接入。没有将后台模型或静态编译当成最终视觉验收。
+完整说明与兼容边界见 [自有工作区](docs/workspace.md)。图片/PDF 查看器已接入，见 [查看器](docs/viewer.md)。Rime 输入法已接入，见 [输入法与键盘预览](docs/input-method.md)；Yazi 和全局 Agent 工具层仍待完成。没有将后台模型或静态编译当成最终视觉验收。
 
 设计与进展见 [实施方案](design/实施方案-v0.1.md) 和 [实施进度](design/实施进度.md)。现有 terminal_agent 实现暂保持不变。
 

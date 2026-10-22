@@ -7,10 +7,11 @@ from cosmos_tui.core import rpc
 from cosmos_tui.input.keymap import bindings, validate
 from cosmos_tui.input.shortcuts import CosmosInput, CosmosModal
 from cosmos_tui.ui.chrome import Frame
+from cosmos_tui.ui.keyboard import KeyboardPreview
 
 
 class KeyBindingEditor(CosmosModal):
-    DEFAULT_CSS = "KeyBindingEditor { align: center middle; background: transparent; } #key-editor { width: 62; height: auto; max-width: 92%; } #key-value { height: 1; border: none; padding: 0; } #key-error { height: auto; }"
+    DEFAULT_CSS = "KeyBindingEditor { align: center middle; background: transparent; } #key-editor { width: 72; height: auto; max-width: 92%; } #key-value { height: 1; border: none; padding: 0; } #key-error { height: auto; }"
     BINDINGS = [Binding("escape", "close", show=False)]
 
     def __init__(self, command):
@@ -25,9 +26,11 @@ class KeyBindingEditor(CosmosModal):
                 ", ".join(bindings(self.command, self.app.settings)), id="key-value"
             )
             yield Static("", id="key-error", markup=False)
+            yield KeyboardPreview(bindings(self.command, self.app.settings))
 
     def on_mount(self):
         self.query_one(CosmosInput).focus()
+        self.query_one(KeyboardPreview).fit()
 
     async def on_input_submitted(self, event):
         settings = await rpc.call("settings.get")
@@ -48,3 +51,11 @@ class KeyBindingEditor(CosmosModal):
 
     def action_close(self):
         self.dismiss(False)
+
+    def on_resize(self):
+        if self.is_mounted:
+            self.query_one(KeyboardPreview).fit()
+
+    def on_input_changed(self, event):
+        if self.is_mounted:
+            self.query_one(KeyboardPreview).present(event.value.split(","))

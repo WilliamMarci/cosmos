@@ -36,6 +36,10 @@ class InputRouter(Controller):
                     app.action_context_actions()
                 elif command.target == "start":
                     app.action_start_menu()
+                elif command.target == "ime_toggle":
+                    await app.ime.toggle()
+                elif command.target == "ime_width":
+                    await app.ime.toggle_width()
                 return
             leader = "ctrl+a" if app.settings["leader"] == "C-a" else "ctrl+b"
             if event.key == leader:
@@ -60,6 +64,8 @@ class InputRouter(Controller):
                     )
                 return
         if isinstance(event, events.Key) and not event.is_forwarded:
+            if await app.ime.handle(event):
+                return
             context = self.key_context()
             if context != "workspace" and not (
                 context == "viewer" and app.search is not None

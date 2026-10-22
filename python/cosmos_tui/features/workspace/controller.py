@@ -44,6 +44,12 @@ class WorkspaceController(Controller):
         if key == "actions":
             app.action_context_actions()
             return
+        if key == "ime_toggle":
+            await app.ime.toggle()
+            return
+        if key == "ime_width":
+            await app.ime.toggle_width()
+            return
         if key == "quit":
             await app.detach("exit")
             return

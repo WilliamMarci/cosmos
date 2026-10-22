@@ -60,6 +60,16 @@ for name, label, keys, target in [
         "workspace." + name, "workspace", label, ["leader+" + k for k in keys], target
     )
 register("global.actions", "global", "Context actions", ["ctrl+p"], "actions")
+register(
+    "global.ime_toggle",
+    "global",
+    "Input language · Chinese / English",
+    ["leader+i"],
+    "ime_toggle",
+)
+register(
+    "global.ime_width", "global", "Input width · Half / Full", [], "ime_width"
+)
 register("workspace.quit", "workspace", "Quit / Exit Cosmos", [], "quit")
 register("workspace.new_session", "workspace", "New session", [], "new_session")
 register("global.start", "global", "Start menu", ["leader+m"], "start")

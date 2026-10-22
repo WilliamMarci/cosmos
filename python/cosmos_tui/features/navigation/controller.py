@@ -27,7 +27,11 @@ class NavigationController(Controller):
 
         async def load():
             snapshot = await rpc.call("state.snapshot")
-            selected = [c for c in keymap.COMMANDS if c.context == context]
+            selected = [
+                c
+                for c in keymap.COMMANDS
+                if c.context == context or c.id.startswith("global.ime_")
+            ]
             if isinstance(source, BottomSearch) and not source.steps:
                 selected = [c for c in selected if c.target not in ("next", "previous")]
             if (
@@ -44,6 +48,8 @@ class NavigationController(Controller):
                     "switch",
                     "detach",
                     "quit",
+                    "ime_toggle",
+                    "ime_width",
                     "new_session",
                     "split_horizontal",
                     "split_vertical",
@@ -167,7 +173,9 @@ class NavigationController(Controller):
                 )
             elif row["kind"] == "command":
                 command = row["command"]
-                if command.context == "workspace":
+                if command.context == "workspace" or command.id.startswith(
+                    "global.ime_"
+                ):
                     await app.action_leader_key(command.target)
                 elif command.context == "copy":
                     await app.copy_action(command.target)

@@ -148,3 +148,5 @@ group = "My tools"
 底部开始菜单、Actions 和内容搜索使用 ui.chrome.BottomSheet：只有带标题的顶部横线，没有侧框或底框；SheetShadow 在右侧一列绘制细纹理阴影，不占用顶部空行。弹层显式设置透明背景与透明 background-tint，避免全局 Screen 样式覆盖透明规则。终端画面和状态栏在弹层外保持可见；不改变 PTY 大小。内容搜索为两行（标题线、输入与按钮）。
 
 Actions、开始菜单和设置 Panel 的列表筛选输入框位于各自容器底部，列表占据上方剩余空间；焦点与方向键选择行为保持一致。
+
+键盘预览与内置 IME 的当前行为、加载路径和提交边界见 [input-method.md](input-method.md)。IME 使用保留 owner `cosmos.ime` 的 insert/cover UIFrame；它不抢 UIRegistry 焦点，候选点击由 HitRegion 回调提交。当前未开放第三方输入法引擎 RPC 注册。

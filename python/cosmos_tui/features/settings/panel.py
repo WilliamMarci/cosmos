@@ -10,6 +10,7 @@ from cosmos_tui.input import keymap
 from cosmos_tui.input.shortcuts import CosmosInput, CosmosModal
 from cosmos_tui.ui.chrome import Frame
 from cosmos_tui.ui.zones import Zone
+from cosmos_tui.ui.keyboard import KeyboardPreview
 
 
 class Palette(CosmosModal):
@@ -28,6 +29,7 @@ class Palette(CosmosModal):
             listing = ListView(id="actions")
             listing.styles.margin = 0
             yield listing
+            yield KeyboardPreview(id="binding-keyboard")
             yield CosmosInput(placeholder="", id="filter")
 
     async def on_mount(self):
@@ -76,6 +78,7 @@ class Palette(CosmosModal):
         await listing.extend(ListItem(Label(row["label"])) for row in self.rows)
         if self.rows:
             listing.index = 0
+        self.update_keyboard()
         self.query_one("#palette", Frame).set_heading(
             "Cosmos / " + self.menu, "workspace.palette"
         )
@@ -145,3 +148,23 @@ class Palette(CosmosModal):
             await self.populate()
         else:
             self.dismiss()
+
+    def update_keyboard(self):
+        keyboard = self.query_one(KeyboardPreview)
+        keyboard.fit(minimum_height=32)
+        keyboard.display = keyboard.display and self.menu == "keys"
+        index = self.query_one(ListView).index
+        command = (
+            self.rows[index].get("command")
+            if index is not None and index < len(self.rows)
+            else None
+        )
+        keyboard.present(keymap.bindings(command, self.app.settings) if command else [])
+
+    def on_list_view_highlighted(self, event):
+        if self.is_mounted:
+            self.update_keyboard()
+
+    def on_resize(self):
+        if self.is_mounted:
+            self.update_keyboard()

@@ -38,6 +38,7 @@ python/cosmos_tui/
     farewell.py          # TUI 完全退出后的 Logo/状态输出
   features/
     assistant/           # presenter、布局、原生桥与启动/被动提示生命周期
+    ime/                 # librime C API、逐目标组字、光标附近候选展示
     history/             # Tmux copy-mode 操作及选区几何
     navigation/          # 开始菜单、Actions、Switch、About 及入口执行
     notifications/       # toast 展示与事件处理
@@ -59,3 +60,5 @@ features 不在运行时导入 app.py；各功能通过控制器显式宿主及�
 app.py 保留少量已有调用入口作为委派，用于当前测试及调用兼容，实际实现只有一份。修改 UI 时到 ui/，改键位到 input/，改终端协议到 terminal/，业务逻辑进入对应 features/；不得重新堆回 app.py。打包递归复制包并排除缓存，路径统一从 core/paths 解析。
 
 公共命令由 core/cli.py 解析，__main__.py 仅分派；帮助、版本和补全不导入 App 或启动服务。runtime/bootstrap.py 负责 UI 启动及协调服务能力检查。根 cosmos 和 dev/cosmos-textual 均先解析软链接再定位项目。
+
+ui/keyboard.py 提供只读键位预览；features/ime/rime.py 管理 C API、资源目录与词库锁，features/ime/controller.py 负责输入路由、提交和 UIFrame 候选展示。InputRouter 在 Leader/全局快捷键后、应用键位前调用 IME。运行时仅调用 refresh/status/close，不包含引擎逻辑。

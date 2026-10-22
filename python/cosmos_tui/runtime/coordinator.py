@@ -37,6 +37,7 @@ class RuntimeController(Controller):
 
     async def on_unmount(self):
         app = self.app
+        app.ime.close()
         await app.assistant_ui.close()
         await app.backend.close()
         try:
@@ -144,6 +145,12 @@ class RuntimeController(Controller):
                             item["role"], app.role_colors["mute"]
                         ),
                     )
+            language = Text(" " + app.ime.status() + " ", style=app.role_colors["accl"])
+            width = max(0, status_widget.size.width - language.cell_len)
+            status.truncate(width, overflow="ellipsis")
+            status.append(" " * max(0, width - status.cell_len))
+            status += language
+            await app.ime.refresh()
             if status != app._status_content:
                 app._status_content = status
                 status_widget.update(status)
