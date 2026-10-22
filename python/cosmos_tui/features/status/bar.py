@@ -44,7 +44,7 @@ class StatusBar(Static):
         if mode == "cosmos" and "cosmos" not in colors:
             start = Text()
             begin, end = (255, 209, 102), (22, 138, 112)
-            dark_begin, dark_end = (29, 25, 18), (8, 23, 20)
+            dark_begin, dark_end = (58, 49, 32), (16, 48, 39)
             for i, character in enumerate(title):
                 fraction = max(0, min(1, (i - 1) / max(1, len(label) - 1)))
                 color = "#%02x%02x%02x" % tuple(
