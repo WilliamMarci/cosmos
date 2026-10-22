@@ -62,3 +62,5 @@ app.py 保留少量已有调用入口作为委派，用于当前测试及调用�
 公共命令由 core/cli.py 解析，__main__.py 仅分派；帮助、版本和补全不导入 App 或启动服务。runtime/bootstrap.py 负责 UI 启动及协调服务能力检查。根 cosmos 和 dev/cosmos-textual 均先解析软链接再定位项目。
 
 ui/keyboard.py 提供只读键位预览；features/ime/rime.py 管理 C API、资源目录与词库锁，features/ime/controller.py 负责输入路由、提交和 UIFrame 候选展示。InputRouter 在 Leader/全局快捷键后、应用键位前调用 IME。运行时仅调用 refresh/status/close，不包含引擎逻辑。
+
+features/status 独立负责状态布局、命中区域和带缓存的目录/Git 元数据；runtime 只调用 refresh。features/ime/config.py 负责桌面优先的 Rime 目录与方案发现，C API 适配器不再硬编码 rime_ice。

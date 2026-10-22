@@ -26,7 +26,7 @@ Mod 使用 `presentation.open(kind="dock")`，默认左侧、不自动抢焦点�
 
 ### Bottom status bar
 
-`presentation.open {client,kind:"status_widget",owner}` 注册一个客户端内的小组件，不占输入焦点。该视图的 content.lines 第一行显示在当前窗口编号/名称之后；后续行不显示。无组件时状态栏只含 Cosmos 开始菜单按钮及当前窗口信息。
+`presentation.open {client,kind:"status_widget",owner}` 注册一个客户端内的小组件，不占输入焦点。该视图的 content.lines 第一行显示在状态栏中心区域（空间允许时）；后续行不显示。无组件时状态栏只含 Cosmos 开始菜单按钮及当前窗口信息。
 
 使用相同的 `presentation.update/close`、revision 校验、owner 和 Mod 生命周期回收规则。role 使用协调服务允许的语义角色，不能提交 ANSI 控制码或私有 RGB 样式。
 
@@ -150,3 +150,5 @@ group = "My tools"
 Actions、开始菜单和设置 Panel 的列表筛选输入框位于各自容器底部，列表占据上方剩余空间；焦点与方向键选择行为保持一致。
 
 键盘预览与内置 IME 的当前行为、加载路径和提交边界见 [input-method.md](input-method.md)。IME 使用保留 owner `cosmos.ime` 的 insert/cover UIFrame；它不抢 UIRegistry 焦点，候选点击由 HitRegion 回调提交。当前未开放第三方输入法引擎 RPC 注册。
+
+状态栏的默认布局、动态开始按钮、颜色配置与点击区域见 [status-bar.md](status-bar.md)。状态 Mod 的单行内容位于可用中心区，不覆盖右侧输入法/时钟。

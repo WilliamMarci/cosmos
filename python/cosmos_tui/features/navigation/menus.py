@@ -7,26 +7,7 @@ from textual.widgets import Label, ListItem, ListView, Static
 from cosmos_tui.input.shortcuts import CosmosInput, CosmosModal
 from cosmos_tui.ui.chrome import BottomSheet, Frame, SheetShadow
 from cosmos_tui.ui.zones import Zone
-from cosmos_tui.ui.cells import cell_width
-
-
-class StatusBar(Static):
-    start_width = 8
-
-    def on_click(self, event):
-        if event.x < self.start_width:
-            event.stop()
-            self.app.action_start_menu()
-        elif hasattr(self.app, "ime"):
-            start = self.size.width - cell_width(" " + self.app.ime.status() + " ")
-            if event.x >= start:
-                event.stop()
-                action = (
-                    self.app.ime.toggle
-                    if event.x < start + 4
-                    else self.app.ime.toggle_width
-                )
-                self.app.run_worker(action())
+from cosmos_tui.features.status.bar import StatusBar as StatusBar
 
 
 class EntryPicker(CosmosModal):

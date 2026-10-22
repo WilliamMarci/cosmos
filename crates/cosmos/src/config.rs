@@ -15,6 +15,7 @@ pub struct Config {
     pub notification_timeout_ms: u64,
     pub keybindings: BTreeMap<String, Vec<String>>,
     pub reduced_motion: bool,
+    pub status_colors: BTreeMap<String, String>,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -28,6 +29,7 @@ impl Default for Config {
             notification_timeout_ms: 5000,
             keybindings: BTreeMap::new(),
             reduced_motion: false,
+            status_colors: BTreeMap::new(),
         }
     }
 }
@@ -56,6 +58,27 @@ impl Config {
             })
         {
             return Err("invalid keybindings".into());
+        }
+        for (role, color) in &self.status_colors {
+            if !["cosmos", "image", "doc", "agent", "files", "foreground"].contains(&role.as_str())
+                || !(color.len() == 7
+                    && color.starts_with('#')
+                    && color[1..].bytes().all(|b| b.is_ascii_hexdigit())
+                    || [
+                        "black",
+                        "red",
+                        "green",
+                        "yellow",
+                        "blue",
+                        "magenta",
+                        "cyan",
+                        "white",
+                        "bright_white",
+                    ]
+                    .contains(&color.as_str()))
+            {
+                return Err("invalid status_colors role or color".into());
+            }
         }
         if !(100..=60000).contains(&self.notification_timeout_ms) {
             return Err("notification_timeout_ms must be 100..60000".into());

@@ -14,6 +14,7 @@ from cosmos_tui.core.services import (
 )
 from cosmos_tui.features.assistant.launch import AssistantLauncher
 from cosmos_tui.features.history.controller import HistoryController
+from cosmos_tui.features.status.controller import StatusController
 from cosmos_tui.features.ime.controller import IMEController
 from cosmos_tui.features.navigation.controller import NavigationController
 from cosmos_tui.features.navigation.menus import StatusBar
@@ -72,6 +73,7 @@ class Cosmos(App, inherit_bindings=False):
         self.runtime = RuntimeController(self)
         self.inputs = InputRouter(self)
         self.ime = IMEController(self)
+        self.status = StatusController(self)
         self.output = OutputController(self)
         self.navigation = NavigationController(self)
         self.reader_ui = ReaderController(self)

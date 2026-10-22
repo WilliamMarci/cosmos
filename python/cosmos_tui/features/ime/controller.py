@@ -37,9 +37,7 @@ class IMEController(Controller):
         self.starting = False
 
     def status(self):
-        return (
-            ("中" if self.enabled else "英") + " " + ("全角" if self.full else "半角")
-        )
+        return ("中" if self.enabled else "En") + " " + ("●" if self.full else "◐")
 
     async def toggle(self):
         if self.starting:

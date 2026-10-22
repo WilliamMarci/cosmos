@@ -5,3 +5,12 @@ leader = "C-b"
 notification_history = 200
 notifications_enabled = true
 notification_timeout_ms = 5000
+
+# Optional independent status button colors (terminal ANSI colors by default).
+# [status_colors]
+# cosmos = "blue"
+# image = "green"
+# doc = "green"
+# agent = "magenta"
+# files = "red"
+# foreground = "bright_white"

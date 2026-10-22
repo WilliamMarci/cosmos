@@ -1,0 +1,111 @@
+# ruff: noqa: E402
+"""Status alignment/clicks and desktop-first Rime discovery."""
+
+import os
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import AsyncMock, patch
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from test_navigation import Probe
+from cosmos_tui.features.status.bar import StatusBar
+from cosmos_tui.features.ime.config import configuration
+
+
+class StatusTests(unittest.IsolatedAsyncioTestCase):
+    async def test_layout_colored_button_and_independent_ime_clicks(self):
+        app = Probe()
+        async with app.run_test(size=(100, 30)) as pilot:
+            bar = app.query_one("#status", StatusBar)
+            bar.present(
+                label="COSMOS",
+                index=1,
+                name="bash",
+                path="~/Program",
+                branch="main",
+                clock="12:00 Oct 22",
+            )
+            text = bar._content
+            self.assertEqual(text.cell_len, 100)
+            self.assertIn("¹ bash", text.plain)
+            self.assertIn("~/Program (main)", text.plain)
+            self.assertTrue(text.plain.endswith("12:00 Oct 22 "))
+            self.assertNotIn("|", text.plain)
+            self.assertIn("En", text.plain)
+            app.ime.toggle = AsyncMock()
+            app.ime.toggle_width = AsyncMock()
+            language = next(
+                left for left, _, action in bar.hits if action == "language"
+            )
+            width = next(left for left, _, action in bar.hits if action == "width")
+            await pilot.click("#status", offset=(language + 1, 0))
+            await pilot.click("#status", offset=(width + 1, 0))
+            app.ime.toggle.assert_awaited_once()
+            app.ime.toggle_width.assert_awaited_once()
+            app.settings["status_colors"] = {
+                "image": "#208040",
+                "foreground": "#ffffff",
+            }
+            bar.present(
+                label="IMAGE",
+                index=1,
+                name="bash",
+                path="",
+                branch="",
+                clock="12:00 Oct 22",
+                mode="image",
+            )
+            self.assertEqual(bar.start_width, 7)
+            self.assertIn(
+                "#208040", str(bar._content.get_style_at_offset(app.console, 0))
+            )
+
+    async def test_focus_modes_and_reader_metadata(self):
+        import base64
+        import json
+        from types import SimpleNamespace
+
+        app = Probe()
+        async with app.run_test(size=(120, 30)):
+            bar = app.query_one("#status", StatusBar)
+            for program, label in [
+                ("bash", "COSMOS"),
+                ("opencode", "AGENT"),
+                ("yazi", "FILES"),
+            ]:
+                app.backend.request = AsyncMock(return_value=["\t" + program])
+                app.status.cached = None
+                await app.status.refresh()
+                self.assertTrue(bar._content.plain.startswith(" " + label + " "))
+            for path, label in [("/tmp/demo.png", "IMAGE"), ("/tmp/demo.pdf", "DOC")]:
+                pane = app.active()
+                pane.viewer = base64.b64encode(
+                    json.dumps(dict(path=path, page=2)).encode()
+                ).decode()
+                app.reader_ui.frames[pane.id] = SimpleNamespace(
+                    source_size=(800, 600), scale=0.5
+                )
+                app.reader_ui.pages[pane.id] = 4
+                await app.status.refresh()
+                self.assertTrue(bar._content.plain.startswith(" " + label + " "))
+                self.assertIn("800×600px · 50%", bar._content.plain)
+
+    def test_config_priority_and_selected_schema(self):
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, XDG_CONFIG_HOME=directory),
+        ):
+            with patch.dict(os.environ, {}, clear=False):
+                os.environ.pop("COSMOS_RIME_DATA", None)
+                os.environ.pop("COSMOS_RIME_SCHEMA", None)
+                root = Path(directory)
+                for folder in ("cosmos/rime", "fcitx5/rime", "ibus/rime"):
+                    data = root / folder
+                    (data / "build").mkdir(parents=True)
+                    (data / "build/luna_pinyin.schema.yaml").touch()
+                    (data / "user.yaml").write_text(
+                        "var:\n  previously_selected_schema: luna_pinyin\n"
+                    )
+                    self.assertEqual(configuration(), (data, "luna_pinyin"))

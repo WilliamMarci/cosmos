@@ -58,13 +58,13 @@ class CosmosModal(ModalScreen):
         if not hasattr(self.app, "action_start_menu"):
             return
         status = self.app.query_one("#status")
-        if (
-            status.display
-            and status.region.contains(event.screen_x, event.screen_y)
-            and event.screen_x < status.region.x + 8
-        ):
-            event.stop()
-            self.app.action_start_menu()
+        if status.display and status.region.contains(event.screen_x, event.screen_y):
+            if hasattr(status, "activate_at"):
+                if status.activate_at(event.screen_x - status.region.x):
+                    event.stop()
+            elif event.screen_x < status.region.x + 8:
+                event.stop()
+                self.app.action_start_menu()
 
 
 class CosmosInput(Input):

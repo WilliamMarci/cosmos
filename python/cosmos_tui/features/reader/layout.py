@@ -99,12 +99,19 @@ class Reader:
         lines = [Text(" " * cols, style=f"on {palette['bg']}") for _ in range(rows)]
         hits, labels, boxes = [], {}, []
         if footer:
-            info = Text(
-                f" {Path(state['path']).name}  {selected + 1}/{len(entries)}  {float(state.get('zoom', 1)):.2f}×  {source.width}×{source.height}",
+            available = max(0, cols - 3)
+            details = Text(
+                f" {selected + 1}/{len(entries)}  {scale * 100:.0f}%  {source.width}×{source.height}px ",
                 style=f"{palette['fg']} on {palette['base']}",
             )
-            info.truncate(max(1, cols - 3), overflow="ellipsis")
-            info.pad_right(max(0, cols - 3 - info.cell_len))
+            details.truncate(available, overflow="ellipsis")
+            info = Text(
+                " " + Path(state["path"]).name,
+                style=f"{palette['fg']} on {palette['base']}",
+            )
+            info.truncate(max(0, available - details.cell_len), overflow="ellipsis")
+            info.pad_right(max(0, available - details.cell_len - info.cell_len))
+            info += details
             info.append(" − " if expanded else " + ", style=palette["accl"])
             labels[main_rows] = (0, info)
             hits.append((cols - 3, main_rows, 3, 1, -1))

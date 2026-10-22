@@ -62,3 +62,5 @@ PDF 与终端历史共用 features/search/bar.BottomSearch，两行紧凑底栏�
 `Ctrl+P` → **New session**, or the Cosmos start menu → **New session**, opens a compact bottom prompt. Enter a name and press Enter to create and switch to it; Escape cancels. Existing sessions remain running. A duplicate or invalid name is reported in the prompt. The action is registered as `workspace.new_session` in keybinding settings, without a default key assignment. CLI equivalents are documented in [cli.md](cli.md).
 
 `Ctrl+P` 和 COSMOS 开始菜单提供 **Quit / Exit Cosmos**：退出当前客户端并显示退出摘要，会话和应用继续保留，语义与保留会话的 detach 一致。该动作是 `workspace.quit`，可在键位设置中绑定；默认无快捷键。停止服务与其 Mods 仍使用 CLI `cosmos stop`。状态栏开始按钮显示为全大写 `COSMOS`。菜单列表紧接标题线，筛选框在底部；底部弹层只在右侧保留一列细纹理阴影。
+
+默认状态栏已按色块分为左/中/右区域；动态开始按钮及可点击输入指示详见 [status-bar.md](status-bar.md)。

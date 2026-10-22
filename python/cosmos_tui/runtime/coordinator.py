@@ -126,34 +126,8 @@ class RuntimeController(Controller):
                 terminal.refresh()
             if app.graphics.pending:
                 app.call_after_refresh(app.flush_graphics)
-            status = Text(
-                " COSMOS ",
-                style=f"bold {app.role_colors['accl']} on {app.role_colors['base']}",
-            )
-            for _, index, active, name in app.backend.tabs:
-                if active == "1":
-                    status.append(
-                        f" {index} {name} ",
-                        style=f"{app.role_colors['on']} on {app.role_colors['acc']}",
-                    )
-                    break
-            for widget in app.status_widgets:
-                for item in widget.get("content", {}).get("lines", [])[:1]:
-                    status.append(
-                        " " + item["text"] + " ",
-                        style=app.role_colors.get(
-                            item["role"], app.role_colors["mute"]
-                        ),
-                    )
-            language = Text(" " + app.ime.status() + " ", style=app.role_colors["accl"])
-            width = max(0, status_widget.size.width - language.cell_len)
-            status.truncate(width, overflow="ellipsis")
-            status.append(" " * max(0, width - status.cell_len))
-            status += language
+            await app.status.refresh()
             await app.ime.refresh()
-            if status != app._status_content:
-                app._status_content = status
-                status_widget.update(status)
             notices = await rpc.call("notifications.active", {"client": app.client})
             for host in (app._workspace_screen, app.screen):
                 if host:

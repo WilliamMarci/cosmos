@@ -9,6 +9,7 @@ import sysconfig
 from pathlib import Path
 
 from cosmos_tui.core.paths import PROJECT_ROOT
+from cosmos_tui.features.ime.config import configuration
 
 
 class Traits(C.Structure):
@@ -117,19 +118,7 @@ class Rime:
         if self.api.data_size + 4 < C.sizeof(API):
             raise RuntimeError("librime C API is too old")
         self.sessions = {}
-        packaged = PROJECT_ROOT / "share/rime-data"
-        source = Path(
-            os.getenv(
-                "COSMOS_RIME_DATA",
-                str(
-                    packaged if packaged.exists() else Path.home() / ".config/ibus/rime"
-                ),
-            )
-        ).expanduser()
-        if not (source / "build/rime_ice.schema.yaml").exists():
-            raise RuntimeError(
-                f"Compiled rime_ice data not found in {source}; set COSMOS_RIME_DATA"
-            )
+        source, self.schema = configuration()
         state = (
             Path(os.getenv("XDG_STATE_HOME", str(Path.home() / ".local/state")))
             / "cosmos/rime"
@@ -193,11 +182,15 @@ class Rime:
             if not sid:
                 raise RuntimeError("Could not create Rime session")
             if not self.call(
-                "select_schema", C.c_int, [C.c_size_t, C.c_char_p], sid, b"rime_ice"
+                "select_schema",
+                C.c_int,
+                [C.c_size_t, C.c_char_p],
+                sid,
+                self.schema.encode(),
             ):
                 self.call("destroy_session", C.c_int, [C.c_size_t], sid)
                 raise RuntimeError(
-                    "Could not load rime_ice; check Rime data and plugins"
+                    f"Could not load {self.schema}; check Rime data and plugins"
                 )
             self.sessions[target] = sid
         sid = self.sessions[target]
