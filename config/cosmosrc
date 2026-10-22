@@ -1,0 +1,23 @@
+# Cosmos Bash entry configuration. Sourced after ~/.bashrc for every new pane.
+# Override with COSMOS_RC=/absolute/path/cosmosrc before starting Cosmos.
+_cosmos_config_root=$(CDPATH= builtin cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && builtin pwd -P)
+export COSMOS_ROOT="$_cosmos_config_root"
+export COSMOS_PYTHON="${COSMOS_PYTHON:-$COSMOS_ROOT/.venv/bin/python}"
+export TERMINAL_AGENT_PYTHON="$COSMOS_PYTHON"
+export COSMOS_AGENT_PROMPT="${COSMOS_AGENT_PROMPT:-$COSMOS_ROOT/config/terminal-agent-prompt.md}"
+if [[ -z ${COSMOS_BINARY:-} ]]; then
+    if [[ -x $COSMOS_ROOT/bin/cosmos ]]; then
+        export COSMOS_BINARY="$COSMOS_ROOT/bin/cosmos"
+    else
+        export COSMOS_BINARY="$COSMOS_ROOT/target/release/cosmos"
+    fi
+fi
+
+# A shell function preserves filenames/arguments exactly; no eval or shell string.
+unalias open 2>/dev/null || true
+function open {
+    PYTHONPATH="$COSMOS_ROOT/python:$COSMOS_ROOT/terminal_agent${PYTHONPATH:+:$PYTHONPATH}" \
+        "$COSMOS_PYTHON" -m cosmos_tui.open_file -- "$@"
+}
+source "$COSMOS_ROOT/terminal_agent/shell/agent.bash"
+unset _cosmos_config_root

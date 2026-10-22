@@ -1,61 +1,37 @@
-# Cosmos 自有工作区
+# 终端工作区
 
-2026-10-22 起，`cosmos` / `cosmos attach` 默认启动 Cosmos 自己的终端客户端；`cosmos workspace NAME` 指定会话。原生 Tmux 界面保留为 `cosmos native` 回退入口。
+唯一 UI 入口为根目录 `./cosmos [session] [--debug]`，执行 Python `cosmos_tui`。`dev/cosmos-textual` 是兼容跳转；Rust 二进制无参数及 attach/workspace 转到同一个 Python UI。旧 Rust panel/native/view 界面已停用。协调服务与管理 CLI 暂留 Rust，源码工作区使用 `target/release/cosmos`，构建包使用 `bin/cosmos`。
 
-## 当前主链路
+## 会话与显示
 
-工作主机上的 Tmux 服务继续承担 PTY、应用进程、VT 解析、screen grid、布局和会话保留。Cosmos 以持久 control-mode 连接获取已解析的可见 grid、窗格位置、窗口、焦点和光标；不再为每个字符启动一个 Tmux CLI 进程，也不把原始 PTY 字节当普通文本拼装。
+Cosmos 管理 UI；Tmux 管理 PTY、终端解析、会话和应用。普通 SSH 登录工作主机后运行 Cosmos，无需连接电脑上的伴随程序。客户端分离后，Tmux 应用保留；重连复用同名会话。主机重启和停止 Tmux 不在进程内会话保留范围。
 
-Cosmos 自己持有物理终端，负责画面合成、基本文本属性与 ANSI/RGB 颜色、光标、窗格间隙、状态栏、Leader 操作、面板、Mod 图层与通知。普通工作区中的面板直接合成在自己的画面中，不调用 Tmux popup。
+窗格尺寸与位置来自后端。字符、窗格分割线、模态 UI 和 Kitty 图形经过同一个 compositor/driver；组件不能独立向终端写屏。分割线占后端预留的一格，单窗格没有额外外框；双窗格分割线按 Tmux 半段规则指示焦点，多个窗格高亮活动窗格相邻边界。
 
-窗口/窗格操作当前仍由后端执行，作为可替换会话引擎的适配；独立的原生多路复用器、Tmux 组件库化并未实现。业务与界面逻辑继续属于 Cosmos。
+终端捕获按整个 pane 保留 SGR 状态解析，不能逐行重置 ANSI 解码器。硬件光标遵循应用 cursor_flag、形状和闪烁状态；请求浮岛使用自己的编辑光标。
 
-## 默认操作
+## 按键与鼠标
 
-所有操作先按 Leader，默认为 Ctrl-B：
+默认 Leader 为 Ctrl-B，可在设置中选 Ctrl-A。按住并释放 Leader 后，再按操作键。默认分屏为 `%`（左右）、`"`（上下），也支持 `|` / `-`；方向键切焦点，H/J/K/L 调整大小，z 放大，s 打开会话/窗口切换器。
 
-- `p`：操作面板，Esc 逐层返回。
-- `?`：面板帮助。
-- `d`：分离当前客户端，保留会话、窗格和程序。
-- `c`：创建并进入新窗口。
-- `n` / `b`：下一 / 上一窗口；数字选择窗口编号。
-- `%` / `"`：左右 / 上下分屏。
-- 方向键 / `o`：切换窗格。
-- `z`：当前窗格放大与恢复。
-- 再按一次 Leader：向应用发送字面 Leader。
+Cosmos 操作统一注册于 keymap.COMMANDS，由设置、分发和上下文帮助读取。动作级键位在 Settings → Keybindings 中编辑；实际默认值以注册表和当前设置为准，`Leader ?` 查看当前上下文帮助。详见 ui-api.md。前台 Bash/OpenCode 等应用的普通按键不由 Cosmos 改写。
 
-Leader 在面板和 Mod 模态视图中也有效。普通 Ctrl-C/Ctrl-Z/Ctrl-D 送给前台应用；不用于终止 Cosmos 客户端。键位设置当前支持更换 Ctrl-A/Ctrl-B Leader，完整动作级键位编辑仍后续完善。
+点击普通窗格可切换焦点。查看器区域支持缩略图、滚轮、缩放和平移。普通终端应用的鼠标事件透传不属于当前鼠标接口。
 
-## 面板与 Mod
+## 区域与组件
 
-面板为居中的临时覆盖表面，独立处理输入。打开/关闭面板不缩放底下应用的 PTY；后台输出继续由后端记录并更新，关闭后显示最新工作状态。
+操作面板和 Switch 是紧凑 pop window；浮岛属于 cover line。辅助 UI 显隐不 resize 下方 PTY。底栏默认只显示当前窗口编号/名称，可注册状态小组件。通知不抢焦点，普通关闭仅影响当前客户端，动作处理服务级同步。接口见 ui-api.md。
 
-工作区沿用统一 Mod 接口。来源客户端可传入 Mod；其视图可以在工作区显示并取得模态焦点。指定 target 为当前后端 pane ID 时，视图裁切到相应窗格；不在当前窗口或被 zoom 隐藏的目标不显示，也不截获其他窗格输入。
+## 配置和诊断
 
-新开的核心面板覆盖旧模态内容，避免焦点和显示顺序不一致。通知不自动抢焦点。
+Shell 加载顺序和 open 函数见 shell.md。配置通过 settings.get/replace 持久化，默认路径 `${XDG_CONFIG_HOME:-~/.config}/cosmos/config.toml`。
 
-## 图像与输入边界
+`--debug` 开启 DEBUG UI 日志，也可 `--log-level INFO`、`--log-file PATH`。默认 WARNING；日志位于 `${XDG_STATE_HOME:-~/.local/state}/cosmos/logs/ui.log`，每文件 2 MiB，三个备份。记录动作/错误，不记录终端正文、完整助手请求或模型密钥。协调服务诊断入口为 `cosmos doctor`。
 
-后端捕获的是已完成 VT 解析的 grid，通过 capture-pane 的转义表示传递颜色和属性。Cosmos 只解码这份有界快照中的样式，不直接透传程序控制序列。
+Python UI 启动时检查 ui-components-v1 和 keybindings 能力。如果旧协调服务缺少能力，启动会明确提示先分离客户端、执行 cosmos stop 后重启；不会悄悄使用不兼容的 UI 接口，也不会自动终止用户 Mod。cosmos stop 保留 Tmux 应用，但会停止协调服务管理的 Mod。
 
-当前支持普通文本、中文显示列、基础组合字符、常见 SGR 属性、16/256 色与 RGB。光标可见性及位置来自活动窗格。键盘包括字符、方向键、Home/End、PageUp/Down、Insert/Delete、常见功能键和控制键。
+## 分离与退出
 
-Bracketed paste 文字作为一次事件传递，Shell/Application 路径保留换行；面板查询则归一化空白。后端按应用是否请求 bracketed paste 决定粘贴协议。这里不是命令建议的执行授权机制。
+终端驱动恢复后显示 Cosmos ANSI Logo 与退出原因。`Leader d` 显示 detach；后端会话结束显示 exit。随后独立查询目标 Tmux 会话：存在时显示 Session retained 和绝对路径重连命令；不存在时显示 Session ended；查询失败时只显示状态未知，不承诺保留。输出重定向时移除 Logo 的 ANSI 颜色。
 
-尚未覆盖所有终端扩展：普通应用鼠标透传、OSC 超链接、复杂 emoji 宽度、完整光标形状与扩展键盘协议仍需实现和兼容验收；不能据基本 TUI 验收声称兼容所有应用。
-
-## 持续会话与保护
-
-客户端退出、SSH 断开不会停止 Tmux 会话中的应用；重新运行 Cosmos 即可连接。主机重启或会话进程全部结束后的恢复不在这一保证内。
-
-不能在某个工作区的后端窗格里再启动捕获同一会话的 Cosmos 客户端，否则会捕获自身形成递归画面。代码在取得 tty 前拒绝这种情况。若正在旧客户端中，先 Ctrl-B d 回到外层 Shell，再运行新版；在原窗格临时打开面板可用 `cosmos panel`。
-
-## 验证
-
-`dev/smoke_workspace.py` 在独立服务和真实 PTY 中验证默认入口、Shell 输入、Ctrl-C、面板不 resize PTY、后台输出、交互 Mod、从 Mod 中分离、分屏/zoom、窗口切换、Vim alternate screen、终端缩放、分离与重连、Shell 变量保留和终端模式恢复。
-
-`tests/engine.rs` 验证持久控制连接、RGB 单元捕获、布局保留与自我捕获保护。多客户端的尺寸与窗口选择目前沿用后端 Tmux 语义，不能据单客户端验收声称所有多端输入与嵌套组合已经验证。
-
-快照当前以约 80 ms 周期检查，帧/光标没有变化时不输出。大量 pane、持续高速输出和高延迟 SSH 场景仍需要性能测量；此值不是最终性能承诺。
-
-图片/PDF 查看器已通过工作区共享位图层接入，见 [查看器](viewer.md)。查看器拥有独立鼠标处理，普通应用仍按上述边界支持。`Leader ?` 按工作区、面板、查看器上下文显示帮助，不常驻展示快捷键。
+运行 Logo 位于 python/cosmos_tui/assets/cosmos-logo.ansi，与 design/cosmos-logo.ansi 保持一致，随构建包分发。启动帮助、启动失败和 UI 异常不显示成功分离提示。

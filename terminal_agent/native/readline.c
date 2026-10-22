@@ -293,9 +293,13 @@ static int cosmos_available(void) {
     }
     close(channel[0]);
     if (child < 0) return 0;
-    int status;
-    while (waitpid(child, &status, 0) < 0) if (errno != EINTR) return 0;
-    if (!WIFEXITED(status) || WEXITSTATUS(status)) return 0;
+    int status = 0;
+    pid_t waited;
+    do { waited = waitpid(child, &status, 0); } while (waited < 0 && errno == EINTR);
+    /* Bash may reap the query child in its SIGCHLD handler. The fully read
+     * response and same-UID socket validation remain authoritative. */
+    if (waited < 0 && errno != ECHILD) return 0;
+    if (waited > 0 && (!WIFEXITED(status) || WEXITSTATUS(status))) return 0;
     while (count && (address[count - 1] == '\n' || address[count - 1] == '\r')) count--;
     address[count] = 0;
     struct stat info;
@@ -309,6 +313,12 @@ static int helper(int cursor) {
     snprintf(point, sizeof point, "%d", characters(rl_line_buffer, cursor));
     const char *python = variable("TERMINAL_AGENT_PYTHON", "python3");
     int demo = !strcmp(variable("TERMINAL_AGENT_DEMO", "0"), "1");
+    char stale[PATH_MAX];
+    const char *outputs[] = {"line", "line.point", "line.action"};
+    for (int i = 0; i < 3; i++) {
+        snprintf(stale, sizeof stale, "%s/%s", session, outputs[i]);
+        unlink(stale);
+    }
     pid_t child = fork();
     if (child < 0) return -1;
     if (!child) {
@@ -318,18 +328,44 @@ static int helper(int cursor) {
         if (!path) _exit(127);
         snprintf(path, size, "%s%s%s", root, old_path ? ":" : "", old_path ? old_path : "");
         setenv("PYTHONPATH", path, 1);
-        if (cosmos_ui) setenv("TERMINAL_AGENT_COSMOS_UI", "1", 1);
-        else unsetenv("TERMINAL_AGENT_COSMOS_UI");
+        char source[192] = "{}";
+        if (cosmos_ui) {
+            setenv("TERMINAL_AGENT_COSMOS_UI", "1", 1);
+            struct winsize size = {0};
+            ioctl(fileno(rl_outstream), TIOCGWINSZ, &size);
+            int prefix_rows = 0, column = 0;
+            const char *prompt = rl_prompt ? rl_prompt : "";
+            const char *last = strrchr(prompt, '\n');
+            if (last) {
+                char *prefix = strndup(prompt, last - prompt + 1);
+                if (prefix) { geometry(prefix, size.ws_col ? size.ws_col : 80, &prefix_rows, &column); free(prefix); }
+            }
+            snprintf(source, sizeof source, "{\"columns\":%d,\"rows\":%d,\"before\":%d,\"after\":%d}",
+                size.ws_col, size.ws_row, *last_row + prefix_rows,
+                *visible_bottom > *last_row ? *visible_bottom - *last_row : 0);
+            setenv("TERMINAL_AGENT_SOURCE_RECT", source, 1);
+        } else {
+            unsetenv("TERMINAL_AGENT_COSMOS_UI");
+            unsetenv("TERMINAL_AGENT_SOURCE_RECT");
+        }
         const char *args[24] = {python, "-m", "terminal_agent.cli", "--shell", "--readline",
             "--output", output, "--state", state, "--shell-line", rl_line_buffer,
             "--shell-point", point, NULL};
-        if (demo) args[13] = "--demo";
+        int argc = 13;
+        if (demo) args[argc++] = "--demo";
+        if (cosmos_ui) {
+            args[argc++] = "--cosmos-ui";
+            args[argc++] = "--source-geometry";
+            args[argc++] = source;
+        }
+        args[argc] = NULL;
         execvp(python, (char * const *)args);
         _exit(127);
     }
     int status;
     while (waitpid(child, &status, 0) < 0) {
         if (errno == EINTR) continue;
+        if (errno == ECHILD) return 0;
         return -1;
     }
     return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
@@ -358,6 +394,7 @@ static int cosmos_widget(void) {
             return 1;
         }
         int update = !strcmp(action, "update");
+        int relocate = !strcmp(action, "relocate");
         int edit = !strcmp(action, "edit"), run = !strcmp(action, "run");
         int changed = strcmp(line, rl_line_buffer), old_point = rl_point;
         if (changed) rl_replace_line(line, 0);
@@ -370,8 +407,8 @@ static int cosmos_widget(void) {
             rl_resize_terminal();
         else if (before.ws_row != after.ws_row)
             rl_set_screen_size(after.ws_row, after.ws_col);
-        if (changed || old_point != rl_point) rl_redisplay();
-        if (update) continue;
+        if (changed || old_point != rl_point || resized) rl_redisplay();
+        if (update || relocate) continue;
         if (edit) {
             overlay_active = 0;
             rl_redisplay_function = redisplay_with_passive;

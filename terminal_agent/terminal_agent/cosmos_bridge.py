@@ -3,6 +3,7 @@ import json
 import os
 import socket
 import subprocess
+import uuid
 
 
 def endpoint():
@@ -19,23 +20,29 @@ def snapshot(ui):
     return dict(history=ui.history, request_history=ui.request_history,
                 history_index=ui.history_index, history_draft=ui.history_draft,
                 request=ui.input.text, cursor=ui.input.buffer.cursor_position,
-                command=ui.command.text, command_cursor=ui.command.buffer.cursor_position)
+                command=ui.command.text, command_cursor=ui.command.buffer.cursor_position,
+                cosmos_ui=getattr(ui, "cosmos_ui", {}))
 
 
 def restore(ui, state):
     for name in ('history', 'request_history', 'history_index', 'history_draft'):
         if name in state:
             setattr(ui, name, state[name])
+    ui.cosmos_ui = state.get('cosmos_ui', {})
     ui.input.text = state.get('request', '')
     ui.input.buffer.cursor_position = state.get('cursor', len(ui.input.text))
     ui.command.text = state.get('command', '')
     ui.command.buffer.cursor_position = state.get('command_cursor', len(ui.command.text))
 
 
-def run(ui, address, demo=False):
+def run(ui, address, demo=False, geometry=None):
     request = dict(version=1, pane=os.environ['TMUX_PANE'], cwd=os.getcwd(),
                    anchor_below=os.environ.get("TERMINAL_AGENT_COSMOS_UI") == "1",
                    prompt=ui.prompt, demo=demo, config=getattr(ui.backend, "config", {}), state=snapshot(ui))
+    request['interaction_id'] = getattr(ui, 'cosmos_ui', {}).get('interaction_id') or uuid.uuid4().hex
+    request['source_geometry'] = geometry or json.loads(os.getenv('TERMINAL_AGENT_SOURCE_RECT', '{}'))
+    if os.getenv('COSMOS_AGENT_PROMPT'):
+        request['config'] = {**request['config'], 'prompt_file': os.environ['COSMOS_AGENT_PROMPT']}
     with socket.socket(socket.AF_UNIX) as client:
         client.settimeout(2)
         client.connect(address)

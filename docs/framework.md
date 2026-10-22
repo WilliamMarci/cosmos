@@ -1,6 +1,6 @@
-# Cosmos 框架接口 v1.1
+# Cosmos 框架接口 v1.2
 
-当前代码提供协调服务、事件、可信 Mod 加载、UI 状态模型和终端面板适配。Cosmos 自有客户端合成器仍待实现；dock/replacement/content 已在 Cosmos 自有字符表面中实际合成，仍不代表已经能叠加到任意 Shell 应用上。
+当前代码提供协调服务、事件、可信 Mod 加载、UI 状态模型和终端面板适配。Python 工作区在统一 compositor 中合成终端、dock/replacement/content 和辅助 UI；Rust 兼容入口单独保留。
 
 ## 1. 模块边界
 
@@ -20,11 +20,11 @@
 - `client.rs`：UI 启动前的协议与能力预检。
 - `signals.rs`：SIGTERM/SIGINT 关闭信号。
 
-终端原始模式仅由面板适配器持有，不修改旧 terminal_agent 的 Readline 生命周期。核心绘制桥接入时复用 UI 状态与操作，不让两个组件竞争应用终端。
+外层终端模式由当前客户端宿主持有，Readline 继续持有源 Shell 编辑缓冲区。辅助 UI 不另起输出循环，不与宿主竞争写屏。
 
 ## 2. RPC 与版本
 
-私有 Unix socket，Linux 同 UID 验证，目录 0700/socket 0600，最多 32 个活动连接。JSON-RPC 2.0 换行分帧，最大 1 MiB；连接空闲 5 秒关闭。先发 `initialize {protocol_major:1}`，响应 minor=1 与能力列表。大版本不兼容拒绝，小版本能力按协商判断。
+私有 Unix socket，Linux 同 UID 验证，目录 0700/socket 0600，最多 32 个活动连接。JSON-RPC 2.0 换行分帧，最大 1 MiB；连接空闲 5 秒关闭。先发 `initialize {protocol_major:1}`，响应 minor=2 与能力列表。大版本不兼容拒绝，小版本能力按协商判断。
 
 事件使用 `events.poll` 长轮询，而非无界推送。最长等待 2 秒，等待期间不占全局状态锁。Python SDK 每次请求重新连接和协商，避免空闲连接失效。
 
@@ -85,13 +85,13 @@ stdout/stderr 各有独立日志，单次启动各保留前 1 MiB，超过后继
 
 `input.route {client}` 返回 application 或当前 modal view 的 owner/ID，仅解析路由，不向应用发送按键。UI 快照通过 `ui.snapshot` 获取；Mod 停止、失败、退出或卸载时自动释放其视图。
 
-布局矩形按客户端尺寸裁切。notification 右下角至多 60 列、2 行；dock 默认左侧至多 40 列。自有字符表面可按这些矩形绘制 Mod 的标题/文本角色；对原始终端应用的 grid 合成和共享 PTY 尺寸协调仍待接入。
+布局矩形按客户端尺寸裁切。notification 右下角至多 60 列、2 行；dock 默认左侧至多 40 列。Python 工作区按这些矩形合成 Mod 文本角色与终端 grid。共享 PTY 尺寸由 Tmux 后端协调。
 
 ## 6. 操作、设置与实际面板
 
 `actions.list` 返回内置和 Mod 操作。`actions.invoke {id,params?}` 使用同一处理逻辑。菜单返回 menu ID，设置操作验证并保存。命令面板默认只显示 actions 分类，设置和 Mods 进入子菜单；Mod 操作出现在 Mods 菜单。
 
-当前 `cosmos panel` 运行真实终端面板；Cosmos 会话内默认 Leader p 通过 Tmux popup 打开同一面板。箭头/Ctrl-N/P 选择，文字过滤，Enter 执行，Esc 返回，? 调出帮助；无常驻快捷键提示。深浅主题共用角色表，中文宽度按显示列裁切。
+`cosmos panel` 是 Rust 兼容面板入口；Python 工作区的 Leader p 在自己的 UI 层打开紧凑操作面板。箭头/Ctrl-N/P 选择，文字过滤，Enter 执行，Esc 返回，? 调出帮助；无常驻快捷键提示。深浅主题共用角色表，中文宽度按显示列裁切。
 
 `settings.get/replace` 读写完整 TOML 配置。新增 notifications_enabled、notification_timeout_ms；通知页面提供显示开关。主题改变立即作用于面板。终端状态栏、Leader 通过 Display/Keys 菜单的 Apply 操作或 `settings.apply` 更新已有 Tmux 服务；此时 p 仍为当前面板键，不是全功能键位编辑器。
 
@@ -105,35 +105,20 @@ Guard 在正常退出、错误返回和 SIGTERM/SIGINT 时恢复终端模式与�
 
 通知和认领状态持久保存；崩溃后遗留认领需持 token 恢复处理或释放，不会擅自重试外部动作。高层动作回调与超时策略待具体 Mod 设计。
 
-当前紧凑右下角通知仅在面板适配器内显示，可 Ctrl-F 进入通知菜单，Ctrl-D 关闭最新通知；普通 Shell 上全局浮层待 Tmux 绘制桥。通知不抢焦点。
+Python 工作区通过 Cosmos 合成器在右下角显示紧凑通知，不抢焦点。动作按钮与服务级同步参见 ui-api.md；普通关闭只影响当前客户端。
 
-## 8. 尚未接入
+## 8. 区域接口与 Shell 接入
 
-终端工作区合成、图形、输入法、Yazi、Agent 工具链、generation 安全对象和高层异步任务取消仍待实现。已有事件/焦点/版本/进程停止接口供其接入，不能据此声称具体功能已经完成。
-
-
-## 架构修订
-
-Cosmos 拥有主要业务、UI、布局、输入与事件；Tmux 仅是稳定终端能力的复用来源和当前会话后端。popup 是临时表面适配，自有合成器不是以修改 Tmux 业务界面为主体。panel 启动先验证 1.1 和所需能力；popup 启动失败保存错误且等待 Enter。详见 design/架构边界修订.md。
+区域 API、状态栏组件、通知动作及按键设置见 [UI 接口参考](ui-api.md)。Shell 加载、open 和命令生成 prompt 见 [Shell 入口](shell.md)。未来规划和未实施设计不属于本接口文档，见 design/当前实施状态.md。
 
 
-## 自有字符表面与输入队列
 
-面板现在使用 Frame 字符帧和 AnsiRenderer。帧有单元数上限，宽字符及后续占位单元一起清理；同尺寸/主题只重画发生变化的行，相同帧输出为空。临时 Mod 图层关闭后，从底层面板模型重新合成，恢复被覆盖区域。这不是终端转义序列解析器，不用于将原始 PTY 文本拼成终端。
+## 正式文档边界
 
-外部 Mod 的 modal 视图获得焦点后，字符、Enter、? 等不再进入底层菜单。客户端提交 `input.send {client,key}`，key 为带 type/value 的枚举，例如 `{"type":"char","value":"中"}`、`{"type":"enter"}` 或 `{"type":"paste","value":"text"}`。Esc 为壳级逐层返回，关闭该视图。
+当前 UI 行为见 ui-api.md/workspace.md，Shell 接入见 shell.md，查看请求见 viewer.md。实现规划和历史迁移说明属于 design/。文档与接口变更同次提交；未记录为公开调用的前端内部类不构成跨进程 API。
 
-Mod 通过 `presentation.read_input {client,view,owner}` 排空自己的输入队列。每个视图最多 128 个输入事件，paste 最大 8192 字节；队列满时拒绝并在表面提示，不能把按键回落到底层菜单。跨客户端/视图隔离，UI 快照不包含队列；公共 `ui.input` 事件只含目标元信息，不广播按键内容。同 UID 的可信程序模型仍适用，这不是抵抗恶意 Mod 的授权沙箱。
+## 输入队列
 
-在面板启动 Mod/action 时，已校验的来源客户端通过 `COSMOS_CLIENT_ID` 传入。无来源的 CLI 启动或 autostart 不默认选择某个活动客户端，避免抢错设备焦点。新输入接口作为可选能力 `surface-input` 宣告。
+`input.send {client,key}` 只将类型化按键送入当前 Mod 模态视图的有界收件箱，不用于向任意 PTY 注入。示例 key 为 `{type:"char",value:"a"}`、`{type:"ctrl",value:3}`、`{type:"enter"}`、`{type:"paste",value:"text"}`。无 Mod 焦点、core 焦点、超过 128 项队列、控制字符 char、超过 8192 字节粘贴等请求拒绝。Ctrl 数值为 0..31。
 
-输入字节分片不会立即视为独立字符；UTF-8 未完成时等待后续数据，孤立 Escape 经超时判断，未知 CSI 整体丢弃。bracketed paste 是单独文字事件，里面的 ? 或换行不会误触帮助或执行操作。字符预算按显示列计算；复杂 emoji/终端字体宽度仍需目标终端实际兼容验证。
-
-示例 examples/surface.mod.toml 可从 Mods 菜单启动；examples/surface.py 展示完整打开、版本更新、输入排空与关闭流程。
-
-
-## 2026-10-22：默认自有工作区已接通
-
-此前“尚未连接终端 grid”的阶段边界已更新。`workspace.rs` 持有屏幕和用户输入，`engine.rs` 通过有界持久控制连接获取后端已解析 grid，合成器将终端、窗格、状态栏和临时 UI 合成。详见 docs/workspace.md。
-
-默认启动和 attach 已切换到自有工作区；popup 仅用于显式 native 回退。Leader 操作不依赖 Tmux key table。后台应用在面板打开时继续运行，PTY 尺寸不因覆盖区变化。指定 pane target 的 Mod 内容会按窗格裁切，不在可见活动上下文时不截获其他窗格输入。
+`presentation.read_input {client,view,owner}` 取出并清空该视图的输入列表；未知视图或 owner 不匹配拒绝。键盘内容不进入全局事件总线；ui.input 仅携带 client/view/owner 元信息。完整类型化按键枚举以 input.rs 的 Key 为准，包括方向、home/end、page_up/page_down、delete/insert、function、back_tab、escape/backspace、cell_size 和 mouse；并非所有前端都向 Mod 发送全部类型。

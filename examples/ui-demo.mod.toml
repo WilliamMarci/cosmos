@@ -1,0 +1,12 @@
+id = "ui-demo"
+protocol_major = 1
+argv = ["python3", "ui-demo.py"]
+cwd = "."
+autostart = false
+ready_required = true
+capabilities = ["presentation", "notifications", "events"]
+
+[[actions]]
+id = "launch"
+label = "UI components demo"
+category = "mods"

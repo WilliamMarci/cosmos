@@ -21,6 +21,8 @@ def main():
     parser.add_argument('--state', help=argparse.SUPPRESS)
     parser.add_argument('--readline', action='store_true', help=argparse.SUPPRESS)
     parser.add_argument('--shell', action='store_true', help=argparse.SUPPRESS)
+    parser.add_argument('--cosmos-ui', action='store_true', help=argparse.SUPPRESS)
+    parser.add_argument('--source-geometry', default='{}', help=argparse.SUPPRESS)
     parser.add_argument('--shell-line', default='', help=argparse.SUPPRESS)
     parser.add_argument('--shell-point', type=int, default=0, help=argparse.SUPPRESS)
     parser.add_argument('--shell-prompt', default='$ ', help=argparse.SUPPRESS)
@@ -40,6 +42,7 @@ def main():
                       native_overlay=args.readline)
         if args.state and Path(args.state).exists():
             state = json.loads(Path(args.state).read_text())
+            ui.cosmos_ui = state.get('cosmos_ui', {})
             ui.history = state.get('history', [])
             ui.request_history = state.get('request_history', [item['request'] for item in ui.history if isinstance(item.get('request'), str)])
             index, draft = state.get('history_index'), state.get('history_draft')
@@ -51,17 +54,17 @@ def main():
             ui.input.buffer.cursor_position = state.get('cursor', len(ui.input.text))
         from . import cosmos_bridge
         address = cosmos_bridge.endpoint() if args.shell else None
-        if args.shell and os.environ.get("TERMINAL_AGENT_COSMOS_UI") == "1" and not address:
+        if args.shell and (args.cosmos_ui or os.environ.get("TERMINAL_AGENT_COSMOS_UI") == "1") and not address:
             raise OSError("Cosmos UI disconnected; command was not executed")
         if address:
-            action, command = cosmos_bridge.run(ui, address, demo=args.demo)
+            action, command = cosmos_bridge.run(ui, address, demo=args.demo, geometry=json.loads(args.source_geometry))
         else:
             action, command = ui.run()
         if args.state:
             context = {'history': ui.history, 'request_history': ui.request_history,
                        'history_index': ui.history_index, 'history_draft': ui.history_draft,
                        'request': ui.input.text,
-                       'cursor': ui.input.buffer.cursor_position,
+                       'cursor': ui.input.buffer.cursor_position, 'cosmos_ui': getattr(ui, 'cosmos_ui', {}),
                        'working_directory': os.getcwd(), 'command': ui.command.text}
             Path(args.state).write_text(json.dumps(context))
             if config.get('persist_sessions', True) and not args.demo:

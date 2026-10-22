@@ -28,12 +28,18 @@ class OpenCode:
         env['OPENCODE_DISABLE_FILEWATCHER'] = 'true'
         return env
 
-    async def propose(self, history, cwd=None):
+    def prompt(self, history, cwd=None):
         prompt = ('Translate the request into one shell command for the current working directory. '
                   'Do not execute commands or use tools. Return ONLY a JSON object with one string key "command". '
                   'Use the previous command and follow-up requests as context. Do not invent filenames; use globs or discovery. '
                   'Actual target working directory (the generated command will run here): '
                   + json.dumps(str(Path(cwd) if cwd else Path.cwd())) + '. Request history: ' + json.dumps(history, ensure_ascii=False))
+        if self.config.get('prompt_file'):
+            prompt = Path(self.config['prompt_file']).read_text() + '\n\n' + prompt
+        return prompt
+
+    async def propose(self, history, cwd=None):
+        prompt = self.prompt(history,cwd)
         argv = [self.config['executable'], 'run', '--standalone', '--format', 'json']
         model = self.model(cwd)
         if model:

@@ -10,6 +10,8 @@ LEADER_KEYS = (
     "g",
     "s",
     "question_mark",
+    "full_stop",
+    "N",
     "d",
     "c",
     "percent_sign",
@@ -46,6 +48,12 @@ def leader_bindings(modal=False):
 class CosmosModal(ModalScreen):
     BINDINGS = leader_bindings(modal=True)
 
+    async def on_mount(self):
+        if hasattr(self.app, "notification_events"):
+            from .notifications import NoticeToast
+
+            await self.mount(NoticeToast(id="cosmos-modal-notice"))
+
 
 class CosmosInput(Input):
     """Keep normal typing local, but release the next Leader key to global actions."""
@@ -78,6 +86,12 @@ def leader_key(key, character):
         "|": "vertical_line",
         "-": "minus",
         "?": "question_mark",
+        ".": "full_stop",
+        "+": "plus",
+        "=": "equals_sign",
+        "/": "slash",
+        "[": "left_square_bracket",
+        "]": "right_square_bracket",
     }
     if character and character.isprintable():
         return aliases.get(character, character)

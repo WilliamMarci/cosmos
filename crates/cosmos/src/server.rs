@@ -81,7 +81,7 @@ impl State {
                     return Err("incompatible protocol major".into());
                 }
                 Ok(
-                    json!({"protocol_major":protocol::MAJOR,"protocol_minor":1,"service_epoch":self.epoch,"capabilities":["settings","notifications","mod-lifecycle","actions","events","ui-model","surface-input","tmux-inventory"],"presentation":"Cosmos-owned character surfaces and workspace; isolated terminal backend"}),
+                    json!({"protocol_major":protocol::MAJOR,"protocol_minor":2,"service_epoch":self.epoch,"capabilities":["settings","notifications","mod-lifecycle","actions","events","ui-model","surface-input","tmux-inventory","ui-components-v1","keybindings"],"presentation":"Cosmos-owned character surfaces and workspace; isolated terminal backend"}),
                 )
             }
             "events.publish" => {
@@ -178,6 +178,7 @@ impl State {
                             } else {
                                 "C-b"
                             }),
+                            "reduced_motion" => json!(!self.config.reduced_motion),
                             "notifications_enabled" => json!(!self.config.notifications_enabled),
                             _ => json!(!self.config.status_visible),
                         };
@@ -209,7 +210,8 @@ impl State {
                         .list(required(p, "client")?, method.ends_with("active")))
                 }
             }
-            "notifications.dismiss"
+            "notifications.act"
+            | "notifications.dismiss"
             | "notifications.resolve"
             | "notifications.claim"
             | "notifications.complete"
@@ -217,6 +219,9 @@ impl State {
                 let mut next = self.notices.clone();
                 let result = next.change(method, p)?;
                 self.save_notices(next)?;
+                if method == "notifications.act" {
+                    self.bus.publish("notifications.action", json!({"id":p["id"],"action":p["action"],"source":result["source"],"client":p["client"]}));
+                }
                 self.bus.publish(
                     "notifications.changed",
                     json!({"id":p["id"],"operation":method}),

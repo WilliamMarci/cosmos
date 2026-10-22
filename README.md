@@ -6,30 +6,21 @@
 
 ## 当前开发入口与状态
 
-新版 UI 从 `./dev/cosmos-textual` 启动（初始化环境见 [Python 入口说明](python/README.md)）。`target/release/cosmos` 当前仍是协调服务与旧 Rust 工作区入口，不会自动切换到新版 UI。
+唯一 UI 入口是根目录 `./cosmos [SESSION] [--debug]`（环境初始化见 [Python 入口说明](python/README.md)）。`dev/cosmos-textual` 仅作兼容跳转。Python + Textual 与 Cosmos 自绘接口负责界面；Tmux 负责持续会话及 VT 解析。
 
-已验收能力、未完成功能与后续顺序见 [当前实施状态](design/当前实施状态.md)。
-
-Git 提交与检查流程见 [开发说明](docs/development.md)。
-
-## Rust 兼容入口
+Rust 暂留协调服务与管理 CLI；旧 Rust UI 已停用。`target/release/cosmos` 无参数及 `attach/workspace` 转到同一个 Python UI；`panel/native/view` 不再启动旧界面。源码首次运行需构建协调服务：
 
 ```bash
-cd /home/amadeus/Program/cosmos
 cargo build --locked --offline --release
-./target/release/cosmos
+./cosmos
+./cosmos study --debug
 ```
 
-默认进入 Cosmos 自己绘制的工作区。`Ctrl-B p` 直接覆盖打开操作面板，`Ctrl-B d` 分离。`Ctrl-B c` 新建窗口，`Ctrl-B %` / `Ctrl-B "` 分屏，方向键切窗格，`Ctrl-B z` 放大。面板支持设置、显示、键位、通知和 Mods 子菜单；文字过滤、方向键选择、Enter 执行、Esc 返回、`?` 帮助。默认不显示按键提示行。
+`Leader d` 分离后显示 Logo、会话状态及重连命令；Shell 中退出最后一个应用导致会话结束时显示 exit。关闭客户端不等于停止服务。
 
-```bash
-./target/release/cosmos panel
-./target/release/cosmos doctor
-./target/release/cosmos events
-./target/release/cosmos rpc state.snapshot
-```
+管理命令仍使用 `./target/release/cosmos daemon|doctor|mod|rpc|stop`；`stop` 关闭协调服务与其管理的 Mods，保留 Tmux 应用。分屏、设置与帮助使用 Python UI 内的统一键位设置。
 
-attach/panel 自动启动协调服务；`cosmos daemon` 可前台诊断。`cosmos stop` 正常关闭协调服务与其管理的 Mods，保留 Tmux 中应用；不等于停止整个 Tmux 服务。
+冻结边界见 [入口与框架冻结记录](design/入口与框架冻结记录.md)，当前能力见 [实施状态](design/当前实施状态.md)。正式 Mod 接口见 [框架 RPC](docs/framework.md)、[UI 区域接口](docs/ui-api.md) 和 [Shell 入口](docs/shell.md)。Git 流程见 [开发说明](docs/development.md)。
 
 ## 加载示例 Mod
 

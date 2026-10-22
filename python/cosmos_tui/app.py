@@ -5,7 +5,6 @@ import base64
 import json
 import os
 import shutil
-import shlex
 import fcntl
 import termios
 import struct
@@ -23,6 +22,19 @@ from textual.widgets import Input, Label, ListItem, ListView, Static
 from textual._compositor import CompositorUpdate
 from .backend import Tmux
 from .borders import borders
+from .terminal_grid import decode_grid
+from . import keymap
+from .key_settings import KeyBindingEditor
+from .ui import UIRegistry
+from .notifications import NoticeToast
+from .menus import CompactMenu
+from .presentation import (
+    SessionWindows,
+    PopWindows,
+    NotificationEvents,
+    PowerlineSlot,
+    PowerlineValue,
+)
 from .media import Media
 from .reading import Reader
 from .chrome import Frame
@@ -38,7 +50,6 @@ from .shortcuts import (
     leader_bindings,
     leader_key,
     MODIFIER_KEYS,
-    LEADER_KEYS,
 )
 
 DARK = dict(
@@ -231,6 +242,16 @@ class Palette(CosmosModal):
         snapshot = await rpc.call("state.snapshot")
         actions = snapshot["actions"]
         rows = [a for a in actions if a.get("category") == self.menu]
+        if self.menu == "keys":
+            settings = snapshot.get("settings", getattr(self.app, "settings", {}))
+            rows.extend(
+                dict(
+                    label=f"{command.context} · {command.label}  {', '.join(keymap.bindings(command, settings))}",
+                    kind="keybinding",
+                    command=command,
+                )
+                for command in keymap.COMMANDS
+            )
         if self.menu == "mods":
             rows += [
                 dict(
@@ -374,6 +395,11 @@ class Cosmos(App, inherit_bindings=False):
         self._surface_state = None
         self._status_content = None
         self._notice_state = None
+        self.ui_registry = UIRegistry()
+        self.session_windows = SessionWindows(self.backend)
+        self.pop_windows = PopWindows(self)
+        self.notification_events = NotificationEvents()
+        self.powerline = PowerlineSlot()
 
     async def on_event(self, event):
         # Resolve Leader before forwarding to focused widgets. Keyboard protocols
@@ -387,14 +413,38 @@ class Cosmos(App, inherit_bindings=False):
                 return
             if self.prefix:
                 key = leader_key(event.key, event.character)
-                if key in LEADER_KEYS:
-                    await self.action_leader_key(key)
+                context = self.key_context()
+                command = keymap.resolve(context, "leader+" + key, self.settings)
+                if command:
+                    if command.context.startswith("assistant") and isinstance(
+                        self.screen, Assistant
+                    ):
+                        self.prefix = False
+                        await self.screen.run_action(command.target)
+                    else:
+                        await self.action_leader_key(command.target)
                 else:
                     self.prefix = False
                     logging.getLogger(__name__).debug(
                         "unmapped Leader key %s", event.key
                     )
                 return
+        if isinstance(event, events.Key) and not event.is_forwarded:
+            context = self.key_context()
+            if context != "workspace" and not (
+                context == "viewer" and self.search is not None
+            ):
+                key = leader_key(event.key, event.character)
+                command = keymap.resolve(context, key, self.settings)
+                if command and command.context.startswith("assistant"):
+                    await self.screen.run_action(command.target)
+                    return
+                if command:
+                    canonical = command.target
+                    character = canonical if len(canonical) == 1 else None
+                    event = events.Key(canonical, character)
+                elif keymap.default_reserved(context, key):
+                    return
         if (
             isinstance(event, events.Key)
             and not event.is_forwarded
@@ -403,11 +453,42 @@ class Cosmos(App, inherit_bindings=False):
             self.screen.set_focus(self.screen.query_one(Input))
         await super().on_event(event)
 
+    def key_context(self):
+        if not self._screen_stack:
+            return "workspace"
+        if isinstance(self.screen, Assistant):
+            return "assistant_actions" if self.screen.actions_mode else "assistant"
+        if isinstance(self.screen, KeyBindingEditor):
+            return "key_settings"
+        if isinstance(self.screen, Switcher):
+            return "switch"
+        if isinstance(self.screen, Palette):
+            return "palette"
+        if isinstance(self.screen, CompactMenu):
+            return "menu"
+        if isinstance(self.screen, Help):
+            return "help"
+        if self.view_focus is not None:
+            return "surface"
+        pane = self.active()
+        return (
+            ("viewer_search" if self.search is not None else "viewer")
+            if pane and pane.viewer
+            else "workspace"
+        )
+
+    def render_background(self, rect, y):
+        return (
+            self.query_one(TerminalSurface)
+            .render_line(rect.y + y)
+            .crop(rect.x, rect.x + rect.width)
+        )
+
     def compose(self) -> ComposeResult:
         yield TerminalSurface(id="terminal")
         yield Static("", id="agent-powerline", markup=False)
         yield Static("", id="status")
-        yield Static("", id="notice")
+        yield NoticeToast(id="notice")
 
     def push_screen(self, *args, **kwargs):
         self.graphics.commit([])
@@ -546,11 +627,32 @@ class Cosmos(App, inherit_bindings=False):
             if self.agent_prompt:
                 arguments += ["--prompt", self.agent_prompt]
             self.agent_prompt = ""
-            await self.backend.request(
-                'split-window -h -c "#{pane_current_path}" '
-                + self.backend.quote(shlex.join(arguments))
-            )
+            pane = self.active()
+            if pane:
+                await self.session_windows.split(pane.id, arguments)
             self.panes = await self.backend.snapshot()
+            return
+        if key == "N":
+            notices = await rpc.call("notifications.active", {"client": self.client})
+            if notices:
+                notice = notices[-1]
+                choices = [(a["id"], a["label"]) for a in notice.get("actions", [])] + [
+                    ("__dismiss__", "×  Dismiss here")
+                ]
+
+                def choose(action):
+                    if action:
+                        self.run_worker(
+                            self.on_notice_toast_action(
+                                NoticeToast.Action(notice["id"], action)
+                            )
+                        )
+
+                self.pop_windows.actions("Notification", choices, choose)
+            return
+        if key == "full_stop":
+            if isinstance(self.screen, Assistant):
+                self.screen.action_actions()
             return
         if key == "s":
             self.push_screen(Switcher())
@@ -563,36 +665,33 @@ class Cosmos(App, inherit_bindings=False):
                 self.push_screen(
                     Help(
                         "Command suggestions",
-                        [
-                            ("Enter", "generate"),
-                            ("Tab", "native Bash editing"),
-                            ("↑ / ↓", "request history"),
-                            ("Ctrl-g", "split OpenCode"),
-                            ("Esc", "cancel generation / close"),
-                        ],
+                        keymap.help_rows(self.key_context(), self.settings),
                     )
                 )
                 return
-            if isinstance(self.screen, Palette):
-                self.push_screen(Help("Actions", PANEL))
+            if isinstance(self.screen, (Palette, CompactMenu)):
+                self.push_screen(
+                    Help("Actions", keymap.help_rows(self.key_context(), self.settings))
+                )
                 return
             if isinstance(self.screen, Switcher):
                 self.push_screen(
                     Help(
                         "Switch",
-                        [
-                            ("↑ / ↓", "choose window"),
-                            ("Type", "filter sessions / windows"),
-                            ("Enter", "confirm switch"),
-                            ("Esc", "cancel"),
-                        ],
+                        keymap.help_rows("switch", self.settings)
+                        + [("Type", "filter sessions / windows")],
                     )
                 )
                 return
             self.push_screen(
                 Help(
                     "Viewer" if self.active() and self.active().viewer else "Workspace",
-                    VIEWER if self.active() and self.active().viewer else WORKSPACE,
+                    keymap.help_rows(
+                        "viewer"
+                        if self.active() and self.active().viewer
+                        else "workspace",
+                        self.settings,
+                    ),
                 )
             )
             return
@@ -649,7 +748,7 @@ class Cosmos(App, inherit_bindings=False):
     def active(self):
         return next((p for p in self.panes if p.active), None)
 
-    async def detach(self):
+    async def detach(self, reason="detach"):
         self.closing = True
         self.graphics.commit([])
         self.flush_graphics()
@@ -658,7 +757,7 @@ class Cosmos(App, inherit_bindings=False):
             await rpc.call("ui.detach", {"client": self.client})
         except (OSError, RuntimeError):
             pass
-        self.exit()
+        self.exit({"reason": reason, "session": self.backend.session})
 
     async def on_unmount(self):
         if self.agent_bridge:
@@ -691,9 +790,13 @@ class Cosmos(App, inherit_bindings=False):
             images = []
             snapshot = await rpc.call("ui.snapshot", {"client": self.client})
             self.views = []
+            self.status_widgets = []
             self.view_focus = None
             for layer in snapshot.get("views", []):
                 view = layer["view"]
+                if view["kind"] == "status_widget":
+                    self.status_widgets.append(view)
+                    continue
                 if view["owner"] == "core":
                     continue
                 target = view.get("target")
@@ -714,7 +817,7 @@ class Cosmos(App, inherit_bindings=False):
                     self.view_focus = view["id"]
 
             for pane in panes:
-                lines[pane.id] = [Text.from_ansi(line) for line in pane.lines]
+                lines[pane.id] = list(decode_grid(tuple(pane.lines)))
                 if pane.viewer:
                     try:
                         state = json.loads(base64.b64decode(pane.viewer))
@@ -767,6 +870,21 @@ class Cosmos(App, inherit_bindings=False):
                 else:
                     await self.screen.action_cancel()
             passive = self.assistant_passive
+            if passive and (
+                not self.powerline.active
+                or self.powerline.active.owner == "terminal_agent"
+            ):
+                self.powerline.publish(
+                    PowerlineValue(
+                        "terminal_agent", passive["pane"], passive["request"]
+                    )
+                )
+            elif not passive:
+                self.powerline.release("terminal_agent")
+            lease = self.powerline.active
+            passive = (
+                dict(pane=lease.source_pane, request=lease.text) if lease else None
+            )
             source = next(
                 (p for p in panes if passive and p.id == passive["pane"] and p.active),
                 None,
@@ -824,26 +942,27 @@ class Cosmos(App, inherit_bindings=False):
                         style=f"{self.role_colors['on']} on {self.role_colors['acc']}",
                     )
                     break
+            for widget in self.status_widgets:
+                for item in widget.get("content", {}).get("lines", [])[:1]:
+                    status.append(
+                        " " + item["text"] + " ",
+                        style=self.role_colors.get(
+                            item["role"], self.role_colors["mute"]
+                        ),
+                    )
             if status != self._status_content:
                 self._status_content = status
                 status_widget.update(status)
             notices = await rpc.call("notifications.active", {"client": self.client})
-            notice = self.query_one("#notice", Static)
-            notice_text = notices[-1]["text"] + " [x]" if notices else ""
-            notice_state = (notice_text, self.size.width, self.size.height)
-            if notice_state != self._notice_state:
-                self._notice_state = notice_state
-                notice.update(Text(notice_text))
-                notice.display = bool(notices)
-                if notices:
-                    from rich.cells import cell_len
-
-                    width = min(60, cell_len(notice_text), self.size.width)
-                    notice.styles.width = width
-                    notice.styles.offset = (
-                        max(0, self.size.width - width),
-                        max(0, self.size.height - 2),
-                    )
+            for host in (self._workspace_screen, self.screen):
+                if host:
+                    for notice in host.query(NoticeToast):
+                        notice.present_notice(
+                            notices[-1] if notices else None,
+                            self.size.width,
+                            self.size.height,
+                            self.role_colors,
+                        )
             pane = self.active()
             # Modal inputs own the physical cursor. Polling a hidden shell must not
             # relocate its cursor into the switcher / restart input cursor painting.
@@ -856,7 +975,7 @@ class Cosmos(App, inherit_bindings=False):
             if not self.is_headless and self.cursor_mode() != self._cursor_mode:
                 self._display(self.screen, Batch())
         except EOFError:
-            await self.detach()
+            await self.detach("exit")
         except Exception as error:
             logging.getLogger(__name__).exception("UI refresh failed")
             self.message = str(error)
@@ -866,6 +985,25 @@ class Cosmos(App, inherit_bindings=False):
                 self.query_one("#status", Static).update(status)
         finally:
             self.busy = False
+
+    async def on_notice_toast_action(self, event):
+        event.stop()
+        method = (
+            "notifications.dismiss"
+            if event.action == "__dismiss__"
+            else "notifications.act"
+        )
+        try:
+            await rpc.call(
+                method,
+                {
+                    "id": event.notification,
+                    "action": event.action,
+                    "client": self.client,
+                },
+            )
+        except RuntimeError as error:
+            await self.action_error(method, error)
 
     def on_resize(self, event):
         pixels = event.pixel_size
@@ -1110,7 +1248,9 @@ class Cosmos(App, inherit_bindings=False):
                 )
                 return
             elif event.character == "?":
-                self.push_screen(Help("Viewer", VIEWER))
+                self.push_screen(
+                    Help("Viewer", keymap.help_rows("viewer", self.settings))
+                )
                 return
             elif event.character == "/":
                 self.search = state.get("query", "")

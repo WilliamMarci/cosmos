@@ -1,4 +1,4 @@
-# Cosmos Textual 入口
+# Cosmos Python UI 入口
 
 需要 Python 3.11+、Tmux 和现有 Cosmos 协调服务二进制。PDF 另需 Poppler。当前测试环境为 Python 3.14、Textual 8.2.8、Pillow 12.1.1；Textual 版本必须保持锁定，升级前运行统一输出回归。
 
@@ -7,18 +7,18 @@
 ```bash
 uv venv .venv
 uv pip install --python .venv/bin/python -r python/requirements.txt
-./dev/cosmos-textual
+./cosmos
 ```
 
 源码工作区需先构建 `target/release/cosmos`；解压包自动使用 `bin/cosmos`。可设置 COSMOS_BINARY 指向协调服务二进制。启动脚本根据自己的位置解析路径，可从任意目录执行。请从外层 Shell 连接，避免在同一后端会话中捕获客户端自身。
 
-这是迁移入口，旧默认入口仍保留。终端网格经 Tmux 解析后进入 Textual 行 API；图形协议批次也经 Textual compositor/driver，应用功能模块没有独立 tty 输出循环。
+这是唯一 UI 入口；dev/cosmos-textual 仅作兼容跳转，旧 Rust UI 已停用。终端网格经 Tmux 解析后进入 Textual 行 API；图形协议批次也经 Textual compositor/driver，应用功能模块没有独立 tty 输出循环。
 
 Leader p 打开操作面板，Leader ? 打开上下文帮助，Leader d 分离。默认不展示快捷键栏。测试入口：`python3 dev/smoke_textual.py`（真实 PTY、隔离 socket 和临时状态）。
 
 范围、迁移待办及私有 API 风险见 `design/Python-Textual迁移.md`。
 
-`Leader s` 打开会话/窗口切换器：输入过滤，方向键选择，Enter 确认，Esc 取消。底部按真实布局预览所选窗口的终端文字，不改变后台焦点或应用尺寸，不显示活动热度。查看器缩略图和 Mod 合成预览后续补齐。
+`Leader s` 打开会话/窗口切换器：输入过滤，方向键选择，Enter 确认，Esc 取消。右侧按真实布局预览所选窗口的终端文字，不改变后台焦点或应用尺寸，不显示活动热度。查看器缩略图和 Mod 合成预览后续补齐。
 
 分屏使用 `Leader %`（左右）与 `Leader "`（上下）；`Leader` 加方向键切换窗格，`Leader z` 放大当前窗格。它们不会常驻显示，统一通过 `Leader ?` 查看。
 

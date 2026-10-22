@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
-use std::{env, fs, io, io::Write, os::unix::fs::OpenOptionsExt, path::PathBuf};
+use std::{
+    collections::BTreeMap, env, fs, io, io::Write, os::unix::fs::OpenOptionsExt, path::PathBuf,
+};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -11,6 +13,8 @@ pub struct Config {
     pub notification_history: usize,
     pub notifications_enabled: bool,
     pub notification_timeout_ms: u64,
+    pub keybindings: BTreeMap<String, Vec<String>>,
+    pub reduced_motion: bool,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -22,6 +26,8 @@ impl Default for Config {
             notification_history: 200,
             notifications_enabled: true,
             notification_timeout_ms: 5000,
+            keybindings: BTreeMap::new(),
+            reduced_motion: false,
         }
     }
 }
@@ -38,6 +44,18 @@ impl Config {
         }
         if !(1..=10000).contains(&self.notification_history) {
             return Err("notification_history must be 1..10000".into());
+        }
+        if self.keybindings.len() > 256
+            || self.keybindings.iter().any(|(id, keys)| {
+                id.is_empty()
+                    || id.len() > 128
+                    || keys.len() > 16
+                    || keys.iter().any(|key| {
+                        key.is_empty() || key.len() > 128 || key.chars().any(char::is_control)
+                    })
+            })
+        {
+            return Err("invalid keybindings".into());
         }
         if !(100..=60000).contains(&self.notification_timeout_ms) {
             return Err("notification_timeout_ms must be 100..60000".into());

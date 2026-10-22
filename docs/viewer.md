@@ -1,59 +1,34 @@
-# 图片与 PDF 查看器
+# 图片与 PDF 阅读接口
 
-## 使用
+本文描述 Python 工作区；`cosmos view FILE` 是独立 Rust 查看器，两者共享查看请求状态但交互实现分别维护。
 
-在 Cosmos 工作区的 Shell 中运行（路径属于当前工作主机，SSH 用法相同）：
+## 打开与关闭
 
-```bash
-/home/amadeus/Program/cosmos/target/release/cosmos open /absolute/path/image.png
-/home/amadeus/Program/cosmos/target/release/cosmos open /absolute/path/document.pdf
-```
+在 Cosmos Shell 中运行 `open FILE` 或 `cosmos open FILE`，使用工作主机上的绝对/相对路径；SSH 场景相同。`open` 的格式分流见 shell.md。
 
-文件临时替换当前窗格的显示，命令立即返回，Shell 与后台程序继续运行。`q` / Esc 退出查看器，恢复同一窗格的实时内容，不清空历史，也不改变应用 PTY 大小。客户端分离后重新连接会重建图片显示，并恢复页码、缩放、平移和已确认的查询；保证范围是后端会话仍存活，不包括主机重启。
+查看请求替换当前 pane 的呈现，底层 Shell/程序继续运行，不改变其 PTY 大小。关闭后恢复最新终端画面。重连在 Tmux 会话仍存活时恢复页码、缩放、平移、缩略图展开状态及已确认查询。未确认的搜索输入属于客户端。
 
-独立使用：`cosmos view FILE`。独立查看器不需要协调服务；它退出后恢复调用终端的模式。普通终端按真彩色半块字符降级；支持 Kitty 的终端直接接收图片数据，服务器文件路径不会发送给本地终端去读取。`COSMOS_GRAPHICS=kitty` / `text` 可显式选择。自动识别 TERM 中的 kitty 和 TERM_PROGRAM=WezTerm；尚未实现图形能力探测应答，无法识别时用 text。
+PNG、JPEG、WebP 由 Pillow 读取，动画取首帧。PDF 使用 PATH 中的 pdfinfo/pdftoppm/pdftotext。图形经 Kitty 协议以内存数据传输，不把服务器路径交给连接电脑读取；非图形终端使用半块字符降级。通过 COSMOS_GRAPHICS=kitty/text 强制选择。
 
-PNG、JPEG、WebP 使用内置解码器，动画先取首帧。PDF 需要工作主机 PATH 中的 `pdfinfo`、`pdftoppm`、`pdftotext`（Poppler）；doctor 显示可用性。当前构建包没有捆绑 Poppler，可用系统 `poppler-utils`。EPS、SVG、ICO、OCR 和文字选择/剪贴板兼容层仍待后续。
+## Python 阅读交互
 
-## 静默交互
+图片同目录缩略图位于底部，PDF 页缩略图位于左侧。默认 t 折叠/展开；[ / ] 选择图片或页；+ / - 缩放，0 适应，方向键平移，q / Esc 关闭。按键从共享注册表读取，可以在设置中重绑；帮助读取同一配置。
 
-遵循 less is more：没有常驻工具栏、快捷键大全和文件属性面板。状态仅在加载、出错、搜索或 PDF 页码确有信息时出现。统一 `Leader ?` 打开当前上下文帮助；查看器也支持 `?`，独立模式用 `?`。触发键加粗着色，描述只出现在帮助层；搜索编辑时临时显示输入，Enter 确认、Esc 取消，不把搜索键输入 Shell。
+滚轮在多图片/PDF 中切换项，单张图片滚轮缩放；Ctrl+滚轮始终缩放。鼠标点击缩略图选择，主视口拖动平移。信息行显示文件名、序号、倍率和位图尺寸。
 
-查看器帮助包含缩放、适应、平移、翻页、搜索及鼠标操作。搜索覆盖文档文字层，忽略大小写，定位匹配页并在位图上高亮；`n` / `N` 在匹配词与匹配页间导航。扫描页明确提示没有文字层，不启动 OCR。搜索文本暂按 Poppler 单词顺序与空格连接，复杂分栏、连字和中文断词还需要专门兼容验收。
+PDF `/` 搜索当前页词级子串并高亮，忽略大小写；无文字层提示，不做 OCR。Python 阅读器不提供跨页匹配跳转、文字选择或复制 API。
 
-滚轮在 PDF 中翻页，在图片中缩放；Ctrl+滚轮始终缩放；左键拖动平移。查看器取得焦点时启用 SGR 鼠标，离开时关闭；所有功能有键盘入口。尚未把鼠标操作透传给普通 Shell/TUI 应用。
+主图缓存最多 3 项、缩略图缓存最多 48 项；目录枚举最多 10000 项，图片缩略条最多 5 项、PDF 侧栏最多 7 页。单个图片输入最多 32 MiB、最多 1600 万像素，渲染画布同样有像素预算。源版本按路径、大小、mtime_ns 校验，文件变化后重载；过时渲染代数结果不会覆盖新的输入状态。当前 Python 路径不使用持久磁盘缓存。
 
-## 模块边界
+## 公开 RPC
 
-- `viewer.rs`：位置状态、交互、渲染任务调度、文字匹配和共享位图视口。
-- `viewer/decoder.rs`：PNG/JPEG/WebP 与 Poppler 适配、文字框、源版本检查、磁盘缓存。
-- `viewer/graphics.rs`：客户端像素几何、Kitty 分块传输和本客户端图像删除。
-- `viewer/host.rs`：Cosmos 工作区合成、窗格裁切、图像生命周期与后端状态桥。
-- `help.rs`：统一上下文帮助的视觉规则，工作区、命令面板、查看器共用。
+这些是协调服务的稳定查看请求入口，不启动第二个外层终端绘制器：
 
-Tmux 仅保存窗格级 `@cosmos_viewer` 位置请求（Base64 JSON）并维持后台应用；不参与图像绘制。位置状态跟随窗格，同一窗格的多个客户端共享最后确认的位置；搜索未确认的编辑稿和帮助层仅属于各客户端。后端替换时应把这一持久位置桥迁入相应 adapter，不把图形协议放进 PTY 捕获路径。
+- `viewer.open {target:"%N",path:"/absolute/file.pdf"}`：打开/替换请求，目标为本服务 pane。
+- `viewer.state {target:"%N"}`：读取已确认位置或 null。
+- `viewer.close {target:"%N"}`：移除请求，恢复应用显示。
+- `viewer.cache.clear {}`：调用 Rust 缓存清理逻辑；不等同于清除 Python 进程内缓存。
 
-对内置功能和可信 Mod 提供 RPC：
+位置数据通过 pane 的 @cosmos_viewer Base64 JSON 保存；包含 path、page、zoom、pan、query，Python 另使用 thumbnails 布尔值。page 从 1 起；pan 是源像素偏移。调用者应通过 RPC 打开/关闭，不直接发送图形 ANSI。事件包括 viewer.changed 与 viewer.cache.cleared。
 
-- `viewer.open {"target":"%0","path":"/host/absolute/file.pdf"}`：打开/替换目标窗格的查看请求。
-- `viewer.state {"target":"%0"}`：返回已确认位置或 null。
-- `viewer.close {"target":"%0"}`：恢复目标应用显示。
-- `viewer.cache.clear {}`：清空持久位图缓存。
-
-RPC 修改通过 `viewer.changed`、`viewer.cache.cleared` 事件通知；工作区自身交互目前通过后端位置轮询同步。第三方坐标化文字选择/复制接口尚未实现，不声称已有稳定公共 API。
-
-## 缓存与生命周期
-
-每个打开的查看器工作线程优先处理当前页，只保留当前页与前后各一页的解码结果；后台预取相邻页。新请求增加 generation，取消过时的 Poppler 进程并丢弃旧结果。子进程单次限时 15 秒，输出上限 32 MiB。图片输入上限 32 MiB、解码像素上限 1600 万，避免不受限分配。
-
-PDF 当前最长边以 1800 像素渲染。磁盘缓存保存基础页面位图，键包含路径、源大小/mtime、页码、渲染参数和 Poppler 版本；屏幕缩放、平移、高亮在共享位图层完成。缓存上限 256 MiB，按文件时间淘汰，退出可复用；缓存目录权限 0700、页面 0600，原子发布。Settings → Display → Clear viewer cache 或 `cosmos cache-clear` 可清理磁盘缓存；已打开的内存页面仍可使用。
-
-约 750 ms 检查源大小/mtime，改写后重载并尽量保留位置；渲染失败保留上一份有效页面，状态显示错误。源在渲染中变化时不发布缓存。未确认的输入不会持久化。
-
-每个物理客户端分配自己的图像 ID；退出、切换窗口、遮挡、关闭、重新连接和尺寸变化时清理/重建。画面不变不重新发送像素，其他窗格更新也不会反复传送同一张图片。Kitty 数据按 4096 字节以内 Base64 分块，使用内联 RGB，兼容 SSH。终端报告的单元像素优先，否则读取 winsize，最后估计 8×16；跨终端字体改变仍需进一步实机验收。
-
-## 验收与限制
-
-`dev/smoke_viewer.py` 使用真实 PTY、独立后端和临时状态，检查数据包可还原为 RGB、PDF 翻页/跨页搜索/高亮、帮助静默、源重载、鼠标、尺寸变化、窗口图像清理、分离重连、Shell 保留、字符降级、缓存清理和终端恢复。可设置 `COSMOS_VIEWER_PROOF=/tmp/viewer-proof.png` 保存从 Kitty 数据包重建的 PDF 页面以检查高亮。
-
-协议验收不等于真实 Kitty/WezTerm 的最终视觉验收。高清连续放大当前仍以 1800 像素底图重采样；没有高清多级瓦片、OCR、动画播放、选择/复制和所有终端组合的兼容保证。
+后端路径及实际参数校验以 viewer.rs 中的请求处理为准；Mod 不因自己能够写该请求就获得模型侧执行权限。格式扩展、缓存调度和阅读设计讨论保留在 design/。

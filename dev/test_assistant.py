@@ -3,6 +3,7 @@
 import asyncio
 import sys
 import unittest
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 sys.path[:0] = [
@@ -10,18 +11,25 @@ sys.path[:0] = [
     for name in ("python", "terminal_agent")
 ]
 from textual.app import App  # noqa: E402
-from cosmos_tui.chrome import MiniAction  # noqa: E402
+from cosmos_tui.editor import CellEditor  # noqa: E402
+from cosmos_tui.surface_widget import CellSurface  # noqa: E402
 from cosmos_tui.assistant import Assistant  # noqa: E402
 from terminal_agent.ui import InlineUI  # noqa: E402
 from cosmos_tui.app import Cosmos, TerminalSurface  # noqa: E402
 from cosmos_tui.backend import Pane  # noqa: E402
 from rich.text import Text  # noqa: E402
-from textual.widgets import Static  # noqa: E402
+
+
+def rendered_text(app):
+    root = ET.fromstring(app.export_screenshot())
+    return "".join(
+        node.text or "" for node in root.iter() if node.tag.endswith("}text")
+    ).replace("\xa0", " ")
 
 
 class Probe(App):
     prefix = False
-    panes = []
+    panes = [Pane("%0", 0, 0, 80, 23, True, [], "", (2, 2))]
 
     async def on_mount(self):
         self.result = None
@@ -31,6 +39,8 @@ class Probe(App):
                     pane="%0",
                     cwd="/tmp",
                     demo=True,
+                    source_command_rect=dict(x=0, y=1, width=80, height=2),
+                    source_size=[80, 23],
                     state=dict(command="draft", request="convert", cursor=7),
                 )
             ),
@@ -49,15 +59,18 @@ class LayerProbe(Cosmos):
         self.panes = [Pane("%0", 0, 0, 80, 23, True, [], "", (2, 2))]
         self.lines = {"%0": [Text("SHELL_SENTINEL"), Text("$ existing command")]}
         self.query_one(TerminalSurface).refresh()
-        await self.push_screen(
+        self.call_after_refresh(
+            self.push_screen,
             Assistant(
                 dict(
                     pane="%0",
                     cwd="/tmp",
                     demo=True,
+                    source_command_rect=dict(x=0, y=1, width=80, height=2),
+                    source_size=[80, 23],
                     state=dict(command="existing command", request="draft"),
                 )
-            )
+            ),
         )
 
     async def on_unmount(self, event):
@@ -71,26 +84,23 @@ class AssistantTests(unittest.IsolatedAsyncioTestCase):
             await pilot.pause()
             screen = app.screen
             self.assertEqual(screen.styles.background.a, 0)
-            self.assertEqual(screen.query_one("#assistant-row").region.height, 1)
-            self.assertIn("SHELL_SENTINEL", app.export_screenshot())
-            self.assertEqual(len(screen.query(MiniAction)), 3)
-            for button in screen.query(MiniAction):
-                self.assertEqual(button.region.height, 1)
-                self.assertEqual(button.content_region.height, 1)
-            self.assertIn("ai", app.export_screenshot())
-            self.assertEqual(
-                screen.query_one("#assistant-indicator", Static).render().plain, " › "
-            )
-            self.assertFalse(
-                screen.query_one("#assistant-confirm", MiniAction).disabled
-            )
-            self.assertTrue(screen.query_one("#assistant-input").cursor_blink)
-            await pilot.click("#assistant-confirm")
+            self.assertEqual(screen.query_one(CellSurface).region.height, 1)
+            self.assertEqual(screen.query_one(CellSurface).region.width, 80)
+            self.assertIn("$ existing command", rendered_text(app))
+            self.assertEqual(screen.query_one(CellSurface).frame.hits, ())
+            screen.action_actions()
+            await pilot.pause()
+            frame = screen.query_one(CellSurface).frame
+            self.assertEqual(len(frame.hits), 3)
+            self.assertIn("a", "".join(run.text for run in frame.runs))
+            self.assertTrue(screen.query_one(CellEditor).cursor_blink)
+            await pilot.press("enter")
             self.assertIs(app.screen, app._workspace_screen)
 
     async def test_busy_and_error_are_visible_without_replacing_request(self):
         app = LayerProbe()
         async with app.run_test(size=(80, 24)) as pilot:
+            await pilot.pause()
             screen = app.screen
             started, finish = asyncio.Event(), asyncio.Event()
 
@@ -103,15 +113,17 @@ class AssistantTests(unittest.IsolatedAsyncioTestCase):
             await pilot.press("enter")
             await started.wait()
             self.assertEqual(screen.controller.state, "busy")
-            self.assertNotEqual(
-                screen.query_one("#assistant-indicator", Static).render().plain, " › "
+            self.assertTrue(screen.query_one(CellEditor).read_only)
+            self.assertIn(
+                "●",
+                "".join(run.text for run in screen.query_one(CellSurface).frame.runs),
             )
             finish.set()
             await pilot.pause()
             self.assertEqual(screen.controller.state, "error")
-            self.assertIn("Provider&#160;unavailable", app.export_screenshot())
-            self.assertEqual(screen.query_one("#assistant-input").value, "draft")
-            self.assertEqual(screen.query_one("#assistant").region.height, 2)
+            self.assertIn("Provider unavailable", rendered_text(app))
+            self.assertEqual(screen.query_one(CellEditor).value, "draft")
+            self.assertEqual(screen.query_one(CellSurface).region.height, 2)
 
     async def test_reuses_controller_and_native_update_protocol(self):
         app = Probe()

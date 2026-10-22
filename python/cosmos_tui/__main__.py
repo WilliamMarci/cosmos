@@ -6,10 +6,11 @@ from pathlib import Path
 from .app import Cosmos
 from . import rpc
 from .diagnostics import configure
+from .farewell import show_farewell
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Cosmos Textual migration frontend")
+    parser = argparse.ArgumentParser(description="Cosmos terminal workspace")
     parser.add_argument("session", nargs="?", default="main")
     parser.add_argument("--debug", action="store_true", help="enable debug log")
     parser.add_argument(
@@ -54,8 +55,23 @@ def main():
             "coordinator startup failed; run cosmos daemon for diagnostics"
         )
 
-    asyncio.run(ensure())
-    Cosmos(args.session).run()
+    async def prepare():
+        await ensure()
+        capabilities = await rpc.call("initialize", {"protocol_major": 1})
+        required = {"ui-components-v1", "keybindings"}
+        if not required.issubset(capabilities.get("capabilities", [])):
+            raise RuntimeError(
+                "coordinator is older than this UI; detach clients, then run cosmos stop and start this UI again (Tmux applications are retained)"
+            )
+
+    try:
+        asyncio.run(prepare())
+    except (OSError, RuntimeError, TimeoutError) as error:
+        parser.exit(1, f"cosmos: {error}\n")
+    app = Cosmos(args.session)
+    result = app.run()
+    if not app._exception:
+        show_farewell(result, app.backend)
 
 
 if __name__ == "__main__":

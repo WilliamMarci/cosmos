@@ -124,7 +124,16 @@ impl Ui {
         owner: &str,
         target: Option<String>,
     ) -> Result<Value, String> {
-        if !["palette", "help", "notification", "dock", "replacement"].contains(&kind) {
+        if ![
+            "palette",
+            "help",
+            "notification",
+            "dock",
+            "replacement",
+            "status_widget",
+        ]
+        .contains(&kind)
+        {
             return Err("unsupported presentation kind".into());
         }
         if owner.is_empty() || owner.len() > 128 {
@@ -262,6 +271,7 @@ impl Ui {
                         let h = c.height.min(2);
                         (c.width - w, c.height - h, w, h)
                     }
+                    "status_widget" => (0, c.height.saturating_sub(1), c.width, 1),
                     "dock" => (0, 0, (c.width / 3).clamp(1, 40), c.height),
                     _ => (0, 0, c.width, c.height),
                 };
@@ -294,6 +304,7 @@ pub fn builtins() -> Vec<Value> {
         json!({"id":"notifications.open","label":"Notifications","category":"settings","kind":"menu","menu":"notifications"}),
         json!({"id":"mods.settings","label":"Mods","category":"settings","kind":"menu","menu":"mods"}),
         json!({"id":"viewer.cache.clear","label":"Clear viewer cache","category":"display","kind":"rpc","method":"viewer.cache.clear"}),
+        json!({"id":"motion.toggle","label":"Toggle reduced motion","category":"display","kind":"setting","key":"reduced_motion"}),
         json!({"id":"theme.toggle","label":"Toggle dark / light theme","category":"display","kind":"setting","key":"theme"}),
         json!({"id":"status.toggle","label":"Toggle status bar","category":"display","kind":"setting","key":"status_visible"}),
         json!({"id":"leader.toggle","label":"Toggle leader Ctrl-B / Ctrl-A","category":"keys","kind":"setting","key":"leader"}),

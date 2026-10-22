@@ -41,10 +41,25 @@ class Cosmos:
         return self.call('mods.ready', {'id': self.owner,
                                        'token': os.environ['COSMOS_MOD_TOKEN']})
 
-    def notify(self, text, actionable=False):
+    def notify(self, text, actionable=False, actions=None):
         return self.call('notifications.publish', {'text': text, 'source': self.owner,
-                                                  'actionable': actionable})
+                                                  'actionable': actionable, 'actions': actions or []})
 
     def publish(self, topic, data):
         return self.call('events.publish', {'owner': self.owner,
                                            'topic': f'mod.{self.owner}.{topic}', 'data': data})
+
+
+class StatusWidget:
+    """A client-local, non-modal status component; Mod lifecycle releases it."""
+    def __init__(self, api, client):
+        self.api, self.client = api, client
+        self.view = api.call('presentation.open', {'client':client,'kind':'status_widget','owner':api.owner})
+
+    def update(self, text, role='mute'):
+        self.view = self.api.call('presentation.update', {'client':self.client,'view':self.view['id'],
+            'owner':self.api.owner,'revision':self.view['revision'],
+            'content':{'lines':[{'text':text,'role':role}]}})
+
+    def close(self):
+        return self.api.call('presentation.close', {'client':self.client,'view':self.view['id'],'owner':self.api.owner})

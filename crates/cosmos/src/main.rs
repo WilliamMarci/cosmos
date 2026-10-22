@@ -9,11 +9,7 @@ fn run() -> Result<i32, String> {
             server::run()?;
             Ok(0)
         }
-        "workspace" | "attach" => {
-            ensure_daemon()?;
-            cosmos::workspace::run(args.get(1).map(String::as_str).unwrap_or("main"))?;
-            Ok(0)
-        }
+        "workspace" | "attach" => launch_ui(&args[1..]),
         "open" | "view" => {
             let path = std::path::Path::new(
                 args.get(1)
@@ -22,7 +18,7 @@ fn run() -> Result<i32, String> {
             if args[0] == "open" {
                 cosmos::viewer::open(path)?;
             } else {
-                cosmos::viewer::standalone(path)?;
+                return Err("legacy Rust viewer disabled; use open FILE inside Cosmos".into());
             }
             Ok(0)
         }
@@ -30,26 +26,13 @@ fn run() -> Result<i32, String> {
             cosmos::viewer::clear_cache()?;
             Ok(0)
         }
-        "native" => {
-            eprintln!("Native Tmux compatibility frontend.");
-            ensure_daemon()?;
-            cosmos::backend::current().attach(&Config::load()?)
-        }
+        "native" => Err("legacy frontend disabled; launch ./cosmos [SESSION]".into()),
         "doctor" => {
             let value = json!({"version":env!("CARGO_PKG_VERSION"),"backend":cosmos::backend::current().describe(),"protocol":server::rpc("initialize",json!({"protocol_major":1})),"config":Config::path(),"config_valid":Config::load().is_ok(),"runtime":cosmos::runtime_dir().map_err(|e|e.to_string()),"coordinator":server::rpc("health",json!({})),"custom_rendering":true,"viewer":{"bitmap_formats":["PNG","JPEG","WebP"],"graphics":if cosmos::viewer::kitty_enabled(){"kitty"}else{"text"},"pdf_tools": (["pdfinfo","pdftoppm","pdftotext"].map(|name|json!({"name":name,"available":std::process::Command::new(name).arg("-v").output().is_ok()})))}});
             println!("{}", serde_json::to_string_pretty(&value).unwrap());
             Ok(0)
         }
-        "panel" => {
-            let result = ensure_daemon().and_then(|_| panel());
-            if let Err(e) = result {
-                if args.iter().any(|s| s == "--popup") {
-                    cosmos::terminal_ui::show_load_error(&e);
-                }
-                return Err(e);
-            }
-            Ok(0)
-        }
+        "panel" => Err("legacy panel disabled; launch ./cosmos and press Leader p".into()),
         "mod" => {
             ensure_daemon()?;
             let operation = args.get(1).map(String::as_str).unwrap_or("list");
@@ -146,7 +129,7 @@ fn run() -> Result<i32, String> {
             Ok(0)
         }
         "help" | "--help" | "-h" => {
-            println!("cosmos [open FILE | view FILE | cache-clear | workspace [SESSION] | attach | native | daemon | doctor | panel | config | stop | events | mod ... | action ID | rpc METHOD [JSON]]\nDefault: Cosmos-owned terminal workspace over an isolated session backend.\nLeader p: panel; Leader d: detach; Leader c: window; Leader % / Leader \" : split.\nUse native for the legacy tmux frontend.\nAttach and panel start the coordinator automatically; RPC requires a running coordinator.\nCOSMOS_TMUX selects the tmux executable. Existing user tmux service is untouched.");
+            println!("Cosmos coordinator and management CLI\nUI: ./cosmos [SESSION] [--debug]; attach/workspace forward to the Python UI.\nManagement: daemon | doctor | config | stop | events | mod ... | action ID | rpc METHOD [JSON]\nFile bridge: open FILE | cache-clear\nLegacy Rust UI commands panel/native/view are disabled.\nCOSMOS_TMUX selects the tmux executable. Existing user tmux service is untouched.");
             Ok(0)
         }
         _ => Err("unknown command; run cosmos help".into()),
@@ -201,6 +184,15 @@ fn ensure_daemon() -> Result<(), String> {
     let _ = child.wait();
     Err("coordinator startup timed out".into())
 }
-fn panel() -> Result<(), String> {
-    cosmos::terminal_ui::run()
+fn launch_ui(args: &[String]) -> Result<i32, String> {
+    use std::os::unix::process::CommandExt;
+    let executable = env::current_exe().map_err(|e| e.to_string())?;
+    let entry = executable
+        .ancestors()
+        .skip(1)
+        .map(|base| base.join("cosmos"))
+        .find(|candidate| candidate.is_file() && candidate != &executable)
+        .ok_or("Python UI entry not found; run the project root ./cosmos")?;
+    let error = std::process::Command::new(entry).args(args).exec();
+    Err(format!("cannot start Python UI: {error}"))
 }

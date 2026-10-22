@@ -2,6 +2,7 @@
 
 import asyncio
 from .surfaces import Zone
+from .terminal_grid import decode_grid
 from rich.segment import Segment
 from rich.style import Style
 from rich.text import Text
@@ -50,7 +51,7 @@ class LayoutPreview(Widget):
                 style = Style(color=colors["fg"], bgcolor=colors["bg"])
                 row = y - top - 1
                 text = (
-                    Text.from_ansi(pane.lines[row])
+                    decode_grid(tuple(pane.lines))[row].copy()
                     if row < len(pane.lines)
                     else Text("")
                 )

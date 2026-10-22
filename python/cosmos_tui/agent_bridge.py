@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import logging
 import os
 import socket
 import struct
@@ -45,6 +46,52 @@ class AgentBridge:
                 )
                 await writer.drain()
                 return
+            # Native Readline gives the occupied rows relative to its cursor.
+            # Read fresh PTY cursor geometry; never guess from a stale UI frame.
+            source = request.get("source_geometry", {})
+            rows = await self.app.backend.request(
+                f"display-message -p -t {request['pane']} '#{{cursor_y}}|#{{pane_width}}|#{{pane_height}}'"
+            )
+            cy, width, height = map(int, rows[0].split("|"))
+            pane = next(p for p in self.app.panes if p.id == request["pane"])
+            valid = (
+                source.get("columns") == width
+                and source.get("rows") == height
+                and isinstance(source.get("before"), int)
+                and isinstance(source.get("after"), int)
+                and 0 <= source["before"] < 262144
+                and 0 <= source["after"] < 262144
+            )
+            if not valid:
+                logging.getLogger(__name__).warning(
+                    "native geometry mismatch: source=%s pane=%sx%s",
+                    source,
+                    width,
+                    height,
+                )
+                from . import rpc
+
+                await rpc.call(
+                    "notifications.publish",
+                    {
+                        "text": "无法定位原位命令区域；请重新加载 Bash 集成",
+                        "source": "terminal_agent",
+                    },
+                )
+                writer.write(
+                    json.dumps(dict(action="edit", state=request["state"])).encode()
+                    + b"\n"
+                )
+                await writer.drain()
+                return
+            top, bottom = (
+                max(0, cy - source["before"]),
+                min(height - 1, cy + source["after"]),
+            )
+            request["source_size"] = [width, height]
+            request["source_command_rect"] = dict(
+                x=pane.x, y=pane.y + top, width=width, height=bottom - top + 1
+            )
             future = asyncio.get_running_loop().create_future()
 
             def done(value):
@@ -72,7 +119,14 @@ class AgentBridge:
             finally:
                 disconnected.cancel()
                 await asyncio.gather(disconnected, return_exceptions=True)
-        except (OSError, ValueError, TimeoutError, KeyError):
+        except (
+            OSError,
+            ValueError,
+            TimeoutError,
+            KeyError,
+            RuntimeError,
+            StopIteration,
+        ):
             pass
         finally:
             self.writers.discard(writer)
