@@ -153,7 +153,7 @@ class ThemePanel(CosmosModal):
             self.app.query_one("#terminal").refresh()
             self.dismiss(True)
         except (OSError, RuntimeError) as error:
-            self.query_one("#theme-error", Static).update(str(error))
+            await self.app.action_error("settings.theme", error)
         finally:
             self.saving = False
 

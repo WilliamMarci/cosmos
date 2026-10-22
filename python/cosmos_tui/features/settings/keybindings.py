@@ -112,8 +112,10 @@ class KeyBindingEditor(CosmosModal):
             await rpc.call("settings.replace", settings)
             self.app.settings = settings
             self.dismiss(True)
-        except (ValueError, RuntimeError, OSError) as error:
+        except ValueError as error:
             self.query_one("#key-error", Static).update(str(error))
+        except (RuntimeError, OSError) as error:
+            await self.app.action_error("settings.keybindings", error)
 
     async def on_mini_action_pressed(self, event):
         event.stop()

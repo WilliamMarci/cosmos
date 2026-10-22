@@ -10,6 +10,22 @@ from cosmos_tui.core.paths import PROJECT_ROOT
 from cosmos_tui.ui.farewell import show_farewell
 
 
+REQUIRED_CAPABILITIES = {
+    "ui-components-v1", "keybindings", "notification-stack-v1", "leader-presets-v1"
+}
+REQUIRED_SETTINGS = {
+    "viewer_cache_mb", "viewer_prefetch", "terminal_theme", "leader2", "leader3",
+    "ime_number_style", "status_colors",
+}
+
+
+def compatibility_gaps(capabilities, settings):
+    """Check the running service, rather than the binary currently on disk."""
+    return sorted(
+        REQUIRED_CAPABILITIES - set(capabilities.get("capabilities", []))
+    ) + ["setting:" + key for key in sorted(REQUIRED_SETTINGS - settings.keys())]
+
+
 def run(args):
     from cosmos_tui.app import Cosmos
 
@@ -53,8 +69,9 @@ def run(args):
     async def prepare():
         await ensure()
         capabilities = await rpc.call("initialize", {"protocol_major": 1})
-        required = {"ui-components-v1", "keybindings"}
-        if not required.issubset(capabilities.get("capabilities", [])):
+        settings = await rpc.call("settings.get")
+        missing = compatibility_gaps(capabilities, settings)
+        if missing:
             binary = Path(
                 os.getenv(
                     "COSMOS_BINARY",
@@ -63,10 +80,8 @@ def run(args):
             )
             entry = PROJECT_ROOT / "cosmos"
             raise RuntimeError(
-                "the persistent coordinator lacks required capabilities: "
-                + ", ".join(
-                    sorted(required - set(capabilities.get("capabilities", [])))
-                )
+                "the persistent coordinator is incompatible with this UI: "
+                + ", ".join(missing)
                 + ". A new terminal reconnects to the same background service.\n"
                 + "Detach other Cosmos clients, then run:\n  "
                 + shlex.join([str(binary), "stop"])

@@ -72,6 +72,50 @@ class SettingsTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(app.screen.styles.background_tint.a, 0)
                     await pilot.press("escape")
 
+    async def test_rejected_setting_uses_notification_and_retains_value(self):
+        state = snapshot()
+        state["settings"]["viewer_cache_mb"] = 128
+        notices = []
+
+        async def rpc(method, params=None):
+            if method == "state.snapshot":
+                return copy.deepcopy(state)
+            if method == "settings.get":
+                return copy.deepcopy(state["settings"])
+            if method == "settings.replace":
+                raise RuntimeError("unknown field `viewer_cache_mb`")
+            if method == "notifications.publish":
+                notices.append(params)
+                return {}
+            return []
+
+        app = Probe()
+        with patch("cosmos_tui.core.rpc.call", side_effect=rpc):
+            async with app.run_test(size=(100, 40)) as pilot:
+                app.push_screen(Palette("reader_settings"))
+                await pilot.pause()
+                menu = app.screen
+                menu.query_one(ListView).index = 0
+                await pilot.press("right")
+                self.assertEqual(menu.rows[0]["value"], 128)
+                self.assertEqual(len(menu.query("#settings-error")), 0)
+                self.assertEqual(len(notices), 1)
+                self.assertEqual(notices[0]["level"], "error")
+                self.assertIn("viewer_cache_mb", notices[0]["text"])
+                self.assertIs(app.screen, menu)
+
+    def test_bootstrap_checks_running_settings_schema(self):
+        from cosmos_tui.runtime.bootstrap import (
+            compatibility_gaps, REQUIRED_CAPABILITIES, REQUIRED_SETTINGS,
+        )
+
+        capabilities = {"capabilities": list(REQUIRED_CAPABILITIES)}
+        settings = dict.fromkeys(REQUIRED_SETTINGS)
+        self.assertEqual(compatibility_gaps(capabilities, settings), [])
+        del settings["viewer_cache_mb"]
+        self.assertIn("setting:viewer_cache_mb", compatibility_gaps(capabilities, settings))
+        self.assertIn("notification-stack-v1", compatibility_gaps({}, settings))
+
     async def test_binding_hints_and_explicit_stage_fields(self):
         state = snapshot()
         state["settings"]["leader"] = "C-a"

@@ -11,7 +11,7 @@ Settings is a compact pop window. The frame and its list share the UI base color
 
 Cache size, adjacent-page prefetch, mouse mode, candidate number glyphs, Leader, interface theme, status visibility, reduced motion and notification enablement use this control. Other entries remain actions/submenus. Mouse mode stays client-local; the other choices use their existing shared configuration fields.
 
-Shared choices write settings.replace and read settings.get back before accepting the change. A rejected/unretained value stays unchanged and an inline error explains the failure. This also reports an older coordinator that cannot retain a newer field, instead of pretending the setting changed.
+Shared choices write settings.replace and read settings.get back before accepting the change. A rejected/unretained value stays unchanged. Persistence and operation failures go through the shared action-error handler and publish an error notification; they do not add an error block to the settings window. Keybinding syntax validation remains next to its input. Before opening the UI, startup checks the running coordinator capabilities and settings fields, including reader cache controls, and provides a restart command if they are incompatible. Opening a new terminal alone reconnects to the same background service.
 
 ## Shortcut names and phases
 

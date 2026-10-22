@@ -32,9 +32,6 @@ class Palette(CosmosModal):
             listing = ListView(id="actions")
             listing.styles.margin = 0
             yield listing
-            error = Static("", id="settings-error", markup=False)
-            error.styles.height = "auto"
-            yield error
             legend = Static(key_legend(self.app.role_colors), id="binding-legend")
             legend.styles.height = 1
             yield legend
@@ -299,12 +296,11 @@ class Palette(CosmosModal):
                 )
             await self.populate()
         except Exception as error:
-            self.app.message = str(error)
+            await self.app.action_error("settings.action", error)
 
     async def cycle_choice(self, row, direction):
         values = [value for value, _ in row["choices"]]
         value = values[(values.index(row["value"]) + direction) % len(values)]
-        error = self.query_one("#settings-error", Static)
         try:
             if row.get("local"):
                 self.app.set_mouse_mode(value)
@@ -319,10 +315,9 @@ class Palette(CosmosModal):
                         "Coordinator did not retain this setting; update/restart the coordinator and retry"
                     )
                 self.app.settings = actual
-            error.update("")
             await self.populate()
         except (RuntimeError, OSError, ValueError) as failure:
-            error.update(str(failure))
+            await self.app.action_error("settings." + row["key"], failure)
 
     async def on_setting_row_cycle(self, event):
         event.stop()
