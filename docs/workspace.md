@@ -18,6 +18,8 @@ Cosmos 管理 UI；Tmux 管理 PTY、终端解析、会话和应用。普通 SSH
 
 Cosmos 操作统一注册于 keymap.COMMANDS，由设置、分发和上下文帮助读取。动作级键位在 Settings → Keybindings 中编辑；实际默认值以注册表和当前设置为准，`Leader ?` 查看当前上下文帮助。详见 ui-api.md。前台 Bash/OpenCode 等应用的普通按键不由 Cosmos 改写。
 
+普通终端窗格中的 Ctrl+Space 按 NUL（Tmux C-Space）转发，兼容传统 Ctrl+@ 和 Kitty 扩展键盘事件。因此 Bash 中绑定到 `\C-@` 的 menu-complete 等操作仍由 Bash 处理。
+
 点击普通窗格可切换焦点。查看器区域支持缩略图、滚轮、缩放和平移。普通终端应用的鼠标事件透传不属于当前鼠标接口。
 
 ## 区域与组件

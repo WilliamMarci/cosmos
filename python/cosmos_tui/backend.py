@@ -265,6 +265,11 @@ class Tmux:
         return [p for p in panes if not zoomed or p.active]
 
     async def send(self, key, character=None):
+        # Legacy terminals send NUL; Kitty reports an explicit Ctrl+Space.
+        # Handle both before printable associated text can become a plain space.
+        if key in ("ctrl+space", "ctrl+@", "ctrl+at", "ctrl-at", "ctrl+\x00"):
+            await self.request("send-keys -- C-Space")
+            return
         names = {
             "enter": "Enter",
             "escape": "Escape",

@@ -11,10 +11,20 @@ sys.path[:0] = [
 from textual import events  # noqa: E402
 from cosmos_tui.app import Cosmos  # noqa: E402
 from textual._xterm_parser import XTermParser  # noqa: E402
-from cosmos_tui.backend import Pane  # noqa: E402
+from cosmos_tui.backend import Pane, Tmux  # noqa: E402
 
 
 class ShortcutTests(unittest.IsolatedAsyncioTestCase):
+    async def test_ctrl_space_legacy_and_kitty_reach_bash_as_nul(self):
+        backend = Tmux("test")
+        backend.request = AsyncMock()
+        for sequence in ("\x00", "\x1b[32;5u", "\x1b[32;5;32u"):
+            parser = XTermParser(lambda: False)
+            for event in parser.feed(sequence):
+                await backend.send(event.key, event.character)
+                backend.request.assert_awaited_with("send-keys -- C-Space")
+        self.assertEqual(backend.request.await_count, 3)
+
     async def test_shifted_quote_character_and_named_key_dispatch(self):
         for key, character in [
             ("quotation_mark", '"'),
