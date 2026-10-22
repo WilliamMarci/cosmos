@@ -7,9 +7,11 @@ from textual.widgets import Static
 from cosmos_tui.input.shortcuts import CosmosInput, CosmosModal
 from cosmos_tui.ui.chrome import BottomSheet, MiniAction, SheetShadow
 from cosmos_tui.ui.zones import Zone
+from cosmos_tui.ui.placement import bottom_input_rect, PaneInputSurface
 
 
-class BottomSearch(CosmosModal):
+class BottomSearch(PaneInputSurface, CosmosModal):
+    input_rows = 2
     preserve_workspace_graphics = True
     zone = Zone.BOTTOM_POWERLINE
     DEFAULT_CSS = """
@@ -26,7 +28,7 @@ class BottomSearch(CosmosModal):
         Binding("shift+f3", "previous", show=False),
     ]
 
-    def __init__(self, label, provider, *, initial="", steps=False):
+    def __init__(self, label, provider, *, initial="", steps=False, bounds=None):
         super().__init__()
         self.styles.background = "transparent"
         self.styles.background_tint = "transparent"
@@ -36,6 +38,8 @@ class BottomSearch(CosmosModal):
             initial,
             steps,
         )
+        self.zone = Zone.SESSION_WINDOW if bounds is not None else Zone.BOTTOM_POWERLINE
+        self.bounds = bounds
         self.busy = False
 
     def compose(self):
@@ -58,12 +62,16 @@ class BottomSearch(CosmosModal):
             yield MiniAction("×", id="content-search-close")
 
     def place(self):
-        bar = self.app.query_one("#status", Static)
         row = self.query_one("#content-search")
         sheet = self.query_one(BottomSheet)
-        y = max(0, self.app.size.height - int(bar.display) - 2)
+        rect = bottom_input_rect(self.app, 2, self.bounds)
+        if rect is None:
+            self.dismiss(None)
+            return
         sheet.apply_theme(self.app.role_colors)
-        self.query_one(SheetShadow).place(sheet, 0, y, self.app.size.width, 2)
+        self.query_one(SheetShadow).place(
+            sheet, *rect, contained=self.bounds is not None
+        )
         palette = self.app.role_colors
         row.styles.background, row.styles.color = palette["base"], palette["fg"]
         for button in self.query(MiniAction):

@@ -222,9 +222,11 @@ class SheetShadow(Widget):
     SheetShadow { position: absolute; width: 1; background: transparent; }
     """
 
-    def place(self, sheet, x, y, width, height):
+    def place(self, sheet, x, y, width, height, *, contained=False):
         # Reserve a single column when the sheet touches the screen edge.
-        content_width = max(1, width - int(x + width >= self.app.size.width))
+        content_width = max(
+            1, width - int(contained or x + width >= self.app.size.width)
+        )
         sheet.styles.width, sheet.styles.height = content_width, height
         sheet.styles.offset = (x, y)
         self.styles.offset = (x + content_width, y + 1)

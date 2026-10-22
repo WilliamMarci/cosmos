@@ -72,3 +72,7 @@ features/theme 隔离终端调色板适配、双栏主题选择和 UI 角色应�
 features/reader/cache.py 实现带锁字节 LRU；pdf.py 只负责元数据、内嵌大纲与文字匹配；media.py 管理 Poppler/Pillow 解码、文字/位图缓存及资源代数；layout.py 合成阅读画布与导航命中区；jump.py 实现底端页码输入；controller.py 管理按 pane 的阅读交互、全页搜索结果及单队列预读。后台工作不修改 Textual 控件；搜索栏的 provider 返回状态字符串，由 UI 更新结果区。
 
 BottomSearch 与 PageJump 声明 preserve_workspace_graphics=True，宿主打开它们时保留 Kitty 阅读图像，runtime 可继续提交下层阅读帧。其他弹窗沿用清图策略。搜索提交经输入控件消息队列，使用 Input.Submitted.value 快照，避免快速输入后回车读取到尚未处理完的前半截查询。
+
+ui/placement.bottom_input_rect 统一计算底端输入几何。阅读器传入基于稳定 pane ID 与文件路径的动态 bounds；运行时快照更新后重新定位搜索/跳页输入，区域包含内容、输入和阴影，源对象失效时退出。控件可共享，定位作用域不必全局：阅读输入属于 session_window，全局历史输入保持 bottom_powerline。
+
+PaneInputSurface 在应用输入显示时裁掉来源阅读图像底部的对应行，避免 Kitty/Ghostty 图形覆盖输入背景；裁剪结果随源帧与行数复用。该裁剪只改变呈现，不改变阅读布局或底层 PTY。

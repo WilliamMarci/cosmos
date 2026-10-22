@@ -4,10 +4,14 @@ from textual.binding import Binding
 from textual.widgets import Static
 from cosmos_tui.input.shortcuts import CosmosInput, CosmosModal
 from cosmos_tui.ui.chrome import BottomSheet, SheetShadow
+from cosmos_tui.ui.placement import bottom_input_rect, PaneInputSurface
+from cosmos_tui.ui.zones import Zone
 
 
-class PageJump(CosmosModal):
+class PageJump(PaneInputSurface, CosmosModal):
+    input_rows = 3
     preserve_workspace_graphics = True
+    zone = Zone.SESSION_WINDOW
     BINDINGS = [Binding("escape", "cancel", show=False)]
     DEFAULT_CSS = """
     #page-jump { position: absolute; width: 100%; height: 3; padding: 0 1; }
@@ -15,11 +19,12 @@ class PageJump(CosmosModal):
     #jump-error { height: 1; }
     """
 
-    def __init__(self, page, pages, submit):
+    def __init__(self, page, pages, submit, *, bounds=None):
         super().__init__()
         self.styles.background = "transparent"
         self.styles.background_tint = "transparent"
         self.page, self.pages, self.submit = page, pages, submit
+        self.bounds = bounds
 
     def compose(self):
         yield SheetShadow(id="jump-shadow")
@@ -33,9 +38,12 @@ class PageJump(CosmosModal):
         self.query_one(CosmosInput).focus()
 
     def place(self):
-        bottom = self.app.size.height - int(self.app.query_one("#status").display)
+        rect = bottom_input_rect(self.app, 3, self.bounds)
+        if rect is None:
+            self.dismiss(None)
+            return
         self.query_one(SheetShadow).place(
-            self.query_one(BottomSheet), 0, max(0, bottom - 3), self.app.size.width, 3
+            self.query_one(BottomSheet), *rect, contained=self.bounds is not None
         )
 
     def on_resize(self):

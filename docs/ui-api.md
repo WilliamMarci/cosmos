@@ -142,7 +142,7 @@ group = "My tools"
 
 ## 底端内容搜索宿主接口
 
-进程内 BottomSearch(label, provider, initial="", steps=False) 位于 features/search/bar.py。provider 是异步 (query, direction) 回调，返回简短状态字符串；direction=0 表示提交，±1 表示前后匹配，只有 steps=True 时显示导航按钮。输入和状态由公共控件负责，实际检索、匹配定位和源对象校验由功能 provider 负责。回调在源文档/窗格消失后必须拒绝继续操作。该接口目前用于内置 provider；尚未提供外部 Mod 搜索 provider 的 RPC 注册。
+进程内 BottomSearch(label, provider, initial="", steps=False, bounds=None) 位于 features/search/bar.py。provider 是异步 (query, direction) 回调，返回简短状态字符串；direction=0 表示提交，±1 表示前后匹配，只有 steps=True 时显示导航按钮。输入和状态由公共控件负责，实际检索、匹配定位和源对象校验由功能 provider 负责。bounds 可为 (x,y,width,height) 或动态返回该矩形的回调；缺省使用全局底部。阅读器传入来源 pane 的动态矩形，搜索覆盖该 pane 底端两行，阴影限制在其宽度内；源对象消失或文档被替换时回调返回 None，宿主关闭输入。PageJump 使用相同定位策略，占三行（含校验提示）。回调在源文档/窗格消失后必须拒绝继续操作。该接口目前用于内置 provider；尚未提供外部 Mod 搜索 provider 的 RPC 注册。
 
 
 底部开始菜单、Actions 和内容搜索使用 ui.chrome.BottomSheet：只有带标题的顶部横线，没有侧框或底框；SheetShadow 在右侧一列绘制细纹理阴影，不占用顶部空行。弹层显式设置透明背景与透明 background-tint，避免全局 Screen 样式覆盖透明规则。终端画面和状态栏在弹层外保持可见；不改变 PTY 大小。内容搜索为两行（标题线、输入与按钮）。

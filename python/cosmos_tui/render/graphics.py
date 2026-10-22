@@ -23,8 +23,10 @@ class Batch(CompositorUpdate):
 
 class Graphics:
     def __init__(self):
-        self.enabled = os.getenv("COSMOS_GRAPHICS", "") == "kitty" or (
-            os.getenv("COSMOS_GRAPHICS") != "text" and "kitty" in os.getenv("TERM", "")
+        mode = os.getenv("COSMOS_GRAPHICS", "")
+        term = os.getenv("TERM", "").lower()
+        self.enabled = mode == "kitty" or (
+            mode != "text" and ("kitty" in term or term == "xterm-ghostty")
         )
         self.images = {}
         self.sources = {}

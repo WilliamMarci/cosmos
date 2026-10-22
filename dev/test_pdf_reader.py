@@ -122,6 +122,41 @@ class PDFTests(unittest.TestCase):
 
 
 class PDFUITests(unittest.IsolatedAsyncioTestCase):
+    async def test_reader_inputs_follow_source_pane_bounds(self):
+        from cosmos_tui.ui.chrome import BottomSheet
+        from textual.events import Key
+
+        app = Probe()
+        async with app.run_test(size=(100, 40)) as pilot:
+            pane = app.active()
+            pane.x, pane.y, pane.width, pane.height = 8, 3, 50, 20
+            state = dict(path="/tmp/book.pdf", page=2, zoom=1, pan=[0, 0])
+            pane.viewer = base64.b64encode(json.dumps(state).encode()).decode()
+            app.reader_ui.pages[pane.id] = 5
+            app.reader_ui.open_pdf_search(pane, state)
+            await pilot.pause()
+            sheet = app.screen.query_one(BottomSheet)
+            self.assertEqual(tuple(sheet.region), (8, 21, 49, 2))
+            from PIL import Image
+
+            image = Image.new("RGB", (500, 400), "white")
+            covered = app.screen.cover_reader_image(image, pane)
+            self.assertEqual(covered.size, (500, 360))
+            self.assertIs(covered, app.screen.cover_reader_image(image, pane))
+            pane.x, pane.y, pane.width, pane.height = 20, 7, 60, 25
+            app.screen.place()
+            await pilot.pause()
+            self.assertEqual(tuple(sheet.region), (20, 30, 59, 2))
+            await pilot.press("escape")
+            await app.reader_ui.on_key(Key("g", "g"), pane)
+            await pilot.pause()
+            sheet = app.screen.query_one(BottomSheet)
+            self.assertEqual(tuple(sheet.region), (20, 29, 59, 3))
+            pane.viewer = None
+            app.screen.place()
+            await pilot.pause()
+            self.assertIs(app.screen, app._workspace_screen)
+
     async def test_rapid_typing_then_enter_preserves_complete_search(self):
         from textual.events import Key
         from cosmos_tui.features.search.bar import BottomSearch

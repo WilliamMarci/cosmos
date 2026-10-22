@@ -110,12 +110,18 @@ class RuntimeController(Controller):
                             return
                         lines[pane.id] = frame.lines
                         if reader_visible and not app.views:
-                            images.append((pane.id, frame.image, pane.x, pane.y))
+                            cover = getattr(app.screen, "cover_reader_image", None)
+                            image = cover(frame.image, pane) if cover else frame.image
+                            images.append((pane.id, image, pane.x, pane.y))
                     except Exception as error:
                         app.message = str(error)
             if app.search is not None:
                 app.message = "/" + app.search
             app.panes, app.lines = panes, lines
+            if getattr(app.screen, "bounds", None) is not None and getattr(
+                app.screen, "preserve_workspace_graphics", False
+            ):
+                app.screen.place()
             await app.assistant_ui.refresh(panes, terminal)
             app.graphics.commit(
                 images if app.graphics.enabled and reader_visible else []

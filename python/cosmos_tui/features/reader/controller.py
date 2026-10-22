@@ -34,6 +34,14 @@ class ReaderController(Controller):
         self.prepared_paths = {}
         self.frame_keys = {}
 
+    def pane_bounds(self, pid, path):
+        for pane in self.app.panes:
+            if pane.id == pid and pane.viewer:
+                state = json.loads(base64.b64decode(pane.viewer))
+                if state["path"] == path:
+                    return pane.x, pane.y, pane.width, pane.height
+        return None
+
     def open_pdf_search(self, pane, state):
         app = self.app
         pid = pane.id
@@ -42,7 +50,13 @@ class ReaderController(Controller):
             return await self.search_document(pid, state["path"], query, step)
 
         app.push_screen(
-            BottomSearch("PDF", search, initial=state.get("query", ""), steps=True)
+            BottomSearch(
+                "PDF",
+                search,
+                initial=state.get("query", ""),
+                steps=True,
+                bounds=lambda: self.pane_bounds(pid, state["path"]),
+            )
         )
 
     async def search_document(self, pid, path, query, step):
@@ -127,7 +141,12 @@ class ReaderController(Controller):
         if pid not in self.pages:
             self.pages[pid] = (await asyncio.to_thread(self.media.info, path))[0]
         self.app.push_screen(
-            PageJump(state.get("page", 1), self.pages.get(pid, 1), jump)
+            PageJump(
+                state.get("page", 1),
+                self.pages.get(pid, 1),
+                jump,
+                bounds=lambda: self.pane_bounds(pid, path),
+            )
         )
 
     def clear_cache(self):

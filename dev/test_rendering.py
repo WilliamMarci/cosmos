@@ -1,5 +1,7 @@
 """A suppressed Textual display batch must not discard queued Kitty images."""
 
+import os
+from unittest.mock import patch
 import sys
 import unittest
 from pathlib import Path
@@ -62,3 +64,15 @@ class RenderingTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GraphicsDetectionTests(unittest.TestCase):
+    def test_ghostty_graphics_and_explicit_text_override(self):
+        from cosmos_tui.render.graphics import Graphics
+
+        with patch.dict(os.environ, {"TERM": "xterm-ghostty", "COSMOS_GRAPHICS": ""}):
+            self.assertTrue(Graphics().enabled)
+        with patch.dict(
+            os.environ, {"TERM": "xterm-ghostty", "COSMOS_GRAPHICS": "text"}
+        ):
+            self.assertFalse(Graphics().enabled)
