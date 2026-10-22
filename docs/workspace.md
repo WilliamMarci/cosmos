@@ -28,7 +28,7 @@ Shell 加载顺序和 open 函数见 shell.md。配置通过 settings.get/replac
 
 `--debug` 开启 DEBUG UI 日志，也可 `--log-level INFO`、`--log-file PATH`。默认 WARNING；日志位于 `${XDG_STATE_HOME:-~/.local/state}/cosmos/logs/ui.log`，每文件 2 MiB，三个备份。记录动作/错误，不记录终端正文、完整助手请求或模型密钥。协调服务诊断入口为 `cosmos doctor`。
 
-Python UI 启动时检查 ui-components-v1 和 keybindings 能力。如果旧协调服务缺少能力，启动会明确提示先分离客户端、执行 cosmos stop 后重启；不会悄悄使用不兼容的 UI 接口，也不会自动终止用户 Mod。cosmos stop 保留 Tmux 应用，但会停止协调服务管理的 Mod。
+Python UI 启动时检查 ui-components-v1 和 keybindings 能力。如果旧协调服务缺少能力，启动会列出缺失能力，并给出协调服务二进制的绝对路径 stop 命令及 UI 重连命令；不会悄悄使用不兼容的 UI 接口，也不会自动终止用户 Mod。cosmos stop 保留 Tmux 应用，但会停止协调服务管理的 Mod。
 
 ## 分离与退出
 

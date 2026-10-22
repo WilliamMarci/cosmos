@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import os
 import subprocess
+import shlex
 from pathlib import Path
 from .app import Cosmos
 from . import rpc
@@ -60,8 +61,26 @@ def main():
         capabilities = await rpc.call("initialize", {"protocol_major": 1})
         required = {"ui-components-v1", "keybindings"}
         if not required.issubset(capabilities.get("capabilities", [])):
+            binary = Path(
+                os.getenv(
+                    "COSMOS_BINARY",
+                    Path(__file__).resolve().parents[2] / "target/release/cosmos",
+                )
+            )
+            entry = Path(__file__).resolve().parents[2] / "cosmos"
             raise RuntimeError(
-                "coordinator is older than this UI; detach clients, then run cosmos stop and start this UI again (Tmux applications are retained)"
+                "the persistent coordinator lacks required capabilities: "
+                + ", ".join(
+                    sorted(required - set(capabilities.get("capabilities", [])))
+                )
+                + ". A new terminal reconnects to the same background service.\n"
+                + "Detach other Cosmos clients, then run:\n  "
+                + shlex.join([str(binary), "stop"])
+                + "\n  "
+                + shlex.join(
+                    [str(entry), args.session] + (["--debug"] if args.debug else [])
+                )
+                + "\nTmux applications are retained; coordinator-managed Mods will stop."
             )
 
     try:
