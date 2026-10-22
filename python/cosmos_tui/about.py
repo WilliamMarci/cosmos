@@ -11,7 +11,7 @@ from .shortcuts import CosmosModal
 from .surfaces import Zone
 
 VERSION = "0.1.0"
-AUTHOR = "amadeus"
+AUTHOR = "William Marci"
 
 
 class About(CosmosModal):
