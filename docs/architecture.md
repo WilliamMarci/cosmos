@@ -78,3 +78,5 @@ ui/placement.bottom_input_rect 统一计算底端输入几何。阅读器传入�
 PaneInputSurface 在应用输入显示时裁掉来源阅读图像底部的对应行，避免 Kitty/Ghostty 图形覆盖输入背景；裁剪结果随源帧与行数复用。该裁剪只改变呈现，不改变阅读布局或底层 PTY。
 
 terminal/mouse.py owns client-local mouse policy, DEC 1016 probing and a pinned Textual Linux input adapter. App owns the requested mouse_mode, and Settings → Input delegates to set_mouse_mode without settings.replace. The parser's cell/pixel conversion follows the selected driver mode even after in-band resize reports. CLI --mouse-mode configures the UI instance through runtime/bootstrap; graphics detection remains independent.
+
+ui/settings.SettingRow 负责设置项名称/值/三角命中与灰色键位提示，feature/settings/Palette 负责配置写入、读回校验、客户端作用域和层级导航。CosmosModal 在构造时显式设置透明 background/background-tint，Frame 与其输入/列表统一语义 base 色；禁用默认 focus tint，使用 Textual 实际的 -highlight 类名。切换界面主题时同步 Frame 与列表颜色。

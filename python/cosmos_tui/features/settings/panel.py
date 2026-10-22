@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from textual.binding import Binding
-from textual.widgets import Input, Label, ListItem, ListView, Static
+from textual.widgets import Input, ListItem, ListView, Static
 
 from cosmos_tui.core import rpc
 from cosmos_tui.features.navigation.about import About
@@ -11,6 +11,7 @@ from cosmos_tui.input import keymap
 from cosmos_tui.input.groups import GROUPS, group
 from cosmos_tui.input.shortcuts import CosmosInput, CosmosModal
 from cosmos_tui.ui.chrome import Frame
+from cosmos_tui.ui.settings import SettingRow
 from cosmos_tui.ui.zones import Zone
 from cosmos_tui.ui.keyboard import KeyboardPreview, key_legend
 
@@ -31,6 +32,9 @@ class Palette(CosmosModal):
             listing = ListView(id="actions")
             listing.styles.margin = 0
             yield listing
+            error = Static("", id="settings-error", markup=False)
+            error.styles.height = "auto"
+            yield error
             legend = Static(key_legend(self.app.role_colors), id="binding-legend")
             legend.styles.height = 1
             yield legend
@@ -60,7 +64,11 @@ class Palette(CosmosModal):
             settings = snapshot.get("settings", getattr(self.app, "settings", {}))
             rows = [
                 dict(
-                    label=f"{command.label}  {', '.join(keymap.bindings(command, settings))}",
+                    label=command.label,
+                    hint=" / ".join(
+                        keymap.display_binding(k, settings)
+                        for k in keymap.bindings(command, settings)
+                    ),
                     kind="keybinding",
                     command=command,
                 )
@@ -73,29 +81,35 @@ class Palette(CosmosModal):
                 for a in actions
                 if a.get("category") == "keys" and a.get("kind") == "setting"
             ] + rows
+        settings = snapshot.get("settings", {})
+
+        def choice(label, key, values, default, *, local=False):
+            current = self.app.mouse_mode if local else settings.get(key, default)
+            values = list(values)
+            if current not in [value for value, _ in values]:
+                values.append((current, str(current)))
+            return dict(
+                label=label,
+                kind="choice",
+                key=key,
+                choices=values,
+                value=current,
+                local=local,
+            )
+
         if self.menu == "reader_settings":
-            settings = snapshot.get("settings", {})
             rows = [
-                dict(
-                    label=f"Reader cache: {size} MiB"
-                    + (
-                        " · current"
-                        if settings.get("viewer_cache_mb", 128) == size
-                        else ""
-                    ),
-                    kind="reader_setting",
-                    key="viewer_cache_mb",
-                    value=size,
-                )
-                for size in (64, 128, 256, 512)
-            ]
-            rows += [
-                dict(
-                    label="Prefetch adjacent pages: "
-                    + ("On" if settings.get("viewer_prefetch", True) else "Off"),
-                    kind="reader_setting",
-                    key="viewer_prefetch",
-                    value=not settings.get("viewer_prefetch", True),
+                choice(
+                    "Cache size",
+                    "viewer_cache_mb",
+                    [(n, f"{n} MiB") for n in (64, 128, 256, 512)],
+                    128,
+                ),
+                choice(
+                    "Prefetch adjacent pages",
+                    "viewer_prefetch",
+                    [(False, "Off"), (True, "On")],
+                    True,
                 ),
                 dict(label="Clear this client's reader cache", kind="reader_clear"),
             ]
@@ -106,29 +120,60 @@ class Palette(CosmosModal):
             ]
         if self.menu == "mouse_settings":
             rows = [
-                dict(
-                    label=mode.title()
-                    + (" · current" if self.app.mouse_mode == mode else ""),
-                    kind="mouse_mode",
-                    mode=mode,
+                choice(
+                    "Mouse mode",
+                    "mouse_mode",
+                    [(m, m.title()) for m in ("auto", "cell", "pixel")],
+                    "auto",
+                    local=True,
                 )
-                for mode in ("auto", "cell", "pixel")
             ]
         if self.menu == "ime_settings":
-            current = snapshot.get("settings", {}).get("ime_number_style", "normal")
             rows = [
-                dict(
-                    label=f"Candidate numbers: {sample}"
-                    + (" · current" if style == current else ""),
-                    kind="ime_style",
-                    style=style,
+                choice(
+                    "Candidate numbers",
+                    "ime_number_style",
+                    [
+                        ("normal", "1 2 3"),
+                        ("superscript", "¹ ² ³"),
+                        ("subscript", "₁ ₂ ₃"),
+                    ],
+                    "normal",
                 )
-                for style, sample in [
-                    ("superscript", "¹ ² ³"),
-                    ("subscript", "₁ ₂ ₃"),
-                    ("normal", "1 2 3"),
-                ]
             ]
+        for index, row in enumerate(rows):
+            if row.get("kind") == "setting":
+                key = row.get("key")
+                options = {
+                    "leader": (
+                        "Leader key",
+                        [("C-b", "Ctrl+B"), ("C-a", "Ctrl+A")],
+                        "C-b",
+                    ),
+                    "theme": (
+                        "Interface theme",
+                        [("dark", "Dark"), ("light", "Light")],
+                        "dark",
+                    ),
+                    "status_visible": (
+                        "Status bar",
+                        [(False, "Hidden"), (True, "Visible")],
+                        True,
+                    ),
+                    "reduced_motion": (
+                        "Reduced motion",
+                        [(False, "Off"), (True, "On")],
+                        False,
+                    ),
+                    "notifications_enabled": (
+                        "Notifications",
+                        [(False, "Off"), (True, "On")],
+                        True,
+                    ),
+                }
+                if key in options:
+                    label, values, default = options[key]
+                    rows[index] = choice(label, key, values, default)
         if self.menu == "mods":
             rows += [
                 dict(
@@ -149,10 +194,11 @@ class Palette(CosmosModal):
             rows.append(dict(label="About", kind="about"))
         self.rows = [a for a in rows if query in a["label"].casefold()]
         listing = self.query_one(ListView)
+        selected = listing.index
         await listing.clear()
-        await listing.extend(ListItem(Label(row["label"])) for row in self.rows)
+        await listing.extend(ListItem(SettingRow(row)) for row in self.rows)
         if self.rows:
-            listing.index = 0
+            listing.index = min(selected or 0, len(self.rows) - 1)
         self.update_keyboard()
         self.query_one("#palette", Frame).set_heading(
             "Cosmos / " + self.menu, "workspace.palette"
@@ -186,38 +232,20 @@ class Palette(CosmosModal):
         if index is None or index >= len(self.rows):
             return
         row = self.rows[index]
-        if row["kind"] == "mouse_mode":
-            self.app.set_mouse_mode(row["mode"])
-            await self.populate()
+        if row["kind"] == "choice":
+            await self.cycle_choice(row, 1)
             return
         if row["kind"] == "reader_clear":
             self.app.reader_ui.clear_cache()
             return
-        if row["kind"] == "reader_setting":
-            settings = await rpc.call("settings.get")
-            settings[row["key"]] = row["value"]
-            try:
-                await rpc.call("settings.replace", settings)
-                self.app.settings = settings
-                await self.populate()
-            except RuntimeError as error:
-                await self.app.action_error("reader settings", error)
-            return
         if row["kind"] == "theme":
             self.app.push_screen(ThemePanel())
             return
-        if row["kind"] == "ime_style":
-            settings = await rpc.call("settings.get")
-            settings["ime_number_style"] = row["style"]
-            try:
-                await rpc.call("settings.replace", settings)
-                self.app.settings = settings
-                await self.populate()
-            except RuntimeError as error:
-                await self.app.action_error("input method settings", error)
-            return
         if row["kind"] == "keybinding":
-            self.app.push_screen(KeyBindingEditor(row["command"]))
+            self.app.push_screen(
+                KeyBindingEditor(row["command"]),
+                lambda saved: self.call_later(self.populate) if saved else None,
+            )
             return
         if row["kind"] == "about":
             self.app.push_screen(About())
@@ -229,6 +257,7 @@ class Palette(CosmosModal):
         if row["kind"] == "menu":
             self.stack.append(self.menu)
             self.menu = row["menu"]
+            self.query_one(ListView).index = 0
             self.query_one(Input).value = ""
             await self.populate()
             return
@@ -245,6 +274,59 @@ class Palette(CosmosModal):
             await self.populate()
         except Exception as error:
             self.app.message = str(error)
+
+    async def cycle_choice(self, row, direction):
+        values = [value for value, _ in row["choices"]]
+        value = values[(values.index(row["value"]) + direction) % len(values)]
+        error = self.query_one("#settings-error", Static)
+        try:
+            if row.get("local"):
+                self.app.set_mouse_mode(value)
+            else:
+                settings = await rpc.call("settings.get")
+                settings[row["key"]] = value
+                await rpc.call("settings.replace", settings)
+                actual = await rpc.call("settings.get")
+                if actual.get(row["key"]) != value:
+                    raise RuntimeError(
+                        "Coordinator did not retain this setting; update/restart the coordinator and retry"
+                    )
+                self.app.settings = actual
+            error.update("")
+            await self.populate()
+        except (RuntimeError, OSError, ValueError) as failure:
+            error.update(str(failure))
+
+    async def on_setting_row_cycle(self, event):
+        event.stop()
+        await self.cycle_choice(event.row, event.direction)
+
+    async def action_cycle_previous(self):
+        await self.cycle_selected(-1)
+
+    async def action_cycle_next(self):
+        await self.cycle_selected(1)
+
+    async def cycle_selected(self, direction):
+        index = self.query_one(ListView).index
+        if (
+            index is not None
+            and index < len(self.rows)
+            and self.rows[index].get("choices")
+        ):
+            await self.cycle_choice(self.rows[index], direction)
+
+    async def action_parent(self):
+        await self.action_back()
+
+    async def action_child(self):
+        index = self.query_one(ListView).index
+        if (
+            index is not None
+            and index < len(self.rows)
+            and self.rows[index]["kind"] in ("menu", "theme", "about", "keybinding")
+        ):
+            await self.invoke()
 
     async def action_back(self):
         if self.stack:

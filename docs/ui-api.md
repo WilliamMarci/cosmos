@@ -86,7 +86,7 @@ SDK `api.notify(text, actionable=False, actions=None)` 返回通知 ID 对象。
 
 Cosmos 动作在 keymap.COMMANDS 注册：稳定 id、context、label、默认 keys 和 target。注册 ID 不可重复。实际分发、设置列表与上下文帮助使用同一注册表。工作区 Leader 动作可用于通用上下文；助手、查看器和菜单各有自己的按键作用域。独立修饰/锁定键不消耗前缀、不发给子 PTY。
 
-设置在 Cosmos → Settings → Keybindings 中修改；使用归一化名称，如 `leader+quotation_mark`、`ctrl+g`、`up`。多个别名用逗号分隔，留空恢复默认。保存时检查未知动作、空键和同作用域冲突。配置字段示例：
+设置在 Cosmos → Settings → Keybindings 中修改；使用归一化名称，如 `leader+quotation_mark`、`ctrl+g`、`up`。编辑器将第一次/第二次按键分栏，每行是一个别名，通过 + 按钮添加；逗号不再分隔阶段或别名，literal , 转为 comma。留空或重置恢复默认；两阶段目前只支持配置的 Leader。保存时检查未知动作、空键和同作用域冲突。配置字段示例：
 
 ```toml
 reduced_motion = false
@@ -117,7 +117,7 @@ reduced_motion = false
 
 内置设置、Switch、上下文键位帮助、键位编辑、About 和居中动作选择共用 ui.chrome.Frame；Mod 的 palette/help 展示也由宿主加同款边框。其余 cover line、通知和终端本身不加此框。边框使用当前主题角色色，标题两端有折线，容器分隔线在外框形成接点。
 
-Frame.set_heading(label, command_id) 从共享键位注册表读取对应按键，在标签中高亮匹配字符；字符不在标题中则追加该键，未绑定时不显示失效提示。Frame.junction_selector 可指定竖向分隔组件，按实际布局位置绘制顶部/底部接点。chrome.frame_border 是 Mod 字符展示与 Widget 共用的折线绘制函数，不创建额外 tty 输出通道。
+Frame.set_heading(label, command_id) 从共享键位注册表读取对应按键，在标签中高亮匹配字符；字符不在标题中则追加灰色实际按键提示（配置的 Ctrl+B/Ctrl+A → 后按键），未绑定时不显示失效提示。Frame.junction_selector 可指定竖向分隔组件，按实际布局位置绘制顶部/底部接点。chrome.frame_border 是 Mod 字符展示与 Widget 共用的折线绘制函数，不创建额外 tty 输出通道。
 
 
 ## 开始菜单与上下文 Actions
@@ -166,3 +166,5 @@ settings.get / settings.replace 的根配置增加 viewer_cache_mb（整数 16�
 ### Client-only input settings
 
 Settings → Input → Mouse mode is local to one UI connection; it is not part of settings.get/settings.replace or the Mod RPC contract. Auto/Cell/Pixel selection does not modify Kitty image rendering. See mouse.md for mode negotiation, startup arguments and lifecycle.
+
+设置列表的轮询值与分阶段编辑器、导航及内部 SettingRow 消息见 settings.md；配置字段与 RPC 形态不变。

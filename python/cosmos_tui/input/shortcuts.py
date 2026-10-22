@@ -48,6 +48,11 @@ def leader_bindings(modal=False):
 class CosmosModal(ModalScreen):
     BINDINGS = leader_bindings(modal=True)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.styles.background = "transparent"
+        self.styles.background_tint = "transparent"
+
     async def on_mount(self):
         if hasattr(self.app, "notification_events"):
             from cosmos_tui.features.notifications.toast import NoticeToast

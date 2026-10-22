@@ -90,7 +90,7 @@ class MouseUITests(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
                 self.assertEqual(first.screen.rows[0]["label"], "Mouse mode")
                 await first.screen.invoke()
-                first.screen.query_one(ListView).index = 1
+                first.screen.query_one(ListView).index = 0
                 await first.screen.invoke()
                 self.assertEqual(first.mouse_mode, "cell")
                 self.assertEqual(second.mouse_mode, "auto")

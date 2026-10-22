@@ -49,6 +49,13 @@ class InputRouter(Controller):
             if event.key == leader:
                 await self.action_leader(leader)
                 return
+            if not app.prefix and self.key_context() == "workspace":
+                direct = keymap.resolve(
+                    "workspace", leader_key(event.key, event.character), app.settings
+                )
+                if direct and direct.context == "workspace":
+                    await app.action_leader_key(direct.target)
+                    return
             if app.prefix:
                 key = leader_key(event.key, event.character)
                 context = self.key_context()
@@ -79,6 +86,14 @@ class InputRouter(Controller):
                 if context == "copy":
                     if command:
                         await app.copy_action(command.target)
+                    return
+                if (
+                    command
+                    and context == "palette"
+                    and command.target
+                    in ("cycle_previous", "cycle_next", "parent", "child")
+                ):
+                    await app.screen.run_action(command.target)
                     return
                 if command and context == "content_search":
                     # Queue editing actions behind the focused Input's earlier

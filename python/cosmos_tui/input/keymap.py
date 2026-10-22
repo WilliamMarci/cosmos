@@ -125,7 +125,17 @@ for context in (
             ("next", "Next item", "down"),
         ] + actions
     for name, label, key in actions:
-        register(context + "." + name, context, label, [key], key)
+        register(
+            context + "." + name,
+            context,
+            label,
+            [key, "q", "comma"]
+            if name == "close" and context == "about"
+            else [key, "q"]
+            if name == "close" and context == "palette"
+            else [key],
+            key,
+        )
 
 for name, label, keys, target in [
     ("cancel", "Return to terminal", ["escape", "q"], "cancel"),
@@ -211,6 +221,32 @@ def validate(overrides):
             raise ValueError(f"{key} conflicts with global command {global_keys[key]}")
 
 
+def display_binding(key, settings):
+    names = {
+        "quotation_mark": '"',
+        "percent_sign": "%",
+        "vertical_line": "|",
+        "full_stop": ".",
+        "comma": ",",
+        "space": "Space",
+        "ctrl": "Ctrl",
+        "alt": "Alt",
+        "shift": "Shift",
+        "left_square_bracket": "[",
+        "right_square_bracket": "]",
+        "question_mark": "?",
+    }
+    if key.startswith("leader+"):
+        leader = (
+            settings.get("leader", "C-b")
+            .replace("C-", "Ctrl+")
+            .upper()
+            .replace("CTRL", "Ctrl")
+        )
+        return leader + " → " + display_binding(key[7:], settings)
+    return "+".join(names.get(part, part) for part in key.split("+"))
+
+
 def help_rows(context, settings):
     names = {
         "quotation_mark": '"',
@@ -284,7 +320,24 @@ for name, label, key in [
     ("save", "Save themes", "ctrl+s"),
     ("cancel", "Cancel theme selection", "escape"),
 ]:
-    register("theme_settings." + name, "theme_settings", label, [key], key)
+    register(
+        "theme_settings." + name,
+        "theme_settings",
+        label,
+        [key, "q", "comma"] if name == "cancel" else [key],
+        key,
+    )
 
 register("page_jump.submit", "page_jump", "Go to page", ["enter"], "enter")
 register("page_jump.cancel", "page_jump", "Cancel page jump", ["escape"], "escape")
+
+register(
+    "palette.cycle_previous",
+    "palette",
+    "Previous setting value",
+    ["left"],
+    "cycle_previous",
+)
+register("palette.cycle_next", "palette", "Next setting value", ["right"], "cycle_next")
+register("palette.parent", "palette", "Parent settings menu", ["comma"], "parent")
+register("palette.child", "palette", "Open settings submenu", ["full_stop"], "child")

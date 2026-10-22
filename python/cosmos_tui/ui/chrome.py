@@ -65,21 +65,21 @@ class Frame(Vertical):
         command = next((c for c in COMMANDS if c.id == self.heading_command), None)
         if command:
             keys = bindings(command, getattr(self.app, "settings", {}))
+            from cosmos_tui.input.keymap import display_binding
+
             trigger = next(
                 (k.split("+")[-1] for k in keys if len(k.split("+")[-1]) == 1), None
             )
-            if trigger:
-                index = text.plain.casefold().find(trigger.casefold())
-                if index < 0:
-                    binding = next(k for k in keys if k.split("+")[-1] == trigger)
-                    hint = (
-                        binding.replace("leader+", "Leader ")
-                        .replace("ctrl+", "Ctrl+")
-                        .replace("alt+", "Alt+")
-                    )
-                    text.append(" [" + hint + "]")
-                    index = len(text.plain) - 2
+            index = text.plain.casefold().find(trigger.casefold()) if trigger else -1
+            if index >= 0:
                 text.stylize(Style(color=palette["accl"], bold=True), index, index + 1)
+            elif keys:
+                text.append(
+                    " ["
+                    + display_binding(keys[0], getattr(self.app, "settings", {}))
+                    + "]",
+                    style=palette["mute"],
+                )
         return text
 
     def border_strip(self, top):
@@ -126,6 +126,10 @@ class Frame(Vertical):
         self.styles.border_title_color = palette["accl"]
         self.styles.background = palette["base"]
         self.styles.color = palette["fg"]
+        for widget in self.query("ListView, Input"):
+            widget.styles.background = palette["base"]
+            widget.styles.background_tint = "transparent"
+            widget.styles.color = palette["fg"]
 
 
 class MiniAction(Widget, can_focus=True):

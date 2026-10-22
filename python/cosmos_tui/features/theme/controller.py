@@ -1,6 +1,7 @@
 """Apply interface colors without touching terminal cell palettes."""
 
 from textual.widgets import Input, ListView
+from cosmos_tui.ui.chrome import Frame
 
 
 def apply_interface(app):
@@ -14,6 +15,8 @@ def apply_interface(app):
         app._workspace_screen.styles.background = palette["bg"]
     for host in hosts:
         host.set_class(app.settings.get("theme") == "light", "cosmos-light")
+        for frame in host.query(Frame):
+            frame.apply_theme(palette)
         for widget in host.query("Input, ListView"):
             if isinstance(widget, (Input, ListView)):
                 widget.styles.background = palette["base"]
