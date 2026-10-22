@@ -24,6 +24,8 @@ Cosmos 操作统一注册于 keymap.COMMANDS，由设置、分发和上下文帮
 
 操作面板和 Switch 是紧凑 pop window；浮岛属于 cover line。辅助 UI 显隐不 resize 下方 PTY。底栏默认只显示当前窗口编号/名称，可注册状态小组件。通知不抢焦点，普通关闭仅影响当前客户端，动作处理服务级同步。接口见 ui-api.md。
 
+`Leader p` 的主菜单包含 About，可输入 about 筛选并按 Enter 打开。About 使用共享 Frame 边框，显示运行资源中的 ANSI Logo、Python UI 版本和作者署名；Esc 返回原菜单。关闭键使用统一键位设置中的 about.close。
+
 ## 配置和诊断
 
 Shell 加载顺序和 open 函数见 shell.md。配置通过 settings.get/replace 持久化，默认路径 `${XDG_CONFIG_HOME:-~/.config}/cosmos/config.toml`。

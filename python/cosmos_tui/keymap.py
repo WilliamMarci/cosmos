@@ -81,9 +81,9 @@ for name, label, keys, target in [
     *[(d, "Pan " + d, [d], d) for d in ("up", "down", "left", "right")],
 ]:
     register("viewer." + name, "viewer", label, keys, target)
-for context in ("palette", "switch", "menu", "help", "key_settings"):
+for context in ("palette", "switch", "menu", "help", "about", "key_settings"):
     actions = [("close", "Back / close", "escape")]
-    if context != "help":
+    if context not in ("help", "about"):
         actions.insert(0, ("choose", "Choose", "enter"))
     if context in ("palette", "switch", "menu"):
         actions = [

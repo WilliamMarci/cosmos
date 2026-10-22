@@ -28,6 +28,7 @@ from .key_settings import KeyBindingEditor
 from .ui import UIRegistry
 from .notifications import NoticeToast
 from .menus import CompactMenu
+from .about import About
 from .presentation import (
     SessionWindows,
     PopWindows,
@@ -270,6 +271,7 @@ class Palette(CosmosModal):
                 [
                     dict(label="Command assistant", kind="local", key="a"),
                     dict(label="OpenCode · split", kind="local", key="g"),
+                    dict(label="About", kind="about"),
                 ]
             )
         self.rows = [a for a in rows if query in a["label"].casefold()]
@@ -308,6 +310,9 @@ class Palette(CosmosModal):
         if index is None or index >= len(self.rows):
             return
         row = self.rows[index]
+        if row["kind"] == "about":
+            self.app.push_screen(About())
+            return
         if row["kind"] == "local":
             self.dismiss()
             self.app.call_after_refresh(self.app.action_leader_key, row["key"])
@@ -468,6 +473,8 @@ class Cosmos(App, inherit_bindings=False):
             return "menu"
         if isinstance(self.screen, Help):
             return "help"
+        if isinstance(self.screen, About):
+            return "about"
         if self.view_focus is not None:
             return "surface"
         pane = self.active()
@@ -669,7 +676,7 @@ class Cosmos(App, inherit_bindings=False):
                     )
                 )
                 return
-            if isinstance(self.screen, (Palette, CompactMenu)):
+            if isinstance(self.screen, (Palette, CompactMenu, About)):
                 self.push_screen(
                     Help("Actions", keymap.help_rows(self.key_context(), self.settings))
                 )
