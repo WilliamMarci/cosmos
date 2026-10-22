@@ -54,8 +54,9 @@ class NoticeToast(CellSurface):
         self.display = bool(notices) and width > 1 and height > status_rows
         if not self.display:
             return
-        available = max(2, min(width, 60, pane_width or width))
-        bottom = height - status_rows
+        available = max(2, int(min(width, 60, pane_width or width) * 0.7))
+        limit = height - status_rows
+        top = 0
         runs, hits = [], []
         left = width
         for notice in reversed(notices):
@@ -82,13 +83,15 @@ class NoticeToast(CellSurface):
             second = clip(remaining, text_width)
             if len(second) < len(remaining) and text_width > 1:
                 second = clip(second, text_width - 1) + "…"
-            rows = 2 if remaining or cell_width(first) + suffix_width > text_width else 1
+            rows = (
+                2 if remaining or cell_width(first) + suffix_width > text_width else 1
+            )
             if rows == 2 and not remaining:
                 first = clip(text, max(0, text_width - suffix_width))
-                remaining = text[len(first):]
+                remaining = text[len(first) :]
                 second = remaining
-            if rows > bottom:
-                if bottom < 1:
+            if rows > limit - top:
+                if limit - top < 1:
                     break
                 rows, second = 1, ""
                 first = clip(first, max(0, text_width - 1)) + "…"
@@ -102,7 +105,7 @@ class NoticeToast(CellSurface):
                         second = clip(second, capacity - 1) + "…"
             content_width = max(cell_width(first), cell_width(second))
             total = available
-            x, y = width - total, bottom - rows
+            x, y = width - total, top
             left = min(left, x)
             level = COLORS.get(notice.get("level", "info"), COLORS["info"])
             for row, value in enumerate((first, second)[:rows]):
@@ -121,10 +124,14 @@ class NoticeToast(CellSurface):
                     )
             if suffix:
                 last_text = first if rows == 1 else second
-                runs.append(CellRun(
-                    Rect(x + 2 + cell_width(last_text), y + rows - 1, suffix_width),
-                    suffix, COLORS["warning"], palette["base"],
-                ))
+                runs.append(
+                    CellRun(
+                        Rect(x + 2 + cell_width(last_text), y + rows - 1, suffix_width),
+                        suffix,
+                        COLORS["warning"],
+                        palette["base"],
+                    )
+                )
             for index, (action, label) in enumerate(actions):
                 rect = Rect(
                     x + total - button_width + index * 3,
@@ -137,12 +144,12 @@ class NoticeToast(CellSurface):
                 label = " " * max(0, (rect.width - cell_width(label)) // 2) + label
                 runs.append(CellRun(rect, label, palette["accl"], palette["base"]))
                 hits.append(HitRegion(f"{notice['id']}:{action}", rect))
-            bottom = y
-            if not bottom:
+            top += rows
+            if top >= limit:
                 break
         self.present(
             UIFrame(
-                Rect(left, bottom, width - left, height - status_rows - bottom),
+                Rect(left, 0, width - left, top),
                 tuple(runs),
                 tuple(hits),
             )

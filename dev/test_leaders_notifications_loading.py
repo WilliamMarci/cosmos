@@ -226,7 +226,8 @@ class NotificationTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(markers[0].foreground, COLORS["error"])
             old = next(h for h in toast.frame.hits if h.action == "1:__dismiss__")
             new = next(h for h in toast.frame.hits if h.action == "2:ok")
-            self.assertLess(old.rect.y, new.rect.y)
+            self.assertGreater(old.rect.y, new.rect.y)
+            self.assertEqual(toast.frame.bounds.y, 0)
             original_post_message = toast.post_message
             toast.post_message = Mock()
             toast.choose("1:__dismiss__")
@@ -236,7 +237,7 @@ class NotificationTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(any(run.text.startswith("¹ ") for run in toast.frame.runs))
             toast.present_notices(notices, 80, 24, app.role_colors, pane_width=40)
             self.assertTrue(
-                all(run.rect.width == 40 for run in toast.frame.runs if not run.text)
+                all(run.rect.width == 28 for run in toast.frame.runs if not run.text)
             )
             for width in (2, 4, 10, 60):
                 toast.present_notices(notices, width, 8, app.role_colors)
