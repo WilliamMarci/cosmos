@@ -116,7 +116,7 @@ class NavigationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn(frame.styles.border_bottom[0], ("", "none"))
                 self.assertEqual(
                     (frame.region.x, frame.region.width, frame.region.bottom),
-                    (0, 80, 23),
+                    (0, 79, 23),
                 )
                 self.assertLessEqual(frame.region.height, 23 // 2)
                 labels = {row["label"] for row in app.screen.entries}
@@ -159,6 +159,21 @@ class NavigationTests(unittest.IsolatedAsyncioTestCase):
                 app.backend.select_window.assert_awaited_once_with(window)
                 self.assertIs(app.screen, app._workspace_screen)
                 self.assertEqual(app.active().id, "%0")
+
+    async def test_quit_action_retains_sessions_and_list_has_no_top_gap(self):
+        with patch("cosmos_tui.core.rpc.call", AsyncMock(return_value=snapshot())):
+            app = Probe()
+            app.detach = AsyncMock()
+            async with app.run_test(size=(80, 24)) as pilot:
+                await pilot.press("ctrl+p")
+                listing = app.screen.query_one("#entry-list")
+                frame = app.screen.query_one("#entry-frame")
+                self.assertEqual(listing.region.y, frame.content_region.y)
+                shadow = app.screen.query_one("#entry-shadow")
+                self.assertEqual(shadow.region.x, frame.region.right)
+                self.assertEqual(shadow.region.width, 1)
+                await pilot.press(*"quit", "enter")
+                app.detach.assert_awaited_once_with("exit")
 
     async def test_status_click_opens_grouped_launcher_and_about(self):
         with patch("cosmos_tui.core.rpc.call", AsyncMock(return_value=snapshot())):

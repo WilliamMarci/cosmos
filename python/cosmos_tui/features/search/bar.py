@@ -57,12 +57,8 @@ class BottomSearch(CosmosModal):
         row = self.query_one("#content-search")
         sheet = self.query_one(BottomSheet)
         y = max(0, self.app.size.height - int(bar.display) - 2)
-        sheet.styles.offset = (0, y)
         sheet.apply_theme(self.app.role_colors)
-        shadow = self.query_one(SheetShadow)
-        shadow.styles.width = self.app.size.width
-        shadow.styles.offset = (0, max(0, y - 1))
-        shadow.display = y > 0
+        self.query_one(SheetShadow).place(sheet, 0, y, self.app.size.width, 2)
         palette = self.app.role_colors
         row.styles.background, row.styles.color = palette["base"], palette["fg"]
         for button in self.query(MiniAction):

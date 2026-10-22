@@ -89,7 +89,7 @@ class Cosmos(App, inherit_bindings=False):
     def compose(self) -> ComposeResult:
         yield TerminalSurface(id="terminal")
         yield Static("", id="agent-powerline", markup=False)
-        yield StatusBar(" cosmos ", id="status")
+        yield StatusBar(" COSMOS ", id="status")
         yield NoticeToast(id="notice")
 
     def push_screen(self, *args, **kwargs):

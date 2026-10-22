@@ -182,7 +182,7 @@ class MiniAction(Widget, can_focus=True):
 
 
 class BottomSheet(Frame):
-    """Compact overlay: title separator only, with a one-cell leading shadow."""
+    """Compact overlay: title separator only, with a separate right-edge shadow."""
 
     DEFAULT_CSS = """
     BottomSheet { border: none; border-top: solid #62a0e6; padding: 0 1; }
@@ -216,11 +216,26 @@ class BottomSheet(Frame):
 
 
 class SheetShadow(Widget):
-    """A local shadow above a bottom sheet; never a screen-sized dimmer."""
-
-    def render(self):
-        return ""
+    """One-cell textured shadow on a sheet's right edge."""
 
     DEFAULT_CSS = """
-    SheetShadow { position: absolute; height: 1; background: black 22%; }
+    SheetShadow { position: absolute; width: 1; background: transparent; }
     """
+
+    def place(self, sheet, x, y, width, height):
+        # Reserve a single column when the sheet touches the screen edge.
+        content_width = max(1, width - int(x + width >= self.app.size.width))
+        sheet.styles.width, sheet.styles.height = content_width, height
+        sheet.styles.offset = (x, y)
+        self.styles.offset = (x + content_width, y + 1)
+        self.styles.height = max(1, height - 1)
+        self.display = x + content_width < self.app.size.width and height > 1
+
+    def render_line(self, y):
+        from cosmos_tui.ui.theme import blend
+
+        palette = getattr(self.app, "role_colors", DEFAULT)
+        style = Style(
+            color=blend(palette["bg"], palette["mute"], 0.35), bgcolor=palette["bg"]
+        )
+        return Strip([Segment("░" * self.size.width, style)], self.size.width)

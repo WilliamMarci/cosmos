@@ -38,11 +38,9 @@ class NewSession(CosmosModal):
 
     def place(self):
         bottom = self.app.size.height - int(self.app.query_one("#status").display)
-        self.query_one(BottomSheet).styles.offset = (0, max(0, bottom - 3))
-        shadow = self.query_one(SheetShadow)
-        shadow.styles.offset = (0, max(0, bottom - 4))
-        shadow.styles.width = self.app.size.width
-        shadow.display = bottom > 3
+        self.query_one(SheetShadow).place(
+            self.query_one(BottomSheet), 0, max(0, bottom - 3), self.app.size.width, 3
+        )
 
     def on_resize(self):
         if self.is_mounted:

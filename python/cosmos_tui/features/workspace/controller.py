@@ -44,6 +44,9 @@ class WorkspaceController(Controller):
         if key == "actions":
             app.action_context_actions()
             return
+        if key == "quit":
+            await app.detach("exit")
+            return
         if key == "d":
             await app.detach()
             return

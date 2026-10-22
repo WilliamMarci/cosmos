@@ -126,7 +126,7 @@ class RuntimeController(Controller):
             if app.graphics.pending:
                 app.call_after_refresh(app.flush_graphics)
             status = Text(
-                " cosmos ",
+                " COSMOS ",
                 style=f"bold {app.role_colors['accl']} on {app.role_colors['base']}",
             )
             for _, index, active, name in app.backend.tabs:

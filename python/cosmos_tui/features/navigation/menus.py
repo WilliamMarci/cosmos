@@ -44,7 +44,9 @@ class EntryPicker(CosmosModal):
                 "Actions" if isinstance(self, ActionDrawer) else "Cosmos",
                 "global.actions" if isinstance(self, ActionDrawer) else "global.start",
             )
-            yield ListView(id="entry-list")
+            listing = ListView(id="entry-list")
+            listing.styles.margin = 0
+            yield listing
             yield CosmosInput(
                 placeholder="Filter actions"
                 if isinstance(self, ActionDrawer)
@@ -76,12 +78,7 @@ class EntryPicker(CosmosModal):
             rows = max(1, min(bottom, max(6, min(len(self.rows) + 3, 20))))
             offset = 0, bottom - rows
         frame = self.query_one(Frame)
-        frame.styles.width, frame.styles.height = width, rows
-        frame.styles.offset = offset
-        shadow = self.query_one(SheetShadow)
-        shadow.styles.width = width
-        shadow.styles.offset = (offset[0], max(0, offset[1] - 1))
-        shadow.display = offset[1] > 0
+        self.query_one(SheetShadow).place(frame, *offset, width, rows)
 
     async def populate(self):
         query = self.query_one(CosmosInput).value.casefold()

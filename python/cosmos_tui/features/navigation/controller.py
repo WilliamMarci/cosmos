@@ -43,6 +43,7 @@ class NavigationController(Controller):
                 available = {
                     "switch",
                     "detach",
+                    "quit",
                     "new_session",
                     "split_horizontal",
                     "split_vertical",
@@ -128,6 +129,7 @@ class NavigationController(Controller):
                     "workspace.switch",
                     "workspace.agent",
                     "workspace.new_session",
+                    "workspace.quit",
                 ):
                     rows.append(
                         dict(

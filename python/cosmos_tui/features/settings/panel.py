@@ -25,7 +25,9 @@ class Palette(CosmosModal):
     def compose(self):
         with Frame(id="palette") as frame:
             frame.set_heading("Cosmos / settings", "workspace.palette")
-            yield ListView(id="actions")
+            listing = ListView(id="actions")
+            listing.styles.margin = 0
+            yield listing
             yield CosmosInput(placeholder="", id="filter")
 
     async def on_mount(self):
