@@ -10,6 +10,7 @@ from cosmos_tui.ui.zones import Zone
 
 
 class BottomSearch(CosmosModal):
+    preserve_workspace_graphics = True
     zone = Zone.BOTTOM_POWERLINE
     DEFAULT_CSS = """
     BottomSearch { background: transparent; background-tint: transparent; }
@@ -19,7 +20,11 @@ class BottomSearch(CosmosModal):
     #content-search-query { width: 1fr; height: 1; border: none; padding: 0; }
     #content-search-result { width: auto; max-width: 30%; height: 1; }
     """
-    BINDINGS = [Binding("escape", "close", show=False)]
+    BINDINGS = [
+        Binding("escape", "close", show=False),
+        Binding("f3", "next", show=False),
+        Binding("shift+f3", "previous", show=False),
+    ]
 
     def __init__(self, label, provider, *, initial="", steps=False):
         super().__init__()
@@ -72,23 +77,29 @@ class BottomSearch(CosmosModal):
         if self.is_mounted:
             self.place()
 
-    async def apply(self, direction=0):
+    async def apply(self, direction=0, query=None):
         if self.busy:
             return
         self.busy = True
         try:
-            query = self.query_one(CosmosInput).value[:8192]
+            query = (self.query_one(CosmosInput).value if query is None else query)[
+                :8192
+            ]
             result = await self.provider(query, direction)
+            if not self.is_mounted:
+                return
             self.query_one("#content-search-result", Static).update(
                 " " + (result or "") + " "
             )
         except (OSError, RuntimeError, ValueError) as error:
+            if not self.is_mounted:
+                return
             self.query_one("#content-search-result", Static).update(str(error))
         finally:
             self.busy = False
 
     async def on_input_submitted(self, event):
-        await self.apply()
+        await self.apply(query=event.value)
 
     async def action_submit(self):
         await self.apply()

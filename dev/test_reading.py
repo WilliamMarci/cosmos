@@ -48,7 +48,9 @@ class ReadingTests(unittest.TestCase):
     def test_document_navigation_is_left_and_collapses(self):
         # Stub thumbnail decoding to isolate layout from Poppler availability.
         media = Media()
-        media.thumbnail = lambda state, bounds: Image.new("RGB", (30, 40), "white")
+        media.thumbnail = lambda state, bounds, **kwargs: Image.new(
+            "RGB", (30, 40), "white"
+        )
         source = Image.new("RGB", (600, 800), "white")
         state = dict(path="/tmp/document.pdf", page=2, zoom=1, pan=[0, 0])
         reader = Reader(media)

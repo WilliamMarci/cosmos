@@ -9,6 +9,7 @@ from cosmos_tui.features.navigation.switcher import Switcher
 from cosmos_tui.features.navigation.session_prompt import NewSession
 from cosmos_tui.features.notifications.toast import NoticeToast
 from cosmos_tui.features.search.bar import BottomSearch
+from cosmos_tui.features.reader.jump import PageJump
 from cosmos_tui.features.settings.keybindings import KeyBindingEditor
 from cosmos_tui.features.settings.panel import Palette
 from cosmos_tui.features.theme.panel import ThemePanel
@@ -121,6 +122,7 @@ class WorkspaceController(Controller):
                     CompactMenu,
                     About,
                     BottomSearch,
+                    PageJump,
                     KeyBindingEditor,
                     ActionDrawer,
                     StartMenu,

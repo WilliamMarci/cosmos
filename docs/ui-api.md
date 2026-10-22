@@ -156,3 +156,9 @@ Actions、开始菜单和设置 Panel 的列表筛选输入框位于各自容器
 进程内 CellRun 新增可选 underline 与 reverse（默认 false），用于共享渲染层绘制输入法分段下划线和编辑光标；既有字段和位置参数保持兼容。输入法的两行布局位于 features/ime/layout.py，以 Rime context、可用 Rect、源 cursor 和主题生成 UIFrame；编号与分页命中区域同帧提交。
 
 终端颜色与 Cosmos UI 主题独立：`terminal_theme` 控制默认颜色和 ANSI 16 色，`theme` 控制语义角色。Mod presentation 的 role 色仍取 Cosmos UI 主题，不跟随终端预设。Theme 面板及配置见 [themes.md](themes.md)。
+
+### 内置阅读搜索与资源设置
+
+内置 BottomSearch 的异步 provider(query, direction) 返回紧凑状态文本；direction 为 0（提交）、1（下一）、-1（上一）。PDF provider 对全文文字层检索并更新 pane 阅读状态，UI 不自行检索；输入控件排队提交完整查询。该 Python 适配器是宿主内部接口，不等同于外部 Mod RPC。
+
+settings.get / settings.replace 的根配置增加 viewer_cache_mb（整数 16–1024，默认 128）与 viewer_prefetch（布尔，默认 true）。Settings → Reader 的清理按钮仅清理当前客户端内存资源；现有 viewer.cache.clear RPC 清理协调服务缓存，二者作用域不同。阅读打开/状态/关闭 RPC 与新增导航状态见 viewer.md。

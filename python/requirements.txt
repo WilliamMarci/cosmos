@@ -4,3 +4,5 @@ prompt-toolkit>=3.0.48,<4
 
 regex>=2025.9,<2027
 wcwidth>=0.2.14,<1
+
+pypdf>=6.9.2,<7

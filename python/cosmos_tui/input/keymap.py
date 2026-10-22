@@ -94,6 +94,11 @@ for name, label, keys, target in [
     ("previous", "Previous page / image", ["left_square_bracket", "comma"], "["),
     ("next", "Next page / image", ["right_square_bracket", "full_stop"], "]"),
     ("search", "Search PDF", ["slash"], "/"),
+    ("jump", "Go to page", ["g"], "g"),
+    ("find_next", "Next PDF match", ["n"], "n"),
+    ("find_previous", "Previous PDF match", ["N"], "N"),
+    ("outline", "Switch thumbnails / outline", ["o"], "o"),
+    ("navigation_focus", "Focus outline / page", ["tab"], "tab"),
     ("help", "Viewer help", ["question_mark"], "?"),
     *[
         (d, "Pan " + d, [d, k], d)
@@ -280,3 +285,6 @@ for name, label, key in [
     ("cancel", "Cancel theme selection", "escape"),
 ]:
     register("theme_settings." + name, "theme_settings", label, [key], key)
+
+register("page_jump.submit", "page_jump", "Go to page", ["enter"], "enter")
+register("page_jump.cancel", "page_jump", "Cancel page jump", ["escape"], "escape")

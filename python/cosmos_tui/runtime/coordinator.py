@@ -38,6 +38,7 @@ class RuntimeController(Controller):
 
     async def on_unmount(self):
         app = self.app
+        await app.reader_ui.close()
         app.ime.close()
         await app.assistant_ui.close()
         await app.backend.close()
@@ -96,6 +97,10 @@ class RuntimeController(Controller):
                 ):
                     app.view_focus = view["id"]
 
+            reader_visible = app.screen is app._workspace_screen or getattr(
+                app.screen, "preserve_workspace_graphics", False
+            )
+            app.reader_ui.sync_visible(panes)
             for pane in panes:
                 lines[pane.id] = list(decode_grid(tuple(pane.lines)))
                 if pane.viewer:
@@ -104,7 +109,7 @@ class RuntimeController(Controller):
                         if frame is None:
                             return
                         lines[pane.id] = frame.lines
-                        if app.screen is app._workspace_screen and not app.views:
+                        if reader_visible and not app.views:
                             images.append((pane.id, frame.image, pane.x, pane.y))
                     except Exception as error:
                         app.message = str(error)
@@ -113,9 +118,7 @@ class RuntimeController(Controller):
             app.panes, app.lines = panes, lines
             await app.assistant_ui.refresh(panes, terminal)
             app.graphics.commit(
-                images
-                if app.graphics.enabled and app.screen is app._workspace_screen
-                else []
+                images if app.graphics.enabled and reader_visible else []
             )
             surface_state = (
                 [(p.id, p.x, p.y, p.width, p.height, p.active) for p in panes],

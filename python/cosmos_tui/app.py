@@ -97,7 +97,9 @@ class Cosmos(App, inherit_bindings=False):
         yield NoticeToast(id="notice")
 
     def push_screen(self, *args, **kwargs):
-        self.graphics.commit([])
+        screen = args[0] if args else kwargs.get("screen")
+        if not getattr(screen, "preserve_workspace_graphics", False):
+            self.graphics.commit([])
         return super().push_screen(*args, **kwargs)
 
     def active(self):

@@ -10,6 +10,7 @@ from pathlib import Path
 from cosmos_tui.core.controller import Controller
 from cosmos_tui.features.reader.layout import Reader
 from cosmos_tui.features.reader.media import Media
+from cosmos_tui.features.reader.jump import PageJump
 from cosmos_tui.features.search.bar import BottomSearch
 from cosmos_tui.input import keymap
 from cosmos_tui.render.surface import TerminalSurface
@@ -26,26 +27,191 @@ class ReaderController(Controller):
         self.revisions = {}
         self.drag = None
         self.pixel_cell = None
+        self.searches = {}
+        self.prefetch_task = None
+        self.prefetch_request = None
+        self.prefetch_token = None
+        self.prepared_paths = {}
+        self.frame_keys = {}
 
     def open_pdf_search(self, pane, state):
         app = self.app
         pid = pane.id
 
         async def search(query, step):
-            target = next((p for p in app.panes if p.id == pid and p.viewer), None)
+            return await self.search_document(pid, state["path"], query, step)
+
+        app.push_screen(
+            BottomSearch("PDF", search, initial=state.get("query", ""), steps=True)
+        )
+
+    async def search_document(self, pid, path, query, step):
+        app = self.app
+        target = next((p for p in app.panes if p.id == pid and p.viewer), None)
+        if not target:
+            raise RuntimeError("Source document pane is no longer available")
+        current = json.loads(base64.b64decode(target.viewer))
+        if Path(current["path"]).suffix.lower() != ".pdf":
+            return "No text layer in this image"
+        if current["path"] != path:
+            raise RuntimeError("Source document changed; reopen search")
+        current["query"] = query
+        if not query:
+            self.searches.pop(pid, None)
+            current.pop("active_match", None)
+            await self.update_viewer(target, current)
+            return "Search cleared"
+        identity = await asyncio.to_thread(self.media.identity, current["path"])
+        cached = self.searches.get(pid)
+        if not cached or cached["key"] != (identity, query):
+            results, has_text = await asyncio.to_thread(
+                self.media.search, current["path"], query
+            )
+            cached = dict(
+                key=(identity, query), results=results, index=-1, has_text=has_text
+            )
+            self.searches[pid] = cached
+        # Verify the captured source again after text extraction.
+        target = next(
+            (
+                p
+                for p in app.panes
+                if p.id == pid
+                and p.viewer
+                and json.loads(base64.b64decode(p.viewer))["path"] == current["path"]
+            ),
+            None,
+        )
+        if not target:
+            raise RuntimeError("Source document is no longer available")
+        results = cached["results"]
+        if not results:
+            await self.update_viewer(target, current)
+            return "No matches" if cached["has_text"] else "No text layer"
+        if cached["index"] < 0 or not step:
+            cached["index"] = next(
+                (
+                    i
+                    for i, item in enumerate(results)
+                    if item["page"] >= current.get("page", 1)
+                ),
+                0,
+            )
+        else:
+            cached["index"] = (cached["index"] + step) % len(results)
+        match = results[cached["index"]]
+        current["page"] = match["page"]
+        current["active_match"] = sum(
+            1 for item in results[: cached["index"]] if item["page"] == match["page"]
+        )
+        current["pan"] = [0, 0]
+        current.pop("outline_scroll", None)
+        await self.update_viewer(target, current)
+        return f"{cached['index'] + 1}/{len(results)} · page {match['page']}"
+
+    async def open_jump(self, pane, state):
+        pid, path = pane.id, state["path"]
+
+        async def jump(page):
+            target = next((p for p in self.app.panes if p.id == pid and p.viewer), None)
             if not target:
                 raise RuntimeError("Source document pane is no longer available")
             current = json.loads(base64.b64decode(target.viewer))
-            if Path(current["path"]).suffix.lower() != ".pdf":
-                return "No text layer in this image"
-            current["query"] = query
+            if current["path"] != path:
+                raise RuntimeError("Source document changed")
+            current.update(page=page, pan=[0, 0])
+            current.pop("outline_scroll", None)
+            current.pop("outline_index", None)
             await self.update_viewer(target, current)
-            _, _, has_text = await asyncio.to_thread(self.media.load, current)
-            if not has_text:
-                return "No text layer"
-            return "Search applied on this page" if query else "Search cleared"
 
-        app.push_screen(BottomSearch("PDF", search, initial=state.get("query", "")))
+        if pid not in self.pages:
+            self.pages[pid] = (await asyncio.to_thread(self.media.info, path))[0]
+        self.app.push_screen(
+            PageJump(state.get("page", 1), self.pages.get(pid, 1), jump)
+        )
+
+    def clear_cache(self):
+        self.prefetch_token = None
+        self.prefetch_request = None
+        self.media.release()
+        self.reader.cache.clear()
+        self.reader.directories.clear()
+        self.frames.clear()
+        self.frame_keys.clear()
+        self.searches.clear()
+
+    async def close(self):
+        self.clear_cache()
+        if self.prefetch_task:
+            self.prefetch_task.cancel()
+            try:
+                await self.prefetch_task
+            except asyncio.CancelledError:
+                pass
+            self.prefetch_task = None
+
+    def schedule_prefetch(self, pane, state, pages):
+        if not self.app.settings.get("viewer_prefetch", True):
+            self.prefetch_token = None
+            self.prefetch_request = None
+            return
+        if Path(state["path"]).suffix.lower() != ".pdf":
+            return
+        token = (
+            pane.id,
+            state["path"],
+            state.get("page", 1),
+            self.media.identity(state["path"]),
+        )
+        if token == self.prefetch_token:
+            return
+        self.prefetch_token = token
+        self.prefetch_request = (token, dict(state), pages)
+        if self.prefetch_task is None or self.prefetch_task.done():
+            self.prefetch_task = asyncio.create_task(self.prefetch())
+
+    async def prefetch(self):
+        while self.prefetch_request:
+            token, state, pages = self.prefetch_request
+            self.prefetch_request = None
+            current = state.get("page", 1)
+            for number in (current - 1, current + 1):
+                if self.prefetch_token != token:
+                    break
+                if 1 <= number <= pages:
+                    try:
+                        await asyncio.to_thread(
+                            self.media.load, dict(state, page=number, query="")
+                        )
+                    except (OSError, ValueError, RuntimeError):
+                        continue
+            for number in range(max(1, current - 3), min(pages, current + 3) + 1):
+                if self.prefetch_token != token:
+                    break
+                try:
+                    await asyncio.to_thread(
+                        self.media.thumbnail,
+                        dict(state, page=number, query=""),
+                        (256, 128),
+                    )
+                except (OSError, ValueError, RuntimeError):
+                    continue
+
+    def sync_visible(self, panes):
+        visible = {p.id for p in panes if p.viewer}
+        for pid in list(self.frames):
+            if pid not in visible:
+                self.frames.pop(pid, None)
+                self.pages.pop(pid, None)
+                self.searches.pop(pid, None)
+                self.prepared_paths.pop(pid, None)
+                self.frame_keys.pop(pid, None)
+        if self.prefetch_token and self.prefetch_token[0] not in visible:
+            self.prefetch_token = None
+            self.prefetch_request = None
+        if not visible and getattr(self, "_had_viewers", False):
+            self.clear_cache()
+        self._had_viewers = bool(visible)
 
     def cell_pixels(self):
         if self.pixel_cell:
@@ -121,7 +287,20 @@ class ReaderController(Controller):
         x, y = event.screen_x - pane.x, event.screen_y - pane.y
         for left, top, width, height, index in frame.hits:
             if left <= x < left + width and top <= y < top + height:
-                if index < 0:
+                if isinstance(index, tuple):
+                    state.update(
+                        page=index[1],
+                        pan=[0, 0],
+                        outline_index=index[2] if len(index) > 2 else 0,
+                        nav_focus=False,
+                    )
+                elif index == -2:
+                    state["navigation"] = (
+                        "thumbnails"
+                        if state.get("navigation") == "outline"
+                        else "outline"
+                    )
+                elif index < 0:
                     state["thumbnails"] = not state.get("thumbnails", True)
                 else:
                     state = self.reader.change(state, index, frame.entries)
@@ -166,6 +345,21 @@ class ReaderController(Controller):
         if not frame:
             return
         state = json.loads(base64.b64decode(pane.viewer))
+        if (
+            state.get("navigation") == "outline"
+            and event.screen_x - pane.x < frame.main_x
+        ):
+            outline = await asyncio.to_thread(lambda: self.media.info(state["path"])[1])
+            state["outline_scroll"] = max(
+                0,
+                min(
+                    max(0, len(outline) - frame.main_rows + 1),
+                    int(state.get("outline_scroll", 0)) + direction,
+                ),
+            )
+            await self.update_viewer(pane, state)
+            event.stop()
+            return
         if not event.ctrl and len(frame.entries) > 1:
             state = self.reader.change(state, frame.selected + direction, frame.entries)
         else:
@@ -197,15 +391,71 @@ class ReaderController(Controller):
         if event.key in ("q", "escape"):
             self.revisions[pane.id] = self.revisions.get(pane.id, 0) + 1
             self.frames.pop(pane.id, None)
+            self.pages.pop(pane.id, None)
+            self.searches.pop(pane.id, None)
+            self.clear_cache()
             pane.viewer = ""
             await app.backend.request(f"set-option -pu -t {pane.id} @cosmos_viewer")
             return
         elif event.character == "?":
             app.push_screen(Help("Viewer", keymap.help_rows("viewer", app.settings)))
             return
+        elif event.character == "g" and Path(state["path"]).suffix.lower() == ".pdf":
+            await self.open_jump(pane, state)
+            return
+        elif event.character == "o" and Path(state["path"]).suffix.lower() == ".pdf":
+            state["navigation"] = (
+                "thumbnails" if state.get("navigation") == "outline" else "outline"
+            )
+            state["thumbnails"] = True
+        elif event.character in ("n", "N") and state.get("query"):
+            await self.search_document(
+                pane.id,
+                state["path"],
+                state["query"],
+                1 if event.character == "n" else -1,
+            )
+            return
         elif event.character == "/":
             self.open_pdf_search(pane, state)
             return
+        elif event.key == "tab" and state.get("navigation") == "outline":
+            state["nav_focus"] = not state.get("nav_focus", False)
+        elif (
+            state.get("nav_focus")
+            and state.get("navigation") == "outline"
+            and event.key in ("up", "down", "enter", "pageup", "pagedown")
+        ):
+            outline = await asyncio.to_thread(lambda: self.media.info(state["path"])[1])
+            if outline:
+                selected = int(
+                    state.get(
+                        "outline_index",
+                        max(
+                            (
+                                i
+                                for i, item in enumerate(outline)
+                                if item["page"] <= state.get("page", 1)
+                            ),
+                            default=0,
+                        ),
+                    )
+                )
+                selected = max(0, min(len(outline) - 1, selected))
+                if event.key == "enter":
+                    state.update(
+                        page=outline[selected]["page"], pan=[0, 0], nav_focus=False
+                    )
+                else:
+                    delta = -1 if event.key in ("up", "pageup") else 1
+                    if event.key in ("pageup", "pagedown"):
+                        delta *= max(1, pane.height - 2)
+                    state["outline_index"] = max(
+                        0, min(len(outline) - 1, selected + delta)
+                    )
+                    state["outline_scroll"] = max(
+                        0, state["outline_index"] - max(1, pane.height - 2) // 2
+                    )
         elif event.character in ("+", "=", "-"):
             state["zoom"] = min(
                 8,
@@ -241,7 +491,41 @@ class ReaderController(Controller):
         app = self.app
         state = json.loads(base64.b64decode(pane.viewer))
         revision = self.revisions.get(pane.id, 0)
+        budget = app.settings.get("viewer_cache_mb", 128)
+        self.media.configure(budget)
+        self.reader.cache.resize(int(budget * 1024**2 * 0.2))
+        identity = await asyncio.to_thread(self.media.identity, state["path"])
+        if self.prepared_paths.get(pane.id) not in (None, identity):
+            self.reader.cache.clear()
+            self.frames.pop(pane.id, None)
+            self.searches.pop(pane.id, None)
+            self.prefetch_token = None
+        self.prepared_paths[pane.id] = identity
+
+        def signature():
+            return (
+                identity,
+                repr(state),
+                pane.width,
+                pane.height,
+                self.cell_pixels(),
+                tuple(app.role_colors.items()),
+                app.graphics.enabled,
+                self.media.revision,
+            )
+
+        if (
+            self.frames.get(pane.id) is not None
+            and self.frame_keys.get(pane.id) == signature()
+        ):
+            self.schedule_prefetch(pane, state, self.pages[pane.id])
+            return self.frames[pane.id]
         source, pages, has_text = await asyncio.to_thread(self.media.load, state)
+        if state.get("page", 1) > pages:
+            state["page"] = pages
+            await self.update_viewer(pane, state)
+            revision = self.revisions.get(pane.id, 0)
+        frame_signature = signature()
         frame = await asyncio.to_thread(
             self.reader.render,
             source,
@@ -255,8 +539,10 @@ class ReaderController(Controller):
         )
         if revision != self.revisions.get(pane.id, 0):
             return
+        self.frame_keys[pane.id] = frame_signature
         self.frames[pane.id] = frame
         self.pages[pane.id] = pages
+        self.schedule_prefetch(pane, state, pages)
         if pane.active:
             app.message = ""
         if pane.active and not has_text and str(state["path"]).lower().endswith(".pdf"):

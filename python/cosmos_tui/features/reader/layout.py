@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw
 from rich.text import Text
 
 from cosmos_tui.render.graphics import halfblocks
+from cosmos_tui.features.reader.cache import ByteCache, image_bytes
 
 FORMATS = {".png", ".jpg", ".jpeg", ".webp"}
 
@@ -31,7 +32,12 @@ class Reader:
     def __init__(self, media):
         self.media = media
         self.directories = {}
-        self.cache = {}
+        self.cache = ByteCache(
+            32 * 1024**2,
+            lambda value: image_bytes(value[1].image)
+            + image_bytes(value[0])
+            + sum(len(line.plain) * 4 for line in value[1].lines),
+        )
 
     def collection(self, state, pages):
         path = Path(state["path"])
@@ -68,6 +74,7 @@ class Reader:
         return state
 
     def render(self, source, state, pages, cols, rows, cell, palette, graphics):
+        epoch = self.media.epoch
         entries, selected = self.collection(state, pages)
         document = Path(state["path"]).suffix.lower() == ".pdf"
         navigation_key = pages if document else tuple(map(str, entries))
@@ -80,12 +87,19 @@ class Reader:
             tuple(palette.items()),
             graphics,
             navigation_key,
+            self.media.revision,
         )
-        if key in self.cache:
-            return self.cache[key][1]
+        cached = self.cache.get(key)
+        if cached is not None:
+            return cached[1]
         cw, ch = cell
         expanded = state.get("thumbnails", True) and rows >= 12 and cols >= 30
-        sidebar = min(18, cols // 5) if document and expanded else 0
+        outline_mode = document and state.get("navigation", "thumbnails") == "outline"
+        sidebar = (
+            (min(30, cols // 3) if outline_mode else min(18, cols // 5))
+            if document and expanded
+            else 0
+        )
         footer = 6 if expanded and not document else 1 if rows >= 3 else 0
         main_rows = max(1, rows - footer)
         main_cols = max(1, cols - sidebar)
@@ -115,17 +129,17 @@ class Reader:
             info.append(" − " if expanded else " + ", style=palette["accl"])
             labels[main_rows] = (0, info)
             hits.append((cols - 3, main_rows, 3, 1, -1))
-        if expanded:
+        if expanded and not outline_mode:
             slots = min(
                 len(entries),
-                min(7, max(1, main_rows // 5))
+                min(7, max(1, (main_rows - 1) // 5))
                 if document
                 else min(5, max(1, cols // 12)),
             )
             start = max(0, min(selected - slots // 2, len(entries) - slots))
             for slot, index in enumerate(range(start, start + slots)):
                 x, y, w = (
-                    (0, slot * 5, sidebar)
+                    (0, 1 + slot * 5, sidebar)
                     if document
                     else (slot * (cols // slots), main_rows + 1, cols // slots)
                 )
@@ -136,8 +150,10 @@ class Reader:
             thumb_state = self.change(state, index, entries)
             try:
                 thumb = self.media.thumbnail(
-                    thumb_state, (max(1, tw - 8), max(1, th - 8))
+                    thumb_state, (max(1, tw - 8), max(1, th - 8)), wait=not document
                 )
+                if thumb is None:
+                    raise ValueError("Thumbnail pending")
                 tx, ty = (
                     x * cw + (tw - thumb.width) // 2,
                     y * ch + (th - thumb.height) // 2,
@@ -182,6 +198,72 @@ class Reader:
                 labels[y + h][1].append_text(text)
             else:
                 labels[y + h] = (x, text)
+        if document and expanded:
+            title = Text(
+                " Outline " if outline_mode else " Pages ",
+                style=f"{palette['accl']} on {palette['base']}",
+            )
+            title.truncate(sidebar)
+            title.pad_right(max(0, sidebar - title.cell_len))
+            labels[0] = (0, title)
+            hits.append((0, 0, sidebar, 1, -2))
+            if outline_mode:
+                outline = self.media.info(state["path"])[1]
+                visible = max(1, main_rows - 1)
+                current = max(
+                    (
+                        i
+                        for i, item in enumerate(outline)
+                        if item["page"] <= state.get("page", 1)
+                    ),
+                    default=0,
+                )
+                selected_outline = max(
+                    0, min(len(outline) - 1, int(state.get("outline_index", current)))
+                )
+                offset = max(
+                    0,
+                    min(
+                        int(
+                            state.get(
+                                "outline_scroll",
+                                max(0, selected_outline - visible // 2),
+                            )
+                        ),
+                        max(0, len(outline) - visible),
+                    ),
+                )
+                if not outline:
+                    labels[1] = (
+                        0,
+                        Text(
+                            " No outline".ljust(sidebar),
+                            style=f"{palette['mute']} on {palette['base']}",
+                        ),
+                    )
+                for row, item in enumerate(outline[offset : offset + visible], 1):
+                    active = offset + row - 1 == selected_outline
+                    if active:
+                        ImageDraw.Draw(canvas).rectangle(
+                            (0, row * ch, sidebar * cw - 1, (row + 1) * ch - 1),
+                            fill=palette["acc"],
+                        )
+                    text = Text(
+                        " " + "  " * min(4, item["depth"]) + item["title"],
+                        style=f"{palette['on'] if active else palette['fg']} on {palette['acc'] if active else palette['base']}",
+                    )
+                    text.truncate(sidebar, overflow="ellipsis")
+                    text.pad_right(max(0, sidebar - text.cell_len))
+                    labels[row] = (0, text)
+                    hits.append(
+                        (
+                            0,
+                            row,
+                            sidebar,
+                            1,
+                            ("outline", item["page"], offset + row - 1),
+                        )
+                    )
         if not graphics:
             lines = halfblocks(canvas, cols, rows)
         for row, (x, text) in labels.items():
@@ -200,7 +282,5 @@ class Reader:
             source.size,
             pan,
         )
-        if len(self.cache) >= 3:
-            self.cache.pop(next(iter(self.cache)))
-        self.cache[key] = source, frame
+        self.media.store(self.cache, key, (source, frame), epoch)
         return frame

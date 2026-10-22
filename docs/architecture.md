@@ -66,3 +66,9 @@ ui/keyboard.py 提供只读键位预览；features/ime/rime.py 管理 C API、�
 features/status 独立负责状态布局、命中区域和带缓存的目录/Git 元数据；runtime 只调用 refresh。features/ime/config.py 负责桌面优先的 Rime 目录与方案发现，C API 适配器不再硬编码 rime_ice。
 
 features/theme 隔离终端调色板适配、双栏主题选择和 UI 角色应用。render/surface 仅对普通终端 cell 应用终端颜色，显式真彩色和阅读画面不被预设覆盖。
+
+## 阅读器资源职责
+
+features/reader/cache.py 实现带锁字节 LRU；pdf.py 只负责元数据、内嵌大纲与文字匹配；media.py 管理 Poppler/Pillow 解码、文字/位图缓存及资源代数；layout.py 合成阅读画布与导航命中区；jump.py 实现底端页码输入；controller.py 管理按 pane 的阅读交互、全页搜索结果及单队列预读。后台工作不修改 Textual 控件；搜索栏的 provider 返回状态字符串，由 UI 更新结果区。
+
+BottomSearch 与 PageJump 声明 preserve_workspace_graphics=True，宿主打开它们时保留 Kitty 阅读图像，runtime 可继续提交下层阅读帧。其他弹窗沿用清图策略。搜索提交经输入控件消息队列，使用 Input.Submitted.value 快照，避免快速输入后回车读取到尚未处理完的前半截查询。

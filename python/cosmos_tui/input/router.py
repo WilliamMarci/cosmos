@@ -12,6 +12,7 @@ from cosmos_tui.features.navigation.about import About
 from cosmos_tui.features.navigation.menus import ActionDrawer, StartMenu
 from cosmos_tui.features.navigation.switcher import Switcher
 from cosmos_tui.features.search.bar import BottomSearch
+from cosmos_tui.features.reader.jump import PageJump
 from cosmos_tui.features.settings.keybindings import KeyBindingEditor
 from cosmos_tui.features.settings.panel import Palette
 from cosmos_tui.features.theme.panel import ThemePanel
@@ -79,10 +80,18 @@ class InputRouter(Controller):
                     if command:
                         await app.copy_action(command.target)
                     return
-                if command and (
-                    command.context.startswith("assistant")
-                    or context == "content_search"
-                ):
+                if command and context == "content_search":
+                    # Queue editing actions behind the focused Input's earlier
+                    # characters instead of reading its value from the App queue.
+                    canonical = {
+                        "submit": "enter",
+                        "next": "f3",
+                        "previous": "shift+f3",
+                        "close": "escape",
+                    }[command.target]
+                    await app._dispatch_native(events.Key(canonical, None))
+                    return
+                if command and command.context.startswith("assistant"):
                     await app.screen.run_action(command.target)
                     return
                 if command:
@@ -119,6 +128,8 @@ class InputRouter(Controller):
             return "help"
         if isinstance(app.screen, About):
             return "about"
+        if isinstance(app.screen, PageJump):
+            return "page_jump"
         if isinstance(app.screen, BottomSearch):
             return "content_search"
         if isinstance(app.screen, ActionDrawer):

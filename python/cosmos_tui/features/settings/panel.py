@@ -73,6 +73,32 @@ class Palette(CosmosModal):
                 for a in actions
                 if a.get("category") == "keys" and a.get("kind") == "setting"
             ] + rows
+        if self.menu == "reader_settings":
+            settings = snapshot.get("settings", {})
+            rows = [
+                dict(
+                    label=f"Reader cache: {size} MiB"
+                    + (
+                        " · current"
+                        if settings.get("viewer_cache_mb", 128) == size
+                        else ""
+                    ),
+                    kind="reader_setting",
+                    key="viewer_cache_mb",
+                    value=size,
+                )
+                for size in (64, 128, 256, 512)
+            ]
+            rows += [
+                dict(
+                    label="Prefetch adjacent pages: "
+                    + ("On" if settings.get("viewer_prefetch", True) else "Off"),
+                    kind="reader_setting",
+                    key="viewer_prefetch",
+                    value=not settings.get("viewer_prefetch", True),
+                ),
+                dict(label="Clear this client's reader cache", kind="reader_clear"),
+            ]
         if self.menu == "ime_settings":
             current = snapshot.get("settings", {}).get("ime_number_style", "normal")
             rows = [
@@ -103,6 +129,7 @@ class Palette(CosmosModal):
             ]
         if self.menu == "settings":
             rows.append(dict(label="Theme", kind="theme"))
+            rows.append(dict(label="Reader", kind="menu", menu="reader_settings"))
             rows.append(dict(label="Input method", kind="menu", menu="ime_settings"))
             rows.append(dict(label="About", kind="about"))
         self.rows = [a for a in rows if query in a["label"].casefold()]
@@ -144,6 +171,19 @@ class Palette(CosmosModal):
         if index is None or index >= len(self.rows):
             return
         row = self.rows[index]
+        if row["kind"] == "reader_clear":
+            self.app.reader_ui.clear_cache()
+            return
+        if row["kind"] == "reader_setting":
+            settings = await rpc.call("settings.get")
+            settings[row["key"]] = row["value"]
+            try:
+                await rpc.call("settings.replace", settings)
+                self.app.settings = settings
+                await self.populate()
+            except RuntimeError as error:
+                await self.app.action_error("reader settings", error)
+            return
         if row["kind"] == "theme":
             self.app.push_screen(ThemePanel())
             return

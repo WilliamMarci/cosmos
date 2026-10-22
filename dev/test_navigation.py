@@ -209,6 +209,12 @@ class NavigationTests(unittest.IsolatedAsyncioTestCase):
                     json.dumps(state).encode()
                 ).decode()
                 app.reader_ui.media.load = Mock(return_value=(None, 1, True))
+                app.reader_ui.media.identity = Mock(
+                    return_value=("/tmp/sample.pdf", 1, 1)
+                )
+                app.reader_ui.media.search = Mock(
+                    return_value=([dict(page=1, boxes=[], extent=(1, 1))], True)
+                )
                 terminal = app.query_one("#terminal")
                 size = terminal.size
                 await pilot.press("slash")

@@ -9,6 +9,8 @@ pub struct Config {
     pub version: u32,
     pub theme: String,
     pub terminal_theme: String,
+    pub viewer_cache_mb: usize,
+    pub viewer_prefetch: bool,
     pub status_visible: bool,
     pub leader: String,
     pub notification_history: usize,
@@ -25,6 +27,8 @@ impl Default for Config {
             version: 1,
             theme: "dark".into(),
             terminal_theme: "inherit".into(),
+            viewer_cache_mb: 128,
+            viewer_prefetch: true,
             status_visible: true,
             leader: "C-b".into(),
             notification_history: 200,
@@ -44,6 +48,9 @@ impl Config {
         }
         if !["dark", "light"].contains(&self.theme.as_str()) {
             return Err("theme must be dark or light".into());
+        }
+        if !(16..=1024).contains(&self.viewer_cache_mb) {
+            return Err("viewer_cache_mb must be between 16 and 1024".into());
         }
         if !["inherit", "ubuntu", "cosmos-dark", "cosmos-light"]
             .contains(&self.terminal_theme.as_str())
