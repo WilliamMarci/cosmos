@@ -11,19 +11,28 @@ from cosmos_tui.ui.farewell import show_farewell
 
 
 REQUIRED_CAPABILITIES = {
-    "ui-components-v1", "keybindings", "notification-stack-v1", "leader-presets-v1"
+    "ui-components-v1",
+    "keybindings",
+    "notification-stack-v1",
+    "leader-presets-v1",
 }
 REQUIRED_SETTINGS = {
-    "viewer_cache_mb", "viewer_prefetch", "terminal_theme", "leader2", "leader3",
-    "ime_number_style", "status_colors",
+    "viewer_image_max_mb",
+    "viewer_cache_mb",
+    "viewer_prefetch",
+    "terminal_theme",
+    "leader2",
+    "leader3",
+    "ime_number_style",
+    "status_colors",
 }
 
 
 def compatibility_gaps(capabilities, settings):
     """Check the running service, rather than the binary currently on disk."""
-    return sorted(
-        REQUIRED_CAPABILITIES - set(capabilities.get("capabilities", []))
-    ) + ["setting:" + key for key in sorted(REQUIRED_SETTINGS - settings.keys())]
+    return sorted(REQUIRED_CAPABILITIES - set(capabilities.get("capabilities", []))) + [
+        "setting:" + key for key in sorted(REQUIRED_SETTINGS - settings.keys())
+    ]
 
 
 def run(args):

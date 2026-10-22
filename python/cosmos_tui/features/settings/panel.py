@@ -103,6 +103,12 @@ class Palette(CosmosModal):
                     128,
                 ),
                 choice(
+                    "Maximum image size",
+                    "viewer_image_max_mb",
+                    [(n, f"{n} MiB") for n in (16, 32, 64, 128, 256, 512, 1024)],
+                    32,
+                ),
+                choice(
                     "Prefetch adjacent pages",
                     "viewer_prefetch",
                     [(False, "Off"), (True, "On")],

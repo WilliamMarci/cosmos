@@ -9,6 +9,7 @@ notification_history = 200
 notifications_enabled = true
 notification_timeout_ms = 5000
 viewer_cache_mb = 128
+viewer_image_max_mb = 32
 viewer_prefetch = true
 
 # Candidate number glyphs: normal, superscript, subscript (Settings → Input method).

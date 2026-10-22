@@ -63,6 +63,7 @@ def tool(*args):
 class Media:
     def __init__(self):
         self._lock = RLock()
+        self.image_max_mb = 32
         self.revision = 0
         self.epoch = 0
         self.versions = OrderedDict()
@@ -74,6 +75,12 @@ class Media:
         self.documents = ByteCache(
             12 * 1024**2, lambda value: len(repr(value).encode()) * 2
         )
+
+    def check_image_size(self, path, size):
+        if Path(path).suffix.lower() != ".pdf" and size > self.image_max_mb * 1024**2:
+            raise ValueError(
+                f"Image {size / 1024**2:.1f} MiB exceeds {self.image_max_mb} MiB limit"
+            )
 
     def configure(self, megabytes):
         budget = int(megabytes) * 1024**2
@@ -159,6 +166,7 @@ class Media:
     def load(self, state):
         path = Path(state["path"])
         identity = self.identity(path)
+        self.check_image_size(path, identity[1])
         epoch = self.epoch
         pages = self.info(path)[0] if path.suffix.lower() == ".pdf" else 1
         page = min(pages, max(1, int(state.get("page", 1))))
@@ -186,8 +194,6 @@ class Media:
                 words = self.text(path, page)
                 has_text = bool(words and words[0]["words"])
             else:
-                if identity[1] > 32 * 1024**2:
-                    raise ValueError("image input exceeds 32 MiB")
                 with Image.open(path) as opened:
                     if opened.width * opened.height > 16_000_000:
                         raise ValueError("image exceeds pixel budget")
@@ -247,8 +253,8 @@ class Media:
     def thumbnail(self, state, bounds, wait=True):
         path = Path(state["path"])
         identity = self.identity(path)
+        self.check_image_size(path, identity[1])
         key = identity + (state.get("page", 1), bounds)
-        stat = path.stat()
         epoch = self.epoch
         cached = self.thumbnails.get(key)
         if cached is not None:
@@ -287,8 +293,6 @@ class Media:
                 )
             )
         else:
-            if stat.st_size > 32 * 1024 * 1024:
-                raise ValueError("image input exceeds 32 MiB")
             opened = Image.open(path)
         with opened:
             if opened.width * opened.height > 16_000_000:

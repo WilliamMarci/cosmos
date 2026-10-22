@@ -10,6 +10,7 @@ pub struct Config {
     pub theme: String,
     pub terminal_theme: String,
     pub viewer_cache_mb: usize,
+    pub viewer_image_max_mb: usize,
     pub viewer_prefetch: bool,
     pub status_visible: bool,
     pub leader: String,
@@ -30,6 +31,7 @@ impl Default for Config {
             theme: "dark".into(),
             terminal_theme: "inherit".into(),
             viewer_cache_mb: 128,
+            viewer_image_max_mb: 32,
             viewer_prefetch: true,
             status_visible: true,
             leader: "C-b".into(),
@@ -52,6 +54,9 @@ impl Config {
         }
         if !["dark", "light"].contains(&self.theme.as_str()) {
             return Err("theme must be dark or light".into());
+        }
+        if !(1..=4096).contains(&self.viewer_image_max_mb) {
+            return Err("viewer_image_max_mb must be between 1 and 4096".into());
         }
         if !(16..=1024).contains(&self.viewer_cache_mb) {
             return Err("viewer_cache_mb must be between 16 and 1024".into());

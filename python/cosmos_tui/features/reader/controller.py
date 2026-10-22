@@ -517,6 +517,7 @@ class ReaderController(Controller):
         revision = self.revisions.get(pane.id, 0)
         budget = app.settings.get("viewer_cache_mb", 128)
         self.media.configure(budget)
+        self.media.image_max_mb = app.settings.get("viewer_image_max_mb", 32)
         self.reader.cache.resize(int(budget * 1024**2 * 0.2))
         identity = await asyncio.to_thread(self.media.identity, state["path"])
         if self.prepared_paths.get(pane.id) not in (None, identity):
@@ -536,6 +537,7 @@ class ReaderController(Controller):
                 tuple(app.role_colors.items()),
                 app.graphics.enabled,
                 self.media.revision,
+                self.media.image_max_mb,
             )
 
         if (

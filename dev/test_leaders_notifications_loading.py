@@ -118,6 +118,50 @@ class LoadingTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(loading.frame(pane).source_size, (72, 72))
             await app.reader_ui.close()
 
+    async def test_oversize_image_keeps_navigation_and_retries_new_limit(self):
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as directory:
+            paths = [Path(directory) / name for name in ("a.png", "b.png", "c.png")]
+            for path in paths:
+                Image.new("RGB", (32, 32), "red").save(path)
+            with paths[1].open("ab") as stream:
+                stream.truncate(40 * 1024**2)
+            app = Probe()
+            app.action_error = AsyncMock()
+            app.settings["viewer_prefetch"] = False
+            app.settings["viewer_image_max_mb"] = 32
+            async with app.run_test(size=(80, 24)):
+                pane = app.active()
+                pane.viewer = base64.b64encode(
+                    json.dumps({"path": str(paths[1])}).encode()
+                ).decode()
+                loading = app.reader_ui.loading
+                loading.frame(pane)
+                await loading.pending[pane.id]
+                self.assertIn("40.0 MiB", loading.errors[pane.id][1])
+                self.assertIn("32 MiB", loading.errors[pane.id][1])
+                self.assertEqual(app.reader_ui.frames[pane.id].selected, 1)
+                await app.reader_ui.on_key(Key("right_square_bracket", "]"), pane)
+                self.assertEqual(
+                    json.loads(base64.b64decode(pane.viewer))["path"], str(paths[2])
+                )
+                loading.frame(pane)
+                await loading.pending[pane.id]
+                self.assertNotIn(pane.id, loading.errors)
+                pane.viewer = base64.b64encode(
+                    json.dumps({"path": str(paths[1])}).encode()
+                ).decode()
+                app.settings["viewer_image_max_mb"] = 64
+                loading.frame(pane)
+                await loading.pending[pane.id]
+                self.assertNotIn(pane.id, loading.errors)
+                self.assertEqual(loading.ready[pane.id][2].source_size, (32, 32))
+                app.reader_ui.media.image_max_mb = 32
+                with self.assertRaisesRegex(ValueError, "40.0 MiB"):
+                    app.reader_ui.media.thumbnail({"path": str(paths[1])}, (20, 20))
+            await app.reader_ui.close()
+
     async def test_pending_and_failed_viewers_never_return_shell_content(self):
         app = Probe()
         app.action_error = AsyncMock()
@@ -182,7 +226,7 @@ class LoadingTests(unittest.IsolatedAsyncioTestCase):
             app.reader_ui.loading.frame(pane)
             await app.reader_ui.loading.pending[pane.id]
             failed = app.reader_ui.loading.frame(pane)
-            self.assertTrue(any("Load failed" in line.plain for line in failed.lines))
+            self.assertTrue(any("Cannot load" in line.plain for line in failed.lines))
             app.action_error.assert_awaited_once()
         await app.reader_ui.close()
 

@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 import time
+import textwrap
 from pathlib import Path
 from PIL import Image, ImageDraw
 from rich.text import Text
@@ -24,6 +25,7 @@ class LoadingFrames:
         app = self.controller.app
         return (
             pane.viewer,
+            app.settings.get("viewer_image_max_mb", 32),
             pane.width,
             pane.height,
             self.controller.cell_pixels(),
@@ -35,21 +37,26 @@ class LoadingFrames:
     def frame(self, pane):
         key = self.key(pane)
         ready = self.ready.get(pane.id)
+        error = self.errors.get(pane.id)
         elapsed = time.monotonic() - self.probed.get(pane.id, 0)
         if (
             ready
+            and not (error and error[0] == key)
             and ready[:2] == (key, self.controller.media.revision)
             and elapsed < 0.5
         ):
             return ready[2]
-        error = self.errors.get(pane.id)
         if pane.id not in self.pending and not (
             error and error[0] == key and elapsed < 1
         ):
             self.probed[pane.id] = time.monotonic()
             self.pending[pane.id] = asyncio.create_task(self.load(pane, key))
         # Retain an already rendered same-state page while thumbnails fill.
-        if ready and (ready[0] == key or self.missing.get(pane.id) != key):
+        if (
+            ready
+            and not (error and error[0] == key)
+            and (ready[0] == key or self.missing.get(pane.id) != key)
+        ):
             return ready[2]
         return self.placeholder(pane, error[1] if error and error[0] == key else None)
 
@@ -69,10 +76,32 @@ class LoadingFrames:
                 self.errors.pop(pane.id, None)
                 self.missing.pop(pane.id, None)
         except Exception as error:
+            detail = str(error)
+            try:
+                path = json.loads(base64.b64decode(pane.viewer))["path"]
+                identity = await asyncio.to_thread(self.controller.media.identity, path)
+                if "MiB" not in detail:
+                    detail += f" ({identity[1] / 1024**2:.1f} MiB)"
+            except (OSError, ValueError, KeyError):
+                pass
             previous = self.errors.get(pane.id)
-            self.errors[pane.id] = key, str(error)
+            self.errors[pane.id] = key, detail
             self.error_versions[pane.id] = identity
-            if previous != (key, str(error)):
+            self.missing[pane.id] = key
+            state = json.loads(base64.b64decode(pane.viewer))
+            try:
+                entries, selected = await asyncio.to_thread(
+                    self.controller.reader.collection,
+                    state,
+                    self.controller.pages.get(pane.id, 1),
+                )
+                frame = self.placeholder(pane, detail)
+                frame.entries, frame.selected = entries, selected
+                frame.hits = []
+                self.controller.frames[pane.id] = frame
+            except (OSError, ValueError):
+                pass
+            if previous != (key, detail):
                 await self.controller.app.action_error(
                     "reader", error, session_id=session_id
                 )
@@ -158,15 +187,19 @@ class LoadingFrames:
         _, canvas, base_lines, box, scale = cached
         lines = [line.copy() for line in base_lines]
         waiting = (
-            "Load failed"
+            "Cannot load: " + error
             if error
             else SPINNER[int(time.monotonic() * 10) % len(SPINNER)] + " Loading"
         )
-        x = max(sidebar, box[2] // cw - len(waiting))
-        y = max(0, min(main_rows - 1, box[3] // ch - 1))
-        label = Text(waiting, style=f"{palette['mute']} on {palette['base']}")
-        label.truncate(max(0, width - x))
-        lines[y] = lines[y][:x] + label + lines[y][x + label.cell_len :]
+        left_col = max(sidebar, (box[0] + cw - 1) // cw)
+        right_col = max(left_col + 1, min(width, box[2] // cw))
+        bottom_row = max(0, min(main_rows - 1, box[3] // ch - 1))
+        labels = textwrap.wrap(waiting, max(1, right_col - left_col - 1))[-3:]
+        for offset, value in enumerate(labels):
+            y = max(0, bottom_row - len(labels) + offset + 1)
+            label = Text(value, style=f"{palette['mute']} on {palette['base']}")
+            x = max(left_col, right_col - label.cell_len)
+            lines[y] = lines[y][:x] + label + lines[y][x + label.cell_len :]
         return ReadingFrame(
             canvas,
             lines,
