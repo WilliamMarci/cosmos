@@ -62,6 +62,8 @@ class CellRun:
     foreground: str
     background: str
     bold: bool = False
+    underline: bool = False
+    reverse: bool = False
 
 
 @dataclass(frozen=True)

@@ -6,7 +6,11 @@ notification_history = 200
 notifications_enabled = true
 notification_timeout_ms = 5000
 
-# Optional independent status button colors (terminal ANSI colors by default).
+# Candidate number glyphs: normal, superscript, subscript (Settings → Input method).
+# ime_number_style = "normal"
+
+# Optional independent status button colors. COSMOS defaults to the logo gradient.
+# Explicit cosmos color overrides the gradient; other defaults use terminal ANSI.
 # [status_colors]
 # cosmos = "blue"
 # image = "green"

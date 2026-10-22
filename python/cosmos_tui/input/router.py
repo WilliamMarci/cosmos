@@ -36,6 +36,8 @@ class InputRouter(Controller):
                     app.action_context_actions()
                 elif command.target == "start":
                     app.action_start_menu()
+                elif command.target in ("ime_enable", "ime_disable"):
+                    await app.action_leader_key(command.target)
                 elif command.target == "ime_toggle":
                     await app.ime.toggle()
                 elif command.target == "ime_width":

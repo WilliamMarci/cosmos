@@ -237,6 +237,26 @@ class Rime:
         try:
             return dict(
                 preedit=decode(ctx.composition.preedit),
+                cursor=len(
+                    decode(
+                        (ctx.composition.preedit or b"")[: ctx.composition.cursor_pos]
+                    )
+                ),
+                selection=(
+                    len(
+                        decode(
+                            (ctx.composition.preedit or b"")[
+                                : ctx.composition.sel_start
+                            ]
+                        )
+                    ),
+                    len(
+                        decode(
+                            (ctx.composition.preedit or b"")[: ctx.composition.sel_end]
+                        )
+                    ),
+                ),
+                last_page=bool(ctx.menu.is_last_page),
                 candidates=[
                     decode(ctx.menu.candidates[i].text)
                     for i in range(ctx.menu.num_candidates)

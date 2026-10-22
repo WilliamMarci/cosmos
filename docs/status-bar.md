@@ -12,13 +12,13 @@ Directory/program and Git branch are refreshed on pane changes and at most once 
 
 `Leader m` and clicking the button open the same COSMOS start menu regardless of its current label. The active pane controls the label:
 
-- `COSMOS`: normal terminal, terminal ANSI blue background.
+- `COSMOS`: normal terminal, default gradient text `#FFD166` → `#168A70` over a very dark gradient background `#1D1912` → `#081714`. An explicit `status_colors.cosmos` overrides it with a solid color.
 - `IMAGE`: bitmap viewer, green background.
 - `DOC`: PDF (and future EPUB/Markdown viewer surfaces), green background.
 - `AGENT`: foreground `opencode`, `claude`, or `codex`, magenta background.
 - `FILES`: foreground `yazi`, red background.
 
-Foreground defaults to terminal bright white. These are independent from the main dark/light palette. Native program names and viewer state determine the label, not inactive panes or window titles. FILES/DOC classification does not imply the planned Yazi/EPUB/Markdown modules have been implemented.
+Other mode foregrounds default to terminal bright white. These are independent from the main dark/light palette. Native program names and viewer state determine the label, not inactive panes or window titles. FILES/DOC classification does not imply the planned Yazi/EPUB/Markdown modules have been implemented.
 
 Set optional colors in `$XDG_CONFIG_HOME/cosmos/config.toml` (default `~/.config/cosmos/config.toml`):
 
@@ -32,7 +32,7 @@ files = "red"
 foreground = "bright_white"
 ```
 
-Each value accepts `#RRGGBB` or one of `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `bright_white`. Unspecified roles use defaults. File changes apply when the coordinator loads the configuration; the current coordinator must support `status_colors` before saving these fields through settings RPC. UI colors react to the service's current settings. There is no color editor in the compact settings panel yet.
+The example deliberately overrides the default COSMOS gradient with solid blue; omit `cosmos` to retain the gradient. Each value accepts `#RRGGBB` or one of `black`, `red`, `green`, `yellow`, `blue`, `magenta`, `cyan`, `white`, `bright_white`. Unspecified roles use defaults. File changes apply when the coordinator loads the configuration; the current coordinator must support `status_colors` before saving these fields through settings RPC. UI colors react to the service's current settings. There is no color editor in the compact settings panel yet.
 
 ## Input indicators and reader information
 

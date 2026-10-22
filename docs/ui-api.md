@@ -152,3 +152,5 @@ Actions、开始菜单和设置 Panel 的列表筛选输入框位于各自容器
 键盘预览与内置 IME 的当前行为、加载路径和提交边界见 [input-method.md](input-method.md)。IME 使用保留 owner `cosmos.ime` 的 insert/cover UIFrame；它不抢 UIRegistry 焦点，候选点击由 HitRegion 回调提交。当前未开放第三方输入法引擎 RPC 注册。
 
 状态栏的默认布局、动态开始按钮、颜色配置与点击区域见 [status-bar.md](status-bar.md)。状态 Mod 的单行内容位于可用中心区，不覆盖右侧输入法/时钟。
+
+进程内 CellRun 新增可选 underline 与 reverse（默认 false），用于共享渲染层绘制输入法分段下划线和编辑光标；既有字段和位置参数保持兼容。输入法的两行布局位于 features/ime/layout.py，以 Rime context、可用 Rect、源 cursor 和主题生成 UIFrame；编号与分页命中区域同帧提交。

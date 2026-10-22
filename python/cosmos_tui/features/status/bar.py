@@ -40,9 +40,32 @@ class StatusBar(Static):
         base = Style(color=palette["fg"], bgcolor=palette["base"], bold=False)
         width = self.size.width
         self.hits = []
-        start = Text(
-            " " + label + " ", style=Style(color=foreground, bgcolor=button, bold=True)
-        )
+        title = " " + label + " "
+        if mode == "cosmos" and "cosmos" not in colors:
+            start = Text()
+            begin, end = (255, 209, 102), (22, 138, 112)
+            dark_begin, dark_end = (29, 25, 18), (8, 23, 20)
+            for i, character in enumerate(title):
+                fraction = max(0, min(1, (i - 1) / max(1, len(label) - 1)))
+                color = "#%02x%02x%02x" % tuple(
+                    round(a + (b - a) * fraction) for a, b in zip(begin, end)
+                )
+                background = "#%02x%02x%02x" % tuple(
+                    round(a + (b - a) * fraction) for a, b in zip(dark_begin, dark_end)
+                )
+                start.append(
+                    character,
+                    style=Style(
+                        color=color,
+                        bgcolor=background,
+                        bold=True,
+                    ),
+                )
+
+        else:
+            start = Text(
+                title, style=Style(color=foreground, bgcolor=button, bold=True)
+            )
         self.start_width = min(width, start.cell_len)
         self.hits.append((0, self.start_width, "start"))
         left = start + Text(f" {str(index).translate(SUPERSCRIPT)} {name} ", style=base)

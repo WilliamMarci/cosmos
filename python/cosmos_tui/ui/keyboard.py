@@ -85,7 +85,7 @@ class KeyboardPreview(Static):
 
     def drawing(self):
         palette = self.app.role_colors
-        active = physical_keys(
+        first, second = key_phases(
             self.keys, getattr(self.app, "settings", {}).get("leader", "C-b")
         )
         text = Text()
@@ -98,10 +98,17 @@ class KeyboardPreview(Static):
                 end = round(offset + units * 4)
                 width = end - round(offset) - 1
                 label = glyphs.get(name, name)[:width].center(width)
-                selected = name in active
+                selected = name in first or name in second
+                background = (
+                    "#FFD166"
+                    if name in first
+                    else "#168A70"
+                    if name in second
+                    else palette["base"]
+                )
                 text.append(
                     label,
-                    style=f"{palette['on'] if selected else palette['fg']} on {palette['acc'] if selected else palette['base']}",
+                    style=f"{palette['on'] if selected else palette['fg']} on {background}",
                 )
                 text.append("▌", style=palette["bg"])
                 offset += units * 4
@@ -112,3 +119,26 @@ class KeyboardPreview(Static):
         self.display = (
             self.app.size.width >= 74 and self.app.size.height >= minimum_height
         )
+
+
+def key_phases(bindings, leader="C-b"):
+    first, second = set(), set()
+    for binding in bindings:
+        value = binding.strip().replace("Leader ", "leader+")
+        if value.startswith("leader+"):
+            first.update(physical_keys(["ctrl+" + leader[-1]]))
+            second.update(physical_keys([value[len("leader+") :]]))
+        else:
+            strokes = value.split()
+            if strokes:
+                first.update(physical_keys([strokes[0]]))
+                second.update(physical_keys(strokes[1:]))
+    return first, second
+
+
+def key_legend(palette):
+    text = Text()
+    text.append(" First press ", style=f"{palette['on']} on #FFD166")
+    text.append("  ")
+    text.append(" Next press ", style="white on #168A70")
+    return text

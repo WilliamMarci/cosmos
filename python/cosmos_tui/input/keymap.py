@@ -67,9 +67,9 @@ register(
     ["leader+i"],
     "ime_toggle",
 )
-register(
-    "global.ime_width", "global", "Input width · Half / Full", [], "ime_width"
-)
+register("global.ime_width", "global", "Input width · Half / Full", [], "ime_width")
+register("global.ime_enable", "global", "Enable IME", [], "ime_enable")
+register("global.ime_disable", "global", "Disable IME", [], "ime_disable")
 register("workspace.quit", "workspace", "Quit / Exit Cosmos", [], "quit")
 register("workspace.new_session", "workspace", "New session", [], "new_session")
 register("global.start", "global", "Start menu", ["leader+m"], "start")
@@ -262,3 +262,13 @@ for name, label, keys, target in [
     ("previous", "Previous match", ["shift+f3"], "previous"),
 ]:
     register("content_search." + name, "content_search", label, keys, target)
+
+for name, label, key in [
+    ("scroll_up", "Previous shortcut", "up"),
+    ("scroll_down", "Next shortcut", "down"),
+    ("first", "First shortcut", "home"),
+    ("last", "Last shortcut", "end"),
+    ("page_up", "Previous shortcut page", "pageup"),
+    ("page_down", "Next shortcut page", "pagedown"),
+]:
+    register("help." + name, "help", label, [key], key)

@@ -23,10 +23,20 @@ The ctypes adapter follows the integer-Bool version of the [official librime C A
 
 ## Keyboard preview
 
-The 64-column, five-row layout derives from `design/cosmos_keys.py`, using Cosmos semantic colors. Help places it below the shortcut list when the viewport can fit both. In keybinding settings it appears beneath the list, above the bottom filter, and follows the selected command. The key editor updates it as its binding text changes. Smaller viewports hide it automatically and restore it after enlargement.
+The 64-column, five-row layout derives from `design/cosmos_keys.py`, using Cosmos semantic colors. Help uses a bounded scrolling shortcut list and reserves space below it for the keyboard when the viewport can fit a useful list and keyboard. Arrow keys, Home/End, PageUp/PageDown and mouse scrolling navigate the list. In keybinding settings it appears beneath the list, above the bottom filter, and follows the selected command. The key editor updates it as its binding text changes. Smaller viewports hide it automatically and restore it after enlargement.
 
-The preview expands Leader to the configured Ctrl+B/Ctrl+A stroke and maps shifted punctuation to physical keys plus Shift. Help highlights the union of its listed bindings; keybinding settings highlight the selected action's keys. This is a preview, not yet a mouse-based keybinding capture editor.
+The preview expands Leader to the configured Ctrl+B/Ctrl+A stroke and maps shifted punctuation to physical keys plus Shift. Help and keybinding settings highlight the selected action. A one-row legend between list and keyboard distinguishes first press (amber) from next press (green). Leader expands to the configured Ctrl+B/Ctrl+A chord; preview sequences such as `ctrl+m x` use their own first chord. This preview does not register additional runtime Mod prefixes. This is a preview, not yet a mouse-based keybinding capture editor.
 
 ## Distribution boundary
 
 The launcher supports package-local shared libraries through `lib/`. The current foundation archive does **not** yet bundle the full Rime runtime and dictionary data. It therefore requires the system dependencies or explicit paths above for IME. A self-contained Rime bundle, dependency/license inventory and clean-machine verification remain distribution work; copying only `librime.so` is insufficient. No claim of portability to machines without Rime is made for the current archive.
+
+## Candidate presentation settings
+
+Settings → Input method selects candidate number glyphs: normal `1 2 3`, superscript `¹ ² ³`, or subscript `₁ ₂ ₃`. These are glyph variants, not changes to the terminal font size. The service persists this as `ime_number_style = "normal" | "superscript" | "subscript"` in Cosmos configuration. A coordinator built before this field was introduced must be stopped and restarted before it can save the new setting; tmux applications are retained.
+
+Numbers use terminal ANSI yellow (the theme's amber). The right edge has one-cell pagination triangles: `◂ ▸` when available, `◃ ▹` when unavailable. Click enabled triangles or use PageUp/PageDown. Numbers continue to select their candidates regardless of glyph style. Preedit uses the engine's UTF-8 byte cursor/selection offsets converted to character positions; arrow keys edit at the visible caret, and separate word segments are underlined with gaps at spaces.
+
+The default language toggle is **Leader i** (Ctrl+B, then i unless Leader was changed). Ctrl+P also exposes explicit **Enable IME** and **Disable IME** actions; repeating either does not toggle it back. The existing language indicator remains clickable.
+
+Keybinding settings are grouped by function: general/menus, sessions/windows, panes/layout, history/selection, command assistant, reader, input method, dialogs/settings. Selecting a group opens its bindings; typing in the root keybinding filter searches actions across all groups.

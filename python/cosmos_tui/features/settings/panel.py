@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 from textual.binding import Binding
-from textual.widgets import Input, Label, ListItem, ListView
+from textual.widgets import Input, Label, ListItem, ListView, Static
 
 from cosmos_tui.core import rpc
 from cosmos_tui.features.navigation.about import About
 from cosmos_tui.features.settings.keybindings import KeyBindingEditor
 from cosmos_tui.input import keymap
+from cosmos_tui.input.groups import GROUPS, group
 from cosmos_tui.input.shortcuts import CosmosInput, CosmosModal
 from cosmos_tui.ui.chrome import Frame
 from cosmos_tui.ui.zones import Zone
-from cosmos_tui.ui.keyboard import KeyboardPreview
+from cosmos_tui.ui.keyboard import KeyboardPreview, key_legend
 
 
 class Palette(CosmosModal):
@@ -29,6 +30,9 @@ class Palette(CosmosModal):
             listing = ListView(id="actions")
             listing.styles.margin = 0
             yield listing
+            legend = Static(key_legend(self.app.role_colors), id="binding-legend")
+            legend.styles.height = 1
+            yield legend
             yield KeyboardPreview(id="binding-keyboard")
             yield CosmosInput(placeholder="", id="filter")
 
@@ -47,16 +51,42 @@ class Palette(CosmosModal):
             and a.get("id") not in {"objects.list", "settings.apply", "keys.apply"}
             and a.get("kind") != "mod"
         ]
-        if self.menu == "keys":
+        if self.menu == "keys" and not query:
+            rows = [
+                dict(label=name, kind="menu", menu="keys:" + name) for name in GROUPS
+            ]
+        elif self.menu == "keys" or self.menu.startswith("keys:"):
             settings = snapshot.get("settings", getattr(self.app, "settings", {}))
-            rows.extend(
+            rows = [
                 dict(
-                    label=f"{command.context} · {command.label}  {', '.join(keymap.bindings(command, settings))}",
+                    label=f"{command.label}  {', '.join(keymap.bindings(command, settings))}",
                     kind="keybinding",
                     command=command,
                 )
                 for command in keymap.COMMANDS
-            )
+                if self.menu == "keys" or group(command) == self.menu[5:]
+            ]
+        if self.menu == "keys:General & menus" or (self.menu == "keys" and query):
+            rows = [
+                a
+                for a in actions
+                if a.get("category") == "keys" and a.get("kind") == "setting"
+            ] + rows
+        if self.menu == "ime_settings":
+            current = snapshot.get("settings", {}).get("ime_number_style", "normal")
+            rows = [
+                dict(
+                    label=f"Candidate numbers: {sample}"
+                    + (" · current" if style == current else ""),
+                    kind="ime_style",
+                    style=style,
+                )
+                for style, sample in [
+                    ("superscript", "¹ ² ³"),
+                    ("subscript", "₁ ₂ ₃"),
+                    ("normal", "1 2 3"),
+                ]
+            ]
         if self.menu == "mods":
             rows += [
                 dict(
@@ -71,6 +101,7 @@ class Palette(CosmosModal):
                 for m in snapshot["mods"]
             ]
         if self.menu == "settings":
+            rows.append(dict(label="Input method", kind="menu", menu="ime_settings"))
             rows.append(dict(label="About", kind="about"))
         self.rows = [a for a in rows if query in a["label"].casefold()]
         listing = self.query_one(ListView)
@@ -111,6 +142,16 @@ class Palette(CosmosModal):
         if index is None or index >= len(self.rows):
             return
         row = self.rows[index]
+        if row["kind"] == "ime_style":
+            settings = await rpc.call("settings.get")
+            settings["ime_number_style"] = row["style"]
+            try:
+                await rpc.call("settings.replace", settings)
+                self.app.settings = settings
+                await self.populate()
+            except RuntimeError as error:
+                await self.app.action_error("input method settings", error)
+            return
         if row["kind"] == "keybinding":
             self.app.push_screen(KeyBindingEditor(row["command"]))
             return
@@ -152,7 +193,8 @@ class Palette(CosmosModal):
     def update_keyboard(self):
         keyboard = self.query_one(KeyboardPreview)
         keyboard.fit(minimum_height=32)
-        keyboard.display = keyboard.display and self.menu == "keys"
+        keyboard.display = keyboard.display and self.menu.startswith("keys:")
+        self.query_one("#binding-legend").display = keyboard.display
         index = self.query_one(ListView).index
         command = (
             self.rows[index].get("command")

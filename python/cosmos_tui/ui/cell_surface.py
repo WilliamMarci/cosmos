@@ -62,7 +62,11 @@ class CellSurface(Widget):
                     Segment(
                         text,
                         Style(
-                            color=run.foreground, bgcolor=run.background, bold=run.bold
+                            color=run.foreground,
+                            bgcolor=run.background,
+                            bold=run.bold,
+                            underline=run.underline,
+                            reverse=run.reverse,
                         ),
                     )
                 ]

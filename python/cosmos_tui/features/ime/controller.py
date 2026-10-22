@@ -5,8 +5,9 @@ from textual.widgets import Input
 
 from cosmos_tui.core.controller import Controller
 from cosmos_tui.features.ime.rime import Rime
+from cosmos_tui.features.ime.layout import compose
 from cosmos_tui.ui.cell_surface import CellSurface
-from cosmos_tui.ui.cells import CellRun, HitRegion, Rect, UIFrame, cell_width, clip
+from cosmos_tui.ui.cells import Rect
 from cosmos_tui.ui.zones import Zone
 
 KEYS = dict(
@@ -152,62 +153,25 @@ class IMEController(Controller):
             self.surface = CellSurface(app.ui_registry, self.owner)
             self.surface.styles.layer = "ime"
             await app.screen.mount(self.surface)
-        palette = app.role_colors
-        candidates = context["candidates"]
-        first = context["preedit"] + " ▏"
-        labels = [f" {i + 1} {text} " for i, text in enumerate(candidates)]
-        left, top = (pane.x, pane.y) if pane else (0, 0)
-        available = pane.width if pane else app.size.width
-        bottom = (
-            pane.y + pane.height
+        area = (
+            Rect(pane.x, pane.y, pane.width, pane.height)
             if pane
-            else app.size.height - int(app.query_one("#status").display)
-        )
-        width = min(available, max(12, cell_width(first), sum(map(cell_width, labels))))
-        height = min(2, bottom - top)
-        x = max(left, min(cursor[0], left + available - width))
-        y = (
-            cursor[1] + 1
-            if cursor[1] + 1 + height <= bottom
-            else max(top, cursor[1] - height)
-        )
-        runs = [
-            CellRun(
-                Rect(x, y, width),
-                clip(first, width).ljust(width),
-                palette["accl"],
-                palette["base"],
+            else Rect(
+                0,
+                0,
+                app.size.width,
+                app.size.height - int(app.query_one("#status").display),
             )
-        ]
-        hits = []
-        if height == 2:
-            runs.append(
-                CellRun(
-                    Rect(x, y + 1, width), " " * width, palette["fg"], palette["base"]
-                )
-            )
-            offset = 0
-            for i, label in enumerate(labels):
-                text = clip(label, width - offset)
-                size = cell_width(text)
-                if not size:
-                    break
-                selected = i == context["selected"]
-                rect = Rect(x + offset, y + 1, size)
-                runs.append(
-                    CellRun(
-                        rect,
-                        text,
-                        palette["on"] if selected else palette["fg"],
-                        palette["acc"] if selected else palette["base"],
-                        selected,
-                    )
-                )
-                hits.append(HitRegion(str(i + 1), rect))
-                offset += size
+        )
         self.surface.display = True
         self.surface.present(
-            UIFrame(Rect(x, y, width, height), tuple(runs), tuple(hits))
+            compose(
+                context,
+                area,
+                cursor,
+                app.role_colors,
+                app.settings.get("ime_number_style", "normal"),
+            )
         )
 
     def click(self, action):
@@ -216,7 +180,9 @@ class IMEController(Controller):
     async def choose(self, action):
         target = self.target()[0]
         if self.engine and target:
-            _, text = self.engine.process(target, ord(action), self.full)
+            _, text = self.engine.process(
+                target, KEYS[action] if action in KEYS else ord(action), self.full
+            )
             if text:
                 await self.commit(target, text)
             await self.refresh()

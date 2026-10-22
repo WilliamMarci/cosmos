@@ -7,7 +7,7 @@ from cosmos_tui.core import rpc
 from cosmos_tui.input.keymap import bindings, validate
 from cosmos_tui.input.shortcuts import CosmosInput, CosmosModal
 from cosmos_tui.ui.chrome import Frame
-from cosmos_tui.ui.keyboard import KeyboardPreview
+from cosmos_tui.ui.keyboard import KeyboardPreview, key_legend
 
 
 class KeyBindingEditor(CosmosModal):
@@ -26,11 +26,17 @@ class KeyBindingEditor(CosmosModal):
                 ", ".join(bindings(self.command, self.app.settings)), id="key-value"
             )
             yield Static("", id="key-error", markup=False)
+            legend = Static(key_legend(self.app.role_colors), id="editor-key-legend")
+            legend.styles.height = 1
+            yield legend
             yield KeyboardPreview(bindings(self.command, self.app.settings))
 
     def on_mount(self):
         self.query_one(CosmosInput).focus()
         self.query_one(KeyboardPreview).fit()
+        self.query_one("#editor-key-legend").display = self.query_one(
+            KeyboardPreview
+        ).display
 
     async def on_input_submitted(self, event):
         settings = await rpc.call("settings.get")
@@ -55,6 +61,9 @@ class KeyBindingEditor(CosmosModal):
     def on_resize(self):
         if self.is_mounted:
             self.query_one(KeyboardPreview).fit()
+            self.query_one("#editor-key-legend").display = self.query_one(
+                KeyboardPreview
+            ).display
 
     def on_input_changed(self, event):
         if self.is_mounted:

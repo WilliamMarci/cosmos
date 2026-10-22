@@ -44,6 +44,11 @@ class WorkspaceController(Controller):
         if key == "actions":
             app.action_context_actions()
             return
+        if key in ("ime_enable", "ime_disable"):
+            desired = key == "ime_enable"
+            if app.ime.enabled != desired:
+                await app.ime.toggle()
+            return
         if key == "ime_toggle":
             await app.ime.toggle()
             return
