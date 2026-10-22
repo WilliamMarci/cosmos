@@ -127,7 +127,8 @@ class LoadingTests(unittest.IsolatedAsyncioTestCase):
                 json.dumps({"path": "/tmp/book.pdf"}).encode()
             ).decode()
             ready = asyncio.Event()
-            image = Image.new("RGB", (80, 24), "white")
+            cw, ch = app.reader_ui.cell_pixels()
+            image = Image.new("RGB", (pane.width * cw, pane.height * ch), "white")
             expected = ReadingFrame(
                 image,
                 [Text("PDF CONTENT")],
@@ -149,21 +150,39 @@ class LoadingTests(unittest.IsolatedAsyncioTestCase):
             app.reader_ui.prepare = prepare
             first = app.reader_ui.loading.frame(pane)
             self.assertTrue(any("Loading" in line.plain for line in first.lines))
-            self.assertEqual(first.lines[0].plain[0], "╭")
+            self.assertGreater(first.main_x, 0)
+            self.assertNotEqual(
+                first.image.getpixel((0, 0)),
+                first.image.getpixel((first.main_x * 8 + 100, 100)),
+            )
             self.assertTrue(all(line.cell_len <= pane.width for line in first.lines))
             self.assertIs(first.image, app.reader_ui.loading.frame(pane).image)
             task = app.reader_ui.loading.pending[pane.id]
             ready.set()
             await task
             self.assertIs(app.reader_ui.loading.frame(pane), expected)
+            # A state-only transition retains the frame while cached content is composed.
+            pane.viewer = base64.b64encode(
+                json.dumps({"path": "/tmp/book.pdf", "page": 2}).encode()
+            ).decode()
+            self.assertIs(app.reader_ui.loading.frame(pane), expected)
+            app.reader_ui.loading.missing[pane.id] = app.reader_ui.loading.key(pane)
+            missing = app.reader_ui.loading.frame(pane)
+            self.assertIsNot(missing, expected)
+            # Sidebar/footer pixels survive a genuinely missing page.
+            self.assertEqual(
+                missing.image.getpixel((0, 0)), expected.image.getpixel((0, 0))
+            )
+            self.assertEqual(
+                missing.image.getpixel((0, missing.image.height - 1)),
+                expected.image.getpixel((0, expected.image.height - 1)),
+            )
             app.reader_ui.clear_cache()
             app.reader_ui.prepare = AsyncMock(side_effect=RuntimeError("bad PDF"))
             app.reader_ui.loading.frame(pane)
             await app.reader_ui.loading.pending[pane.id]
             failed = app.reader_ui.loading.frame(pane)
-            self.assertTrue(
-                any("Unable to load" in line.plain for line in failed.lines)
-            )
+            self.assertTrue(any("Load failed" in line.plain for line in failed.lines))
             app.action_error.assert_awaited_once()
         await app.reader_ui.close()
 
@@ -176,14 +195,16 @@ class NotificationTests(unittest.IsolatedAsyncioTestCase):
             await app.mount(toast)
             for text in ("Failed", "Very long message " * 20):
                 toast.present_notices(
-                    [dict(id=1, text=text, count=12)], 80, 24,
-                    app.role_colors, pane_width=40,
+                    [dict(id=1, text=text, count=12)],
+                    80,
+                    24,
+                    app.role_colors,
+                    pane_width=40,
                 )
                 suffix = next(r for r in toast.frame.runs if r.text == " ×12")
                 self.assertEqual(suffix.foreground, COLORS["warning"])
                 self.assertLessEqual(suffix.rect.x + suffix.rect.width, 77)
                 self.assertLessEqual(toast.frame.bounds.height, 2)
-
 
     async def test_stack_order_color_two_line_limit_and_action_identity(self):
         app = Probe()

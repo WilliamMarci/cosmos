@@ -544,6 +544,9 @@ class ReaderController(Controller):
         ):
             self.schedule_prefetch(pane, state, self.pages[pane.id])
             return self.frames[pane.id]
+        page = max(1, int(state.get("page", 1)))
+        if self.media.cache.get(identity + (page,)) is None:
+            self.loading.missing[pane.id] = self.loading.key(pane)
         source, pages, has_text = await asyncio.to_thread(self.media.load, state)
         if state.get("page", 1) > pages:
             state["page"] = pages

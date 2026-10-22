@@ -5,9 +5,10 @@ import base64
 import json
 import time
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageDraw
 from rich.text import Text
 from cosmos_tui.features.reader.layout import ReadingFrame
+from cosmos_tui.render.graphics import halfblocks
 
 SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
@@ -17,6 +18,7 @@ class LoadingFrames:
         self.controller = controller
         self.pending, self.ready, self.errors, self.placeholders = {}, {}, {}, {}
         self.probed, self.error_versions = {}, {}
+        self.missing = {}
 
     def key(self, pane):
         app = self.controller.app
@@ -47,7 +49,7 @@ class LoadingFrames:
             self.probed[pane.id] = time.monotonic()
             self.pending[pane.id] = asyncio.create_task(self.load(pane, key))
         # Retain an already rendered same-state page while thumbnails fill.
-        if ready and ready[0] == key:
+        if ready and (ready[0] == key or self.missing.get(pane.id) != key):
             return ready[2]
         return self.placeholder(pane, error[1] if error and error[0] == key else None)
 
@@ -65,6 +67,7 @@ class LoadingFrames:
             if frame is not None:
                 self.ready[pane.id] = key, self.controller.media.revision, frame
                 self.errors.pop(pane.id, None)
+                self.missing.pop(pane.id, None)
         except Exception as error:
             previous = self.errors.get(pane.id)
             self.errors[pane.id] = key, str(error)
@@ -74,63 +77,107 @@ class LoadingFrames:
                     "reader", error, session_id=session_id
                 )
         finally:
-            self.pending.pop(pane.id, None)
+            if self.pending.get(pane.id) is asyncio.current_task():
+                self.pending.pop(pane.id, None)
 
     def placeholder(self, pane, error=None):
         app = self.controller.app
         palette = app.role_colors
         width, height = max(1, pane.width), max(1, pane.height)
         cw, ch = self.controller.cell_pixels()
-        shape = width, height, cw, ch, palette["base"]
+        try:
+            state = json.loads(base64.b64decode(pane.viewer))
+        except (ValueError, KeyError):
+            state = {"path": "document.pdf"}
+        previous = self.ready.get(pane.id)
+        previous = previous[2] if previous else None
+        document = Path(state["path"]).suffix.lower() == ".pdf"
+        expanded = state.get("thumbnails", True) and height >= 12 and width >= 30
+        sidebar = (
+            (
+                min(30, width // 3)
+                if state.get("navigation") == "outline"
+                else min(18, width // 5)
+            )
+            if document and expanded
+            else 0
+        )
+        footer = 6 if expanded and not document else 1 if height >= 3 else 0
+        main_rows, main_cols = max(1, height - footer), max(1, width - sidebar)
+        source_size = (
+            previous.source_size
+            if previous
+            else ((1391, 1800) if document else (800, 600))
+        )
+        shape = (self.key(pane), error, id(previous))
         cached = self.placeholders.get(pane.id)
         if not cached or cached[0] != shape:
-            cached = shape, Image.new("RGB", (width * cw, height * ch), palette["base"])
+            canvas = (
+                previous.image.copy()
+                if previous and previous.image.size == (width * cw, height * ch)
+                else Image.new("RGB", (width * cw, height * ch), palette["base"])
+            )
+            draw = ImageDraw.Draw(canvas)
+            draw.rectangle(
+                (sidebar * cw, 0, width * cw - 1, main_rows * ch - 1),
+                fill=palette["bg"],
+            )
+            sw, sh = source_size
+            scale = max(
+                0.001,
+                min(main_cols * cw / sw, main_rows * ch / sh) * state.get("zoom", 1),
+            )
+            pan = state.get("pan", [0, 0])
+            left = sidebar * cw + (main_cols * cw - sw * scale) / 2 - pan[0] * scale
+            top = (main_rows * ch - sh * scale) / 2 - pan[1] * scale
+            box = (
+                max(sidebar * cw, int(left)),
+                max(0, int(top)),
+                min(width * cw - 1, int(left + sw * scale) - 1),
+                min(main_rows * ch - 1, int(top + sh * scale) - 1),
+            )
+            draw.rectangle(box, fill=palette["base"], outline=palette["mute"], width=1)
+            lines = (
+                [line.copy() for line in previous.lines]
+                if previous and len(previous.lines) == height
+                else [
+                    Text(" " * width, style=f"on {palette['base']}")
+                    for _ in range(height)
+                ]
+            )
+            for row in range(main_rows):
+                lines[row] = lines[row][:sidebar] + Text(
+                    " " * main_cols, style=f"on {palette['bg']}"
+                )
+            if not app.graphics.enabled:
+                pixels = halfblocks(canvas, width, height)
+                for row in range(main_rows):
+                    lines[row] = lines[row][:sidebar] + pixels[row][sidebar:]
+            cached = shape, canvas, lines, box, scale
             self.placeholders[pane.id] = cached
-        style = f"{palette['mute']} on {palette['base']}"
-        lines = [
-            Text("│" + " " * max(0, width - 2) + "│", style=style)
-            for _ in range(height)
-        ]
-        if width >= 2:
-            lines[0] = Text("╭" + "─" * (width - 2) + "╮", style=style)
-            if height > 1:
-                lines[-1] = Text("╰" + "─" * (width - 2) + "╯", style=style)
-        try:
-            name = Path(json.loads(base64.b64decode(pane.viewer))["path"]).name
-        except (ValueError, KeyError):
-            name = "document"
-        text = ("Unable to load: " + error) if error else "Loading " + name
-        if height > 3 and width > 4:
-            label = Text(" " + text, style=style)
-            label.truncate(width - 2, overflow="ellipsis")
-            lines[height // 2] = Text("│", style=style) + label
-            lines[height // 2].pad_right(
-                max(0, width - 1 - lines[height // 2].cell_len)
-            )
-            lines[height // 2].append("│", style=style)
-            waiting = (
-                "Load failed"
-                if error
-                else SPINNER[int(time.monotonic() * 10) % len(SPINNER)] + " Loading"
-            )
-            waiting = Text(waiting, style=f"{palette['mute']} on {palette['base']}")
-            waiting.truncate(width - 2)
-            lines[-2] = (
-                Text("│" + " " * max(0, width - waiting.cell_len - 2), style=style)
-                + waiting
-                + Text("│", style=style)
-            )
+        _, canvas, base_lines, box, scale = cached
+        lines = [line.copy() for line in base_lines]
+        waiting = (
+            "Load failed"
+            if error
+            else SPINNER[int(time.monotonic() * 10) % len(SPINNER)] + " Loading"
+        )
+        x = max(sidebar, box[2] // cw - len(waiting))
+        y = max(0, min(main_rows - 1, box[3] // ch - 1))
+        label = Text(waiting, style=f"{palette['mute']} on {palette['base']}")
+        label.truncate(max(0, width - x))
+        lines[y] = lines[y][:x] + label + lines[y][x + label.cell_len :]
         return ReadingFrame(
-            cached[1],
+            canvas,
             lines,
-            range(1),
-            0,
-            [],
-            height,
-            0,
-            width,
-            1,
-            cached[1].size,
+            previous.entries if previous else range(1),
+            previous.selected if previous else 0,
+            previous.hits if previous else [],
+            main_rows,
+            sidebar,
+            main_cols,
+            scale,
+            source_size,
             (0, 0),
         )
 
@@ -141,13 +188,14 @@ class LoadingFrames:
             self.placeholders,
             self.probed,
             self.error_versions,
+            self.missing,
         ):
             for pid in list(store):
                 if pid not in visible:
                     store.pop(pid, None)
         for pid in list(self.pending):
             if pid not in visible:
-                self.pending[pid].cancel()
+                self.pending.pop(pid).cancel()
 
     def clear(self):
         self.prune(set())
