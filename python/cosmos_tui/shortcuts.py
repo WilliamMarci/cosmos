@@ -89,12 +89,15 @@ def leader_key(key, character):
         ".": "full_stop",
         ",": "comma",
         " ": "space",
+        "$": "dollar_sign",
         "+": "plus",
         "=": "equals_sign",
         "/": "slash",
         "[": "left_square_bracket",
         "]": "right_square_bracket",
     }
+    if key.startswith(("ctrl+", "alt+", "meta+")):
+        return key
     if character and character.isprintable():
         return aliases.get(character, character)
     # Protocols without associated text still provide Shift plus the base key.

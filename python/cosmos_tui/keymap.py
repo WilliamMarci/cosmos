@@ -28,6 +28,9 @@ for name, label, keys, target in [
     ("switch", "Switch window / session", ["s"], "s"),
     ("help", "Context help", ["question_mark"], "question_mark"),
     ("detach", "Detach", ["d"], "d"),
+    ("copy_mode", "Select / scroll history", ["left_square_bracket"], "copy_mode"),
+    ("history_search", "Search pane history", ["slash"], "history_search"),
+    ("paste_buffer", "Paste Tmux selection", ["right_square_bracket"], "paste_buffer"),
     ("new_window", "New window", ["c"], "c"),
     (
         "split_horizontal",
@@ -95,6 +98,49 @@ for context in ("palette", "switch", "menu", "help", "about", "key_settings"):
         ] + actions
     for name, label, key in actions:
         register(context + "." + name, context, label, [key], key)
+
+for name, label, keys, target in [
+    ("cancel", "Return to terminal", ["escape", "q"], "cancel"),
+    (
+        "select",
+        "Begin selection",
+        ["space", "v", "ctrl+space", "ctrl+@"],
+        "begin-selection",
+    ),
+    ("clear", "Clear selection", ["ctrl+g"], "clear-selection"),
+    (
+        "copy",
+        "Copy selection to Tmux buffer",
+        ["enter", "y", "alt+w"],
+        "copy-selection-and-cancel",
+    ),
+    ("page_up", "Previous history page", ["pageup"], "page-up"),
+    ("page_down", "Next history page", ["pagedown", "ctrl+f"], "page-down"),
+    ("top", "Oldest retained output", ["home", "g"], "history-top"),
+    ("bottom", "Latest output", ["end", "G"], "history-bottom"),
+    ("line_start", "Start of line", ["0", "ctrl+a"], "start-of-line"),
+    ("line_end", "End of line", ["dollar_sign", "ctrl+e"], "end-of-line"),
+    ("word_next", "Next word", ["w"], "next-word"),
+    ("word_previous", "Previous word", ["b"], "previous-word"),
+    ("search", "Search history forward", ["slash", "ctrl+s"], "search"),
+    (
+        "search_backward",
+        "Search history backward",
+        ["question_mark", "ctrl+r"],
+        "search_backward",
+    ),
+    ("next", "Next match", ["n"], "search-again"),
+    ("previous", "Previous match", ["N"], "search-reverse"),
+    *[
+        (d, "Move " + d, [d, k], "cursor-" + d)
+        for d, k in (("left", "h"), ("down", "j"), ("up", "k"), ("right", "l"))
+    ],
+]:
+    register("copy." + name, "copy", label, keys, target)
+register(
+    "history_search.close", "history_search", "Cancel search", ["escape"], "escape"
+)
+register("history_search.choose", "history_search", "Search", ["enter"], "enter")
 
 
 def bindings(command, settings):

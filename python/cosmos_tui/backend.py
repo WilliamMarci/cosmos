@@ -23,6 +23,11 @@ class Pane:
     cursor_visible: bool = True
     cursor_shape: str = "default"
     cursor_blinking: bool = True
+    copy_mode: bool = False
+    selection: tuple | None = None
+    selection_inclusive: bool = False
+    selection_rectangle: bool = False
+    copy_match: str = ""
 
 
 class Tmux:
@@ -220,21 +225,59 @@ class Tmux:
         rows = await self.request(
             "list-panes "
             + target
-            + " -F '#{pane_id}|#{pane_left}|#{pane_top}|#{pane_width}|#{pane_height}|#{pane_active}|#{window_zoomed_flag}|#{cursor_x}|#{cursor_y}|#{cursor_flag}|#{cursor_shape}|#{cursor_blinking}|#{@cosmos_viewer}'"
+            + " -F '#{pane_id}|#{pane_left}|#{pane_top}|#{pane_width}|#{pane_height}|#{pane_active}|#{window_zoomed_flag}|#{cursor_x}|#{cursor_y}|#{cursor_flag}|#{cursor_shape}|#{cursor_blinking}|#{@cosmos_viewer}|#{pane_in_mode}'"
         )
         panes = []
         zoomed = False
         for row in rows:
-            fields = row.split("|", 12)
-            if len(fields) != 13:
+            fields = row.split("|", 13)
+            if len(fields) != 14:
                 continue
-            pane, x, y, w, h, active, zoom, cx, cy, visible, shape, blink, wire = fields
+            (
+                pane,
+                x,
+                y,
+                w,
+                h,
+                active,
+                zoom,
+                cx,
+                cy,
+                visible,
+                shape,
+                blink,
+                wire,
+                mode,
+            ) = fields
+            copy_mode = mode not in ("", "0")
             if not re.fullmatch(r"%\d+", pane):
                 raise RuntimeError("invalid pane ID")
+            selection = None
+            offset = 0
+            inclusive = rectangle = False
+            copy_match = ""
+            if copy_mode:
+                position = await self.request(
+                    f"display-message -p -t {pane} '#{{copy_cursor_x}}|#{{copy_cursor_y}}|#{{scroll_position}}|#{{history_size}}|#{{selection_present}}|#{{selection_start_x}}|#{{selection_start_y}}|#{{selection_end_x}}|#{{selection_end_y}}|#{{mode-keys}}|#{{rectangle_toggle}}|#{{=256:search_match}}'"
+                )
+                if position:
+                    values = position[0].split("|", 11)
+                    cx, cy = values[:2]
+                    offset, history_size = map(int, values[2:4])
+                    inclusive, rectangle = values[9] == "vi", values[10] == "1"
+                    copy_match = values[11]
+                    if values[4] == "1":
+                        sx, sy, ex, ey = map(int, values[5:9])
+                        top = history_size - offset
+                        selection = (sx, sy - top, ex, ey - top)
             width, height = int(w), int(h)
             if width * height > 262144:
                 raise RuntimeError("pane exceeds cell budget")
-            lines = await self.request(f"capture-pane -p -e -C -N -t {pane}")
+            lines = await self.request(
+                "capture-pane -p -e -C -N "
+                + (f"-M -S {-offset} -E {height - 1 - offset} " if copy_mode else "")
+                + f"-t {pane}"
+            )
             lines = [
                 re.sub(
                     r"\\([0-7]{3}|\\)",
@@ -254,9 +297,14 @@ class Tmux:
                     lines,
                     wire,
                     (int(cx), int(cy)),
-                    visible != "0",
+                    copy_mode or visible != "0",
                     shape or "default",
                     blink != "0",
+                    copy_mode,
+                    selection,
+                    inclusive,
+                    rectangle,
+                    copy_match,
                 )
             )
             zoomed = zoom == "1"

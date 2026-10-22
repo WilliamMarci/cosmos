@@ -18,7 +18,7 @@ class KeyBindingEditor(CosmosModal):
 
     def compose(self):
         with Frame(id="key-editor") as frame:
-            frame.border_title = self.command.label
+            frame.set_heading(self.command.label, self.command.id)
             yield Static("Comma-separated keys; empty restores defaults", markup=False)
             yield CosmosInput(
                 ", ".join(bindings(self.command, self.app.settings)), id="key-value"

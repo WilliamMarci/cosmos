@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path[:0] = [
     str(Path(__file__).resolve().parents[1] / n) for n in ("python", "terminal_agent")
 ]
-from cosmos_tui.app import Cosmos  # noqa: E402
+from cosmos_tui.app import Cosmos, TerminalSurface  # noqa: E402
 from cosmos_tui.rendering import Batch  # noqa: E402
 
 
@@ -21,6 +21,31 @@ class Probe(Cosmos):
 
 
 class RenderingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_mod_popup_uses_folded_frame_without_overrunning_rect(self):
+        app = Probe()
+        async with app.run_test(size=(80, 24)):
+            app.views = [
+                {
+                    "view": {
+                        "kind": "help",
+                        "content": {
+                            "title": "Mod preview",
+                            "lines": [{"text": "Body", "role": "fg"}],
+                        },
+                    },
+                    "rect": {"x": 2, "y": 1, "width": 30, "height": 6},
+                }
+            ]
+            surface = app.query_one(TerminalSurface)
+            top = surface.render_line(1)
+            self.assertIn("╭─┐ Mod preview ┌", top.text)
+            body = surface.render_line(2).text
+            self.assertEqual(body[2], "│")
+            self.assertEqual(body[31], "│")
+            self.assertIn("Body", body)
+            self.assertEqual(top.cell_length, 80)
+            self.assertEqual(surface.render_line(6).text[2], "╰")
+
     async def test_suppressed_batch_preserves_packet_for_later_display(self):
         app = Probe()
         async with app.run_test():

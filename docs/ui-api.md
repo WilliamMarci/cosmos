@@ -112,3 +112,9 @@ reduced_motion = false
 ```
 
 随后从 Python 工作区的 Mods 子菜单启动 UI components demo，保证启动时带 COSMOS_CLIENT_ID。点击通知按钮，或使用 Notification actions 键打开紧凑菜单；关闭 Mod 时视图随 owner 生命周期清理。这个示例不访问模型、不执行 Shell 命令、不修改文件。
+
+## Pop window 边框
+
+内置设置、Switch、上下文键位帮助、键位编辑、About、动作选择和历史搜索共用 chrome.Frame；Mod 的 palette/help 展示也由宿主加同款边框。其余 cover line、通知和终端本身不加此框。边框使用当前主题角色色，标题两端有折线，容器分隔线在外框形成接点。
+
+Frame.set_heading(label, command_id) 从共享键位注册表读取对应按键，在标签中高亮匹配字符；字符不在标题中则追加该键，未绑定时不显示失效提示。Frame.junction_selector 可指定竖向分隔组件，按实际布局位置绘制顶部/底部接点。chrome.frame_border 是 Mod 字符展示与 Widget 共用的折线绘制函数，不创建额外 tty 输出通道。

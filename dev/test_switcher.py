@@ -99,6 +99,19 @@ class SwitcherTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(
                 app.screen.query_one("#switcher").styles.border_top[0], "round"
             )
+            frame = app.screen.query_one("#switcher")
+            divider = app.screen.query_one("#switch-divider")
+            x = divider.region.x - frame.region.x
+            self.assertEqual(frame.border_strip(True).text[x], "┬")
+            self.assertEqual(frame.border_strip(False).text[x], "┴")
+            self.assertEqual(divider.region.y, frame.region.y + 1)
+            self.assertEqual(divider.region.bottom, frame.region.bottom - 1)
+            self.assertIn("┐ Switch ┌", frame.border_strip(True).text)
+            heading = frame.heading(app.role_colors)
+            self.assertTrue(any(s.start == 0 and s.end == 1 for s in heading.spans))
+            app.settings["keybindings"] = {"workspace.switch": ["leader+w"]}
+            heading = frame.heading(app.role_colors)
+            self.assertTrue(any(s.start == 1 and s.end == 2 for s in heading.spans))
 
     async def test_slow_preview_never_activates_textual_loading_cover(self):
         app = Probe()

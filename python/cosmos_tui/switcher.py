@@ -70,18 +70,28 @@ class LayoutPreview(Widget):
         return strip
 
 
+class SwitchDivider(Widget):
+    DEFAULT_CSS = "SwitchDivider { width: 1; height: 100%; }"
+
+    def render_line(self, y):
+        palette = self.app.role_colors
+        return Strip(
+            [Segment("│", Style(color=palette["acc"], bgcolor=palette["base"]))], 1
+        )
+
+
 class Switcher(CosmosModal):
     zone = Zone.POP_WINDOW
     AUTO_FOCUS = "#switch-filter"
     BINDINGS = [Binding("escape", "cancel", show=False)]
     DEFAULT_CSS = """
     Switcher { align: center middle; background: transparent; }
-    #switcher { width: 88%; height: 82%; }
+    #switcher { width: 88%; height: 82%; padding: 0; }
     #switch-columns { height: 1fr; }
-    #switch-browser { width: 35%; min-width: 12; height: 100%; border-right: solid #7a8092; padding-right: 1; }
+    #switch-browser { width: 35%; min-width: 12; height: 100%; padding: 0 1; }
     #switch-list { height: 1fr; min-height: 2; background: #1e212c; margin-top: 1; }
-    LayoutPreview { width: 1fr; height: 100%; margin-left: 1; background: #14161e; }
-    #switch-error { height: auto; color: #eb7080; }
+    LayoutPreview { width: 1fr; height: 100%; background: #14161e; }
+    #switch-error { height: auto; color: #eb7080; display: none; }
     """
 
     def __init__(self):
@@ -96,15 +106,17 @@ class Switcher(CosmosModal):
 
     def compose(self):
         with Frame(id="switcher") as frame:
-            frame.border_title = "Switch"
+            frame.set_heading("Switch", "workspace.switch")
+            frame.junction_selector = "#switch-divider"
             with Horizontal(id="switch-columns"):
                 with Vertical(id="switch-browser"):
                     yield CosmosInput(id="switch-filter")
                     listing = ListView(id="switch-list")
                     listing.can_focus = False
                     yield listing
+                    yield Static("", id="switch-error")
+                yield SwitchDivider(id="switch-divider")
                 yield LayoutPreview()
-            yield Static("", id="switch-error")
 
     async def on_mount(self):
         self.set_focus(self.query_one(Input))
@@ -119,6 +131,7 @@ class Switcher(CosmosModal):
             self.inventory_ready.set()
 
     def error(self, error):
+        self.query_one("#switch-error").display = True
         self.query_one("#switch-error", Static).update(Text(str(error)))
 
     async def populate(self):

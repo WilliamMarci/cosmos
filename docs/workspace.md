@@ -41,3 +41,13 @@ Python UI 启动时检查 ui-components-v1 和 keybindings 能力。如果旧协
 终端驱动恢复后显示 Cosmos ANSI Logo 与退出原因。`Leader d` 显示 detach；后端会话结束显示 exit。随后独立查询目标 Tmux 会话：存在时显示 Session retained 和绝对路径重连命令；不存在时显示 Session ended；查询失败时只显示状态未知，不承诺保留。输出重定向时移除 Logo 的 ANSI 颜色。
 
 运行 Logo 位于 python/cosmos_tui/assets/cosmos-logo.ansi，与 design/cosmos-logo.ansi 保持一致，随构建包分发。启动帮助、启动失败和 UI 异常不显示成功分离提示。
+
+## Tmux 操作菜单与历史模式
+
+操作主菜单暴露 Switch、Detach、两种分屏；Pane operations 子菜单放焦点切换、窗格缩放、尺寸调整，以及历史选择/搜索/粘贴。原有直接快捷键保留；原始 Terminal panes 清单和手动 Apply terminal/keybindings 不在 Python 菜单展示，管理 RPC 仍可调用。
+
+普通终端窗格默认 Leader [ 进入 Tmux copy mode，Leader / 打开当前窗格历史搜索，Leader ] 粘贴 Tmux buffer。历史模式中：方向键或 h/j/k/l 移动，PageUp/PageDown 翻页，Home/g 到最早保留内容，End/G 到最新内容，0/$ 到行首/行末，Space/v/Ctrl+Space 开始选区，Enter/y/Alt+w 复制选区并返回，Esc/q 返回；/ 或 Ctrl+s 向前搜索，? 或 Ctrl+r 向后搜索，n/N 前后匹配。Leader ? 查看此模式的实际键位；键位均在统一设置中可改，Leader 本身优先于模式快捷键。
+
+普通窗格上滚进入历史并按三行滚动，下滚在历史模式中继续滚动。Tmux 保留历史、选区、搜索位置和 buffer；Cosmos 按 copy-mode 的 scroll_position 捕获对应视口，并显示选区及当前匹配。当前实现依赖 Tmux 的 capture-pane -M 支持，已在 Tmux 3.6 验证。
+
+复制目标为服务器端 Tmux buffer；不承诺本地系统剪贴板同步。当前提供键盘选区，尚不提供终端内容鼠标拖选。这是单窗格保留历史搜索，不是跨窗格搜索。

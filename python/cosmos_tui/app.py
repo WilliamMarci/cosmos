@@ -25,10 +25,11 @@ from .borders import borders
 from .terminal_grid import decode_grid
 from . import keymap
 from .key_settings import KeyBindingEditor
-from .ui import UIRegistry
+from .ui import UIRegistry, cell_width
 from .notifications import NoticeToast
 from .menus import CompactMenu
 from .about import About
+from .history import HistorySearch, selection_range
 from .presentation import (
     SessionWindows,
     PopWindows,
@@ -38,7 +39,7 @@ from .presentation import (
 )
 from .media import Media
 from .reading import Reader
-from .chrome import Frame
+from .chrome import Frame, frame_border
 from .rendering import Batch, Graphics
 from . import rpc
 from .switcher import Switcher
@@ -157,6 +158,28 @@ class TerminalSurface(Widget):
                 .crop(0, pane.width)
                 .extend_cell_length(pane.width, style)
             )
+            selected = selection_range(pane, row)
+            if (
+                not selected
+                and pane.copy_mode
+                and pane.copy_match
+                and row == pane.cursor[1]
+            ):
+                selected = (
+                    pane.cursor[0],
+                    min(pane.width, pane.cursor[0] + cell_width(pane.copy_match)),
+                )
+            if selected:
+                left, right = selected
+                strip = Strip.join(
+                    [
+                        strip.crop(0, left),
+                        strip.crop(left, right).apply_style(
+                            Style(color=palette["on"], bgcolor=palette["acc"])
+                        ),
+                        strip.crop(right, pane.width),
+                    ]
+                )
             parts.append(strip)
             x = pane.x + pane.width
         if x < width:
@@ -169,18 +192,45 @@ class TerminalSurface(Widget):
                 continue
             row = y - rect["y"]
             content = view["content"]
-            items = [
-                {"text": content.get("title", ""), "role": "acc"},
-                *content.get("lines", []),
-            ]
-            item = items[row] if row < len(items) else {"text": "", "role": "fg"}
-            rendered = Text(
-                item["text"],
-                style=Style(
-                    color=palette.get(item["role"], palette["fg"]),
-                    bgcolor=palette["base"],
-                ),
+            framed = (
+                view["kind"] in ("palette", "help")
+                and rect["width"] >= 4
+                and rect["height"] >= 3
             )
+            if framed and row in (0, rect["height"] - 1):
+                rendered = frame_border(
+                    rect["width"],
+                    palette,
+                    Text(content.get("title", ""), style=palette["fg"]),
+                    top=row == 0,
+                )
+            else:
+                items = (
+                    content.get("lines", [])
+                    if framed
+                    else [
+                        {"text": content.get("title", ""), "role": "acc"},
+                        *content.get("lines", []),
+                    ]
+                )
+                index = row - 1 if framed else row
+                item = (
+                    items[index] if index < len(items) else {"text": "", "role": "fg"}
+                )
+                rendered = Text(
+                    item["text"],
+                    style=Style(
+                        color=palette.get(item["role"], palette["fg"]),
+                        bgcolor=palette["base"],
+                    ),
+                )
+                if framed:
+                    rendered.truncate(rect["width"] - 2)
+                    rendered.pad_right(rect["width"] - 2 - cell_width(rendered.plain))
+                    edge = Text(
+                        "│", style=Style(color=palette["acc"], bgcolor=palette["base"])
+                    )
+                    rendered = edge + rendered + edge
             overlay = (
                 Strip(
                     Segment(s.text, s.style or style, s.control)
@@ -211,11 +261,14 @@ class Help(CosmosModal):
         self.items = items
 
     def compose(self):
-        text = Text(self.heading + "\n\n", style="bold")
+        palette = getattr(self.app, "role_colors", DARK)
+        text = Text()
         for key, label in self.items:
-            text.append(f"{key:<19}", style="bold #a0cdfa")
-            text.append(label + "\n", style="#cdd2dc")
-        yield Static(text, id="help-content")
+            text.append(f"{key:<19}", style="bold " + palette["accl"])
+            text.append(label + "\n", style=palette["fg"])
+        with Frame(id="help-frame") as frame:
+            frame.set_heading(self.heading, "workspace.help")
+            yield Static(text, id="help-content")
 
 
 class Palette(CosmosModal):
@@ -230,7 +283,7 @@ class Palette(CosmosModal):
 
     def compose(self):
         with Frame(id="palette") as frame:
-            frame.border_title = "Cosmos / actions"
+            frame.set_heading("Cosmos / actions", "workspace.palette")
             yield CosmosInput(placeholder="", id="filter")
             yield ListView(id="actions")
 
@@ -242,7 +295,12 @@ class Palette(CosmosModal):
         query = self.query_one(Input).value.casefold()
         snapshot = await rpc.call("state.snapshot")
         actions = snapshot["actions"]
-        rows = [a for a in actions if a.get("category") == self.menu]
+        rows = [
+            a
+            for a in actions
+            if a.get("category") == self.menu
+            and a.get("id") not in {"objects.list", "settings.apply", "keys.apply"}
+        ]
         if self.menu == "keys":
             settings = snapshot.get("settings", getattr(self.app, "settings", {}))
             rows.extend(
@@ -272,7 +330,30 @@ class Palette(CosmosModal):
                     dict(label="Command assistant", kind="local", key="a"),
                     dict(label="OpenCode · split", kind="local", key="g"),
                     dict(label="About", kind="about"),
+                    dict(label="Pane operations", kind="menu", menu="panes"),
                 ]
+            )
+        if self.menu in ("actions", "panes"):
+            main = {
+                "workspace.switch",
+                "workspace.detach",
+                "workspace.split_horizontal",
+                "workspace.split_vertical",
+            }
+            pane = {
+                "workspace.next_pane",
+                "workspace.zoom",
+                "workspace.copy_mode",
+                "workspace.history_search",
+                "workspace.paste_buffer",
+                *["workspace.focus_" + d for d in ("left", "down", "up", "right")],
+                *["workspace.resize_" + d for d in ("left", "down", "up", "right")],
+            }
+            allowed = main if self.menu == "actions" else pane
+            rows.extend(
+                dict(label=c.label, kind="local", key=c.target)
+                for c in keymap.COMMANDS
+                if c.id in allowed
             )
         self.rows = [a for a in rows if query in a["label"].casefold()]
         listing = self.query_one(ListView)
@@ -280,7 +361,9 @@ class Palette(CosmosModal):
         await listing.extend(ListItem(Label(row["label"])) for row in self.rows)
         if self.rows:
             listing.index = 0
-        self.query_one("#palette", Frame).border_title = "Cosmos / " + self.menu
+        self.query_one("#palette", Frame).set_heading(
+            "Cosmos / " + self.menu, "workspace.palette"
+        )
 
     async def on_input_changed(self, event):
         await self.populate()
@@ -356,7 +439,8 @@ class Cosmos(App, inherit_bindings=False):
     #notice { layer: notices; position: absolute; width: auto; max-width: 60; height: 1; background: #1e212c; color: #e8a662; align-horizontal: right; }
     Assistant { background: transparent; background-tint: transparent; }
     Help, Palette { align: center middle; background: transparent; }
-    #help-content { width: 72; max-width: 90%; height: auto; max-height: 90%; background: #1e212c; padding: 1 2; }
+    #help-frame { width: 76; max-width: 90%; height: auto; max-height: 90%; }
+    #help-content { width: 100%; height: auto; padding: 1 0; background: transparent; }
     #palette { width: 72; max-width: 90%; height: 70%; }
     #palette-title { height: 1; color: #a0cdfa; }
     Input { border: none; background: #1e212c; padding: 0; height: 1; }
@@ -441,6 +525,10 @@ class Cosmos(App, inherit_bindings=False):
             ):
                 key = leader_key(event.key, event.character)
                 command = keymap.resolve(context, key, self.settings)
+                if context == "copy":
+                    if command:
+                        await self.copy_action(command.target)
+                    return
                 if command and command.context.startswith("assistant"):
                     await self.screen.run_action(command.target)
                     return
@@ -475,9 +563,13 @@ class Cosmos(App, inherit_bindings=False):
             return "help"
         if isinstance(self.screen, About):
             return "about"
+        if isinstance(self.screen, HistorySearch):
+            return "history_search"
         if self.view_focus is not None:
             return "surface"
         pane = self.active()
+        if pane and pane.copy_mode and not pane.viewer:
+            return "copy"
         return (
             ("viewer_search" if self.search is not None else "viewer")
             if pane and pane.viewer
@@ -600,11 +692,34 @@ class Cosmos(App, inherit_bindings=False):
     async def action_leader_key(self, key):
         logging.getLogger(__name__).debug("action_leader_key %s", key)
         self.prefix = False
+        if key in ("copy_mode", "history_search", "paste_buffer"):
+            pane = self.active()
+            if not pane or pane.viewer or self.screen is not self._workspace_screen:
+                return
+            try:
+                if key == "paste_buffer":
+                    if pane.copy_mode:
+                        await self.backend.request(f"send-keys -X -t {pane.id} cancel")
+                    await self.backend.request(f"paste-buffer -p -t {pane.id}")
+                else:
+                    await self.backend.request(f"copy-mode -t {pane.id}")
+                self.panes = await self.backend.snapshot()
+                if key == "history_search":
+                    await self.copy_action("search")
+            except RuntimeError as error:
+                await self.action_error(key, error)
+            return
         if key == "d":
             await self.detach()
             return
         if key == "a":
             pane = self.active()
+            if pane and pane.copy_mode:
+                await self.action_error(
+                    "command assistant",
+                    "Leave history mode before opening the command assistant",
+                )
+                return
             if pane and self.screen is self._workspace_screen:
                 ready = await self.backend.request(
                     f"show-options -pqv -t {pane.id} @cosmos_terminal_agent"
@@ -668,6 +783,11 @@ class Cosmos(App, inherit_bindings=False):
             self.push_screen(Palette())
             return
         if key == "question_mark":
+            if self.key_context() == "copy":
+                self.push_screen(
+                    Help("History / selection", keymap.help_rows("copy", self.settings))
+                )
+                return
             if isinstance(self.screen, Assistant):
                 self.push_screen(
                     Help(
@@ -676,7 +796,10 @@ class Cosmos(App, inherit_bindings=False):
                     )
                 )
                 return
-            if isinstance(self.screen, (Palette, CompactMenu, About)):
+            if isinstance(
+                self.screen,
+                (Palette, CompactMenu, About, HistorySearch, KeyBindingEditor),
+            ):
                 self.push_screen(
                     Help("Actions", keymap.help_rows(self.key_context(), self.settings))
                 )
@@ -738,6 +861,33 @@ class Cosmos(App, inherit_bindings=False):
                 self.panes = await self.backend.snapshot()
             except RuntimeError as error:
                 await self.action_error(command, error)
+
+    async def copy_action(self, command):
+        pane = self.active()
+        if not pane or not pane.copy_mode:
+            return
+        if command in ("search", "search_backward"):
+            pid = pane.id
+            backward = command == "search_backward"
+
+            async def search(query):
+                if query:
+                    try:
+                        direction = "search-backward" if backward else "search-forward"
+                        await self.backend.request(
+                            f"send-keys -X -t {pid} {direction} {self.backend.quote(query)}"
+                        )
+                        self.panes = await self.backend.snapshot()
+                    except RuntimeError as error:
+                        await self.action_error("history search", error)
+
+            self.push_screen(HistorySearch(backward), search)
+            return
+        try:
+            await self.backend.request(f"send-keys -X -t {pane.id} {command}")
+            self.panes = await self.backend.snapshot()
+        except RuntimeError as error:
+            await self.action_error("history", error)
 
     async def action_error(self, command, error):
         # A rejected user operation is not a fatal frontend exception.
@@ -1182,10 +1332,43 @@ class Cosmos(App, inherit_bindings=False):
         event.stop()
 
     async def on_mouse_scroll_up(self, event):
-        await self.scroll_viewer(event, -1)
+        if self.viewer_at(event):
+            await self.scroll_viewer(event, -1)
+        else:
+            await self.scroll_history(event, True)
 
     async def on_mouse_scroll_down(self, event):
-        await self.scroll_viewer(event, 1)
+        if self.viewer_at(event):
+            await self.scroll_viewer(event, 1)
+        else:
+            await self.scroll_history(event, False)
+
+    async def scroll_history(self, event, up):
+        if self.screen is not self._workspace_screen or self.views:
+            return
+        pane = next(
+            (
+                p
+                for p in self.panes
+                if p.x <= event.screen_x < p.x + p.width
+                and p.y <= event.screen_y < p.y + p.height
+            ),
+            None,
+        )
+        if not pane or pane.viewer or not up and not pane.copy_mode:
+            return
+        try:
+            if not pane.active:
+                await self.backend.request(f"select-pane -t {pane.id}")
+            if not pane.copy_mode:
+                await self.backend.request(f"copy-mode -t {pane.id}")
+            await self.backend.request(
+                f"send-keys -X -N 3 -t {pane.id} {'scroll-up' if up else 'scroll-down'}"
+            )
+            self.panes = await self.backend.snapshot()
+            event.stop()
+        except RuntimeError as error:
+            await self.action_error("history scroll", error)
 
     async def on_key(self, event: events.Key):
         if self.screen is not self._workspace_screen:
