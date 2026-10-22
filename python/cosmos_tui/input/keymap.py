@@ -62,7 +62,7 @@ for name, label, keys, target in [
 register("global.actions", "global", "Context actions", ["ctrl+p"], "actions")
 register("workspace.quit", "workspace", "Quit / Exit Cosmos", [], "quit")
 register("workspace.new_session", "workspace", "New session", [], "new_session")
-register("global.start", "global", "Start menu", ["leader+space"], "start")
+register("global.start", "global", "Start menu", ["leader+m"], "start")
 for name, label, keys, target in [
     ("generate", "Generate command", ["enter"], "submit"),
     ("edit", "Native Bash editing", ["tab", "shift+tab"], "edit"),

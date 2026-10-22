@@ -44,7 +44,7 @@ Python UI 启动时检查 ui-components-v1 和 keybindings 能力。如果旧协
 
 ## Tmux 操作菜单与历史模式
 
-Leader p 打开设置 Panel，只包含显示、键位、通知、Mod 管理与 About；不混入终端动作。Ctrl+P 打开 Actions，在源窗格下半部覆盖显示当前上下文可执行动作，不改变 PTY 尺寸；上下文变化后旧动作不会执行。点击底栏最左侧 cosmos，或按 Leader Space，打开底部开始菜单，Cosmos 自身入口与 Mod 分组展示。原有直接快捷键保留；原始 Terminal panes 清单和手动 Apply terminal/keybindings 不在设置 Panel 展示，管理 RPC 仍可调用。
+Leader p 打开设置 Panel，只包含显示、键位、通知、Mod 管理与 About；不混入终端动作。Ctrl+P 打开 Actions，在源窗格下半部覆盖显示当前上下文可执行动作，不改变 PTY 尺寸；上下文变化后旧动作不会执行。点击底栏最左侧 COSMOS，或按 Leader m，打开底部开始菜单，Cosmos 自身入口与 Mod 分组展示。原有直接快捷键保留；原始 Terminal panes 清单和手动 Apply terminal/keybindings 不在设置 Panel 展示，管理 RPC 仍可调用。
 
 普通终端窗格默认 Leader [ 进入 Tmux copy mode，Leader / 打开当前窗格历史搜索，Leader ] 粘贴 Tmux buffer。历史模式中：方向键或 h/j/k/l 移动，PageUp/PageDown 翻页，Home/g 到最早保留内容，End/G 到最新内容，0/$ 到行首/行末，Space/v/Ctrl+Space 开始选区，Enter/y/Alt+w 复制选区并返回，Esc/q 返回；/ 或 Ctrl+s 向前搜索，? 或 Ctrl+r 向后搜索，n/N 前后匹配。Leader ? 查看此模式的实际键位；键位均在统一设置中可改，Leader 本身优先于模式快捷键。
 

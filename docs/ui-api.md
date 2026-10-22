@@ -138,7 +138,7 @@ group = "My tools"
 
 调用动作仍使用 actions.invoke {id,params:{client}}，进程获得 COSMOS_CLIENT_ID，按原就绪握手和生命周期运行；传入的是受管 argv/args，不是 Shell 源码。动作可打开自己的 presentation 界面。当前不是向已运行进程发送任意动作事件的接口。注册字段需协调服务支持 menu-registration-v1；旧服务升级命令为项目内 target/release/cosmos stop，然后重开 UI，Tmux 应用保留。
 
-入口展示由 features/navigation/menus.EntryPicker 统一处理，StartMenu 底部靠左，ActionDrawer 锚定源窗格下半部。Ctrl+P 与 Leader Space 都来自 input/keymap，允许重绑。
+入口展示由 features/navigation/menus.EntryPicker 统一处理，StartMenu 底部靠左，ActionDrawer 锚定源窗格下半部。Ctrl+P 与 Leader m 都来自 input/keymap，允许重绑。
 
 ## 底端内容搜索宿主接口
 

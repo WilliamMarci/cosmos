@@ -179,6 +179,9 @@ class NavigationTests(unittest.IsolatedAsyncioTestCase):
         with patch("cosmos_tui.core.rpc.call", AsyncMock(return_value=snapshot())):
             app = Probe()
             async with app.run_test(size=(80, 24)) as pilot:
+                await pilot.press("ctrl+b", "m")
+                self.assertIsInstance(app.screen, StartMenu)
+                await pilot.press("escape")
                 await pilot.click("#status", offset=(1, 0))
                 self.assertIsInstance(app.screen, StartMenu)
                 self.assertTrue(
