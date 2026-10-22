@@ -16,16 +16,25 @@ cp cosmos "dist/$bundle_name/"
 mkdir -p "dist/$bundle_name/design"
 cp design/实施方案-v0.1.md design/实施进度.md design/实施设计与决策记录.md design/架构边界修订.md design/Python-Textual迁移.md design/UI分区与Agent接入.md "dist/$bundle_name/design/"
 mkdir -p "dist/$bundle_name/docs" "dist/$bundle_name/examples" "dist/$bundle_name/sdk/python"
-cp docs/framework.md docs/workspace.md docs/viewer.md docs/ui-api.md docs/shell.md "dist/$bundle_name/docs/"
+cp docs/framework.md docs/workspace.md docs/viewer.md docs/ui-api.md docs/shell.md docs/architecture.md docs/cli.md "dist/$bundle_name/docs/"
 cp examples/demo.py examples/demo.mod.toml examples/surface.py examples/surface.mod.toml examples/ui-demo.py examples/ui-demo.mod.toml "dist/$bundle_name/examples/"
 cp sdk/python/cosmos_mod.py "dist/$bundle_name/sdk/python/"
 mkdir -p "dist/$bundle_name/python/cosmos_tui" "dist/$bundle_name/dev"
-cp python/cosmos_tui/*.py "dist/$bundle_name/python/cosmos_tui/"
-mkdir -p "dist/$bundle_name/python/cosmos_tui/assets"
-cp python/cosmos_tui/assets/cosmos-logo.ansi "dist/$bundle_name/python/cosmos_tui/assets/"
+python3 - "dist/$bundle_name/python/cosmos_tui" <<'PY'
+from pathlib import Path
+import shutil
+import sys
+destination = Path(sys.argv[1])
+if destination.exists():
+    shutil.rmtree(destination)
+shutil.copytree('python/cosmos_tui', destination,
+                ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
+PY
 cp python/README.md python/requirements*.txt "dist/$bundle_name/python/"
 cp dev/cosmos-textual "dist/$bundle_name/dev/"
 mkdir -p "dist/$bundle_name/shell" "dist/$bundle_name/terminal_agent/terminal_agent" "dist/$bundle_name/terminal_agent/shell" "dist/$bundle_name/terminal_agent/native"
+mkdir -p "dist/$bundle_name/shell/completions"
+cp shell/completions/cosmos.bash "dist/$bundle_name/shell/completions/"
 cp shell/cosmos.bash "dist/$bundle_name/shell/"
 cp terminal_agent/terminal_agent/*.py "dist/$bundle_name/terminal_agent/terminal_agent/"
 cp terminal_agent/shell/agent.bash "dist/$bundle_name/terminal_agent/shell/"

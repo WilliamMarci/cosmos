@@ -1,0 +1,169 @@
+import logging
+
+from cosmos_tui.core import rpc
+from cosmos_tui.core.controller import Controller
+from cosmos_tui.features.assistant.presenter import Assistant
+from cosmos_tui.features.navigation.about import About
+from cosmos_tui.features.navigation.menus import ActionDrawer, StartMenu
+from cosmos_tui.features.navigation.switcher import Switcher
+from cosmos_tui.features.notifications.toast import NoticeToast
+from cosmos_tui.features.search.bar import BottomSearch
+from cosmos_tui.features.settings.keybindings import KeyBindingEditor
+from cosmos_tui.features.settings.panel import Palette
+from cosmos_tui.input import keymap
+from cosmos_tui.ui.help import Help
+from cosmos_tui.ui.menus import CompactMenu
+
+
+class WorkspaceController(Controller):
+    async def action_leader_key(self, key):
+        app = self.app
+        logging.getLogger(__name__).debug("action_leader_key %s", key)
+        app.prefix = False
+        if key in ("copy_mode", "history_search", "paste_buffer"):
+            pane = app.active()
+            if not pane or pane.viewer or app.screen is not app._workspace_screen:
+                return
+            try:
+                if key == "paste_buffer":
+                    if pane.copy_mode:
+                        await app.backend.request(f"send-keys -X -t {pane.id} cancel")
+                    await app.backend.request(f"paste-buffer -p -t {pane.id}")
+                else:
+                    await app.backend.request(f"copy-mode -t {pane.id}")
+                app.panes = await app.backend.snapshot()
+                if key == "history_search":
+                    await app.copy_action("search")
+            except RuntimeError as error:
+                await app.action_error(key, error)
+            return
+        if key == "start":
+            app.action_start_menu()
+            return
+        if key == "actions":
+            app.action_context_actions()
+            return
+        if key == "d":
+            await app.detach()
+            return
+        if key == "a":
+            await app.assistant_ui.open_command_assistant()
+            return
+        if key == "g":
+            await app.assistant_ui.open_agent()
+            return
+        if key == "N":
+            notices = await rpc.call("notifications.active", {"client": app.client})
+            if notices:
+                notice = notices[-1]
+                choices = [(a["id"], a["label"]) for a in notice.get("actions", [])] + [
+                    ("__dismiss__", "×  Dismiss here")
+                ]
+
+                def choose(action):
+                    if action:
+                        app.run_worker(
+                            app.on_notice_toast_action(
+                                NoticeToast.Action(notice["id"], action)
+                            )
+                        )
+
+                app.pop_windows.actions("Notification", choices, choose)
+            return
+        if key == "full_stop":
+            if isinstance(app.screen, Assistant):
+                app.screen.action_actions()
+            return
+        if key == "s":
+            app.push_screen(Switcher())
+            return
+        if key == "p":
+            app.push_screen(Palette())
+            return
+        if key == "question_mark":
+            if app.key_context() == "copy":
+                app.push_screen(
+                    Help("History / selection", keymap.help_rows("copy", app.settings))
+                )
+                return
+            if isinstance(app.screen, Assistant):
+                app.push_screen(
+                    Help(
+                        "Command suggestions",
+                        keymap.help_rows(app.key_context(), app.settings),
+                    )
+                )
+                return
+            if isinstance(
+                app.screen,
+                (
+                    Palette,
+                    CompactMenu,
+                    About,
+                    BottomSearch,
+                    KeyBindingEditor,
+                    ActionDrawer,
+                    StartMenu,
+                ),
+            ):
+                app.push_screen(
+                    Help("Actions", keymap.help_rows(app.key_context(), app.settings))
+                )
+                return
+            if isinstance(app.screen, Switcher):
+                app.push_screen(
+                    Help(
+                        "Switch",
+                        keymap.help_rows("switch", app.settings)
+                        + [("Type", "filter sessions / windows")],
+                    )
+                )
+                return
+            app.push_screen(
+                Help(
+                    "Viewer" if app.active() and app.active().viewer else "Workspace",
+                    keymap.help_rows(
+                        "viewer"
+                        if app.active() and app.active().viewer
+                        else "workspace",
+                        app.settings,
+                    ),
+                )
+            )
+            return
+        command = {
+            "c": "new-window",
+            "percent_sign": "split-window -h",
+            "quotation_mark": "split-window -v",
+            "vertical_line": "split-window -h",
+            "minus": "split-window -v",
+            "H": "resize-pane -L 5",
+            "J": "resize-pane -D 5",
+            "K": "resize-pane -U 5",
+            "L": "resize-pane -R 5",
+            "n": "next-window",
+            "b": "previous-window",
+            "o": "select-pane -t :.+",
+            "z": "resize-pane -Z",
+            "up": "select-pane -U",
+            "down": "select-pane -D",
+            "left": "select-pane -L",
+            "right": "select-pane -R",
+        }.get(key)
+        if key.isdigit():
+            command = f"select-window -t :{key}"
+        if command:
+            if app.screen is not app._workspace_screen:
+                return
+            pane = app.active()
+            if pane and command.startswith(
+                ("split-window", "select-pane", "resize-pane")
+            ):
+                name, _, arguments = command.partition(" ")
+                command = f"{name} -t {pane.id} {arguments}"
+            logging.getLogger(__name__).debug("layout %s", command)
+            try:
+                await app.backend.request(command)
+                app.panes = await app.backend.snapshot()
+            except RuntimeError as error:
+                await app.action_error(command, error)

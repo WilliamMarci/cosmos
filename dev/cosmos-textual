@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-cosmos_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+cosmos_script=$(readlink -f -- "${BASH_SOURCE[0]}")
+cosmos_root=$(cd -- "$(dirname -- "$cosmos_script")/.." && pwd)
 exec "$cosmos_root/cosmos" "$@"

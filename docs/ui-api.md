@@ -1,6 +1,6 @@
 # UI 接口参考
 
-适用实现：Python 前端 `dev/cosmos-textual` 与本仓库协调服务。UI 扩展仍在演进；本文只描述当前可调用行为。新增参数、事件或行为变更必须与实现和示例同次提交。未来方案见 design/，不作为本文接口承诺。
+适用实现：Python 前端 `./cosmos` 与本仓库协调服务。UI 扩展仍在演进；本文只描述当前可调用行为。新增参数、事件或行为变更必须与实现和示例同次提交。未来方案见 design/，不作为本文接口承诺。
 
 ## 各区域的不同接口
 
@@ -18,7 +18,7 @@
 
 进程内 `PopWindows.actions(title, choices, callback)` 显示紧凑的 `CompactMenu`；choices 是非空 `(action_id,label)` 列表，确认时 callback 收到 ID，取消时收到 None。不直接调用外部程序。
 
-Mod 使用已有 `presentation.open` 的 `palette/help`；内容提交、revision 和输入队列参见 framework.md。设置沿用协调服务 `settings.get/replace` 和操作面板的设置子菜单，布局使用共享 Frame。
+Mod 使用已有 `presentation.open` 的 `palette/help`；内容提交、revision 和输入队列参见 framework.md。设置沿用协调服务 `settings.get/replace` 和独立设置 Panel，布局使用共享 Frame。
 
 ### Left panel
 
@@ -26,7 +26,7 @@ Mod 使用 `presentation.open(kind="dock")`，默认左侧、不自动抢焦点�
 
 ### Bottom status bar
 
-`presentation.open {client,kind:"status_widget",owner}` 注册一个客户端内的小组件，不占输入焦点。该视图的 content.lines 第一行显示在当前窗口编号/名称之后；后续行不显示。无组件时状态栏仍只有当前窗口信息。
+`presentation.open {client,kind:"status_widget",owner}` 注册一个客户端内的小组件，不占输入焦点。该视图的 content.lines 第一行显示在当前窗口编号/名称之后；后续行不显示。无组件时状态栏只含 Cosmos 开始菜单按钮及当前窗口信息。
 
 使用相同的 `presentation.update/close`、revision 校验、owner 和 Mod 生命周期回收规则。role 使用协调服务允许的语义角色，不能提交 ANSI 控制码或私有 RGB 样式。
 
@@ -111,10 +111,38 @@ reduced_motion = false
 ./target/release/cosmos mod add examples/ui-demo.mod.toml
 ```
 
-随后从 Python 工作区的 Mods 子菜单启动 UI components demo，保证启动时带 COSMOS_CLIENT_ID。点击通知按钮，或使用 Notification actions 键打开紧凑菜单；关闭 Mod 时视图随 owner 生命周期清理。这个示例不访问模型、不执行 Shell 命令、不修改文件。
+随后从开始菜单的 Mods / Examples 分组或上下文 Actions 启动 UI components demo，保证启动时带 COSMOS_CLIENT_ID。点击通知按钮，或使用 Notification actions 键打开紧凑菜单；关闭 Mod 时视图随 owner 生命周期清理。这个示例不访问模型、不执行 Shell 命令、不修改文件。
 
 ## Pop window 边框
 
-内置设置、Switch、上下文键位帮助、键位编辑、About、动作选择和历史搜索共用 chrome.Frame；Mod 的 palette/help 展示也由宿主加同款边框。其余 cover line、通知和终端本身不加此框。边框使用当前主题角色色，标题两端有折线，容器分隔线在外框形成接点。
+内置设置、Switch、上下文键位帮助、键位编辑、About 和居中动作选择共用 ui.chrome.Frame；Mod 的 palette/help 展示也由宿主加同款边框。其余 cover line、通知和终端本身不加此框。边框使用当前主题角色色，标题两端有折线，容器分隔线在外框形成接点。
 
 Frame.set_heading(label, command_id) 从共享键位注册表读取对应按键，在标签中高亮匹配字符；字符不在标题中则追加该键，未绑定时不显示失效提示。Frame.junction_selector 可指定竖向分隔组件，按实际布局位置绘制顶部/底部接点。chrome.frame_border 是 Mod 字符展示与 Widget 共用的折线绘制函数，不创建额外 tty 输出通道。
+
+
+## 开始菜单与上下文 Actions
+
+Mod 通过 manifest 的 actions 注册两个独立位置；不在设置 Panel 的 Mod 管理列表中混入业务动作：
+
+```toml
+[[actions]]
+id = "open"
+label = "Open my tool"
+args = ["--interactive"]
+surfaces = ["start", "actions"]
+contexts = ["workspace", "viewer"]
+group = "My tools"
+```
+
+设置 surfaces=["start"] 仅注册启动入口；["actions"] 仅注册上下文动作。两者默认都注册。Actions 匹配当前 context 或 *；常见 context 包括 workspace、viewer、copy、assistant、assistant_actions、palette、switch、surface、content_search。开始菜单是启动入口目录，不按当前 context 隐藏条目；两处都隐藏暂时无法启动的运行中 Mod 动作。Mod 分组始终带 Mods / 前缀，不能覆盖 Cosmos 自身分组。
+
+调用动作仍使用 actions.invoke {id,params:{client}}，进程获得 COSMOS_CLIENT_ID，按原就绪握手和生命周期运行；传入的是受管 argv/args，不是 Shell 源码。动作可打开自己的 presentation 界面。当前不是向已运行进程发送任意动作事件的接口。注册字段需协调服务支持 menu-registration-v1；旧服务升级命令为项目内 target/release/cosmos stop，然后重开 UI，Tmux 应用保留。
+
+入口展示由 features/navigation/menus.EntryPicker 统一处理，StartMenu 底部靠左，ActionDrawer 锚定源窗格下半部。Ctrl+P 与 Leader Space 都来自 input/keymap，允许重绑。
+
+## 底端内容搜索宿主接口
+
+进程内 BottomSearch(label, provider, initial="", steps=False) 位于 features/search/bar.py。provider 是异步 (query, direction) 回调，返回简短状态字符串；direction=0 表示提交，±1 表示前后匹配，只有 steps=True 时显示导航按钮。输入和状态由公共控件负责，实际检索、匹配定位和源对象校验由功能 provider 负责。回调在源文档/窗格消失后必须拒绝继续操作。该接口目前用于内置 provider；尚未提供外部 Mod 搜索 provider 的 RPC 注册。
+
+
+底部开始菜单、Actions 和内容搜索使用 ui.chrome.BottomSheet：只有带标题的顶部横线，没有侧框或底框；SheetShadow 只在上方一行绘制局部阴影。弹层显式设置透明背景与透明 background-tint，避免全局 Screen 样式覆盖透明规则。终端画面和状态栏在弹层外保持可见；不改变 PTY 大小。内容搜索为两行（标题线、输入与按钮）。

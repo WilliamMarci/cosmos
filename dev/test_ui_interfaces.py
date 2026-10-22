@@ -11,12 +11,12 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[1] / name)
     for name in ("python", "terminal_agent")
 ]
-from cosmos_tui.ui import Rect, boundaries, cell_width, snap  # noqa: E402
-from cosmos_tui.island import layout_island  # noqa: E402
-from cosmos_tui.backend import Pane  # noqa: E402
-from cosmos_tui.terminal_grid import decode_grid  # noqa: E402
-from cosmos_tui.open_file import main as open_file  # noqa: E402
-from cosmos_tui import keymap  # noqa: E402
+from cosmos_tui.ui.cells import Rect, boundaries, cell_width, snap  # noqa: E402
+from cosmos_tui.features.assistant.layout import layout_island  # noqa: E402
+from cosmos_tui.terminal.tmux import Pane  # noqa: E402
+from cosmos_tui.render.ansi import decode_grid  # noqa: E402
+from cosmos_tui.features.reader.opener import main as open_file  # noqa: E402
+from cosmos_tui.input import keymap  # noqa: E402
 
 
 class Interfaces(unittest.TestCase):
@@ -75,7 +75,9 @@ class Interfaces(unittest.TestCase):
                         "COSMOS_BINARY": "/cosmos",
                     },
                 ),
-                patch("cosmos_tui.open_file.subprocess.call", return_value=0) as call,
+                patch(
+                    "cosmos_tui.features.reader.opener.subprocess.call", return_value=0
+                ) as call,
             ):
                 self.assertEqual(
                     open_file(["--", str(image), str(other), "https://example.com"]), 0

@@ -9,8 +9,8 @@ from PIL import Image
 sys.path[:0] = [
     str(Path(__file__).resolve().parents[1] / n) for n in ("python", "terminal_agent")
 ]
-from cosmos_tui.media import Media  # noqa: E402
-from cosmos_tui.reading import Reader  # noqa: E402
+from cosmos_tui.features.reader.media import Media  # noqa: E402
+from cosmos_tui.features.reader.layout import Reader  # noqa: E402
 from cosmos_tui.app import DARK  # noqa: E402
 
 

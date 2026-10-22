@@ -11,8 +11,9 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[1] / p) for p in ("python", "terminal_agent")
 ]
 from cosmos_tui.app import Cosmos  # noqa: E402
-from cosmos_tui.backend import Tmux  # noqa: E402
-from cosmos_tui.history import HistorySearch, selection_range  # noqa: E402
+from cosmos_tui.terminal.tmux import Tmux  # noqa: E402
+from cosmos_tui.features.history.selection import selection_range  # noqa: E402
+from cosmos_tui.features.search.bar import BottomSearch  # noqa: E402
 
 
 @unittest.skipUnless(
@@ -60,10 +61,14 @@ class HistoryTests(unittest.IsolatedAsyncioTestCase):
                     await pilot.press("home")
                     self.assertTrue(any("ROW-001" in row for row in app.active().lines))
                     await pilot.press("slash")
-                    self.assertIsInstance(app.screen, HistorySearch)
+                    self.assertIsInstance(app.screen, BottomSearch)
                     await pilot.press(*"ROW-020", "enter")
                     await pilot.pause()
                     self.assertTrue(any("ROW-020" in row for row in app.active().lines))
+                    self.assertEqual(
+                        app.screen.query_one("#content-search").region.height, 1
+                    )
+                    await pilot.press("escape")
                     # Select exactly the matched line using the public key registry.
                     await pilot.press("0", "space", "dollar_sign")
                     self.assertIsNotNone(

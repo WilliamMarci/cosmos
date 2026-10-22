@@ -3,14 +3,14 @@
 import asyncio
 import sys
 import unittest
-from pathlib import Path
+from pathlib import Path  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "terminal_agent"))
 from textual import events  # noqa: E402
 from textual.widgets import Input, ListView  # noqa: E402
 from cosmos_tui.app import Cosmos  # noqa: E402
-from cosmos_tui.switcher import Switcher, LayoutPreview  # noqa: E402
+from cosmos_tui.features.navigation.switcher import Switcher, LayoutPreview  # noqa: E402
 
 
 class Backend:

@@ -7,8 +7,9 @@ from pathlib import Path
 sys.path[:0] = [
     str(Path(__file__).resolve().parents[1] / n) for n in ("python", "terminal_agent")
 ]
-from cosmos_tui.app import Cosmos, TerminalSurface  # noqa: E402
-from cosmos_tui.rendering import Batch  # noqa: E402
+from cosmos_tui.app import Cosmos  # noqa: E402
+from cosmos_tui.app import TerminalSurface  # noqa: E402
+from cosmos_tui.render.graphics import Batch  # noqa: E402
 
 
 class Probe(Cosmos):

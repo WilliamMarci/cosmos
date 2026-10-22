@@ -81,7 +81,7 @@ impl State {
                     return Err("incompatible protocol major".into());
                 }
                 Ok(
-                    json!({"protocol_major":protocol::MAJOR,"protocol_minor":2,"service_epoch":self.epoch,"capabilities":["settings","notifications","mod-lifecycle","actions","events","ui-model","surface-input","tmux-inventory","ui-components-v1","keybindings"],"presentation":"Cosmos-owned character surfaces and workspace; isolated terminal backend"}),
+                    json!({"protocol_major":protocol::MAJOR,"protocol_minor":3,"service_epoch":self.epoch,"capabilities":["settings","notifications","mod-lifecycle","actions","events","ui-model","surface-input","tmux-inventory","ui-components-v1","keybindings","menu-registration-v1"],"presentation":"Cosmos-owned character surfaces and workspace; isolated terminal backend"}),
                 )
             }
             "events.publish" => {

@@ -49,6 +49,14 @@ class Cosmos:
         return self.call('events.publish', {'owner': self.owner,
                                            'topic': f'mod.{self.owner}.{topic}', 'data': data})
 
+    def register_manifest(self, manifest):
+        """Register trusted program actions and launcher metadata (absolute cwd)."""
+        return self.call('mods.register', manifest)
+
+    def actions(self):
+        """Discover registered actions, placements, UI contexts and launchability."""
+        return self.call('actions.list')
+
 
 class StatusWidget:
     """A client-local, non-modal status component; Mod lifecycle releases it."""

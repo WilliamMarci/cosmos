@@ -11,7 +11,7 @@ sys.path[:0] = [
 from textual import events  # noqa: E402
 from cosmos_tui.app import Cosmos  # noqa: E402
 from textual._xterm_parser import XTermParser  # noqa: E402
-from cosmos_tui.backend import Pane, Tmux  # noqa: E402
+from cosmos_tui.terminal.tmux import Pane, Tmux  # noqa: E402
 
 
 class ShortcutTests(unittest.IsolatedAsyncioTestCase):
@@ -77,7 +77,7 @@ class ShortcutTests(unittest.IsolatedAsyncioTestCase):
                 event.prevent_default()
 
         app = Probe("test")
-        with patch("cosmos_tui.app.rpc.call", AsyncMock()) as rpc:
+        with patch("cosmos_tui.core.rpc.call", AsyncMock()) as rpc:
             async with app.run_test() as pilot:
                 await pilot.press("ctrl+b", "5")
                 await pilot.pause()

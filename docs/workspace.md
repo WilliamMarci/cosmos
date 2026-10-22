@@ -1,6 +1,6 @@
 # 终端工作区
 
-程序内置界面、占位文字及提示使用英语；用户输入、文件内容和终端应用自身的语言保持原样。
+程序内置界面、占位文字及提示使用英语；用户输入、文件内容和终端应用自身的语言保持原样。模块组织见 architecture.md。
 
 唯一 UI 入口为根目录 `./cosmos [session] [--debug]`，执行 Python `cosmos_tui`。`dev/cosmos-textual` 是兼容跳转；Rust 二进制无参数及 attach/workspace 转到同一个 Python UI。旧 Rust panel/native/view 界面已停用。协调服务与管理 CLI 暂留 Rust，源码工作区使用 `target/release/cosmos`，构建包使用 `bin/cosmos`。
 
@@ -16,7 +16,7 @@ Cosmos 管理 UI；Tmux 管理 PTY、终端解析、会话和应用。普通 SSH
 
 默认 Leader 为 Ctrl-B，可在设置中选 Ctrl-A。按住并释放 Leader 后，再按操作键。默认分屏为 `%`（左右）、`"`（上下），也支持 `|` / `-`；方向键切焦点，H/J/K/L 调整大小，z 放大，s 打开会话/窗口切换器。
 
-Cosmos 操作统一注册于 keymap.COMMANDS，由设置、分发和上下文帮助读取。动作级键位在 Settings → Keybindings 中编辑；实际默认值以注册表和当前设置为准，`Leader ?` 查看当前上下文帮助。详见 ui-api.md。前台 Bash/OpenCode 等应用的普通按键不由 Cosmos 改写。
+Cosmos 操作统一注册于 keymap.COMMANDS，由设置、分发和上下文帮助读取。动作级键位在 Settings → Keybindings 中编辑；实际默认值以注册表和当前设置为准，`Leader ?` 查看当前上下文帮助。详见 ui-api.md。前台 Bash/OpenCode 等应用的普通按键继续透传；默认 Ctrl+P 被 Cosmos 的上下文动作抽屉占用，可在键位设置中重绑 global.actions。
 
 普通终端窗格中的 Ctrl+Space 按 NUL（Tmux C-Space）转发，兼容传统 Ctrl+@ 和 Kitty 扩展键盘事件。因此 Bash 中绑定到 `\C-@` 的 menu-complete 等操作仍由 Bash 处理。
 
@@ -44,10 +44,15 @@ Python UI 启动时检查 ui-components-v1 和 keybindings 能力。如果旧协
 
 ## Tmux 操作菜单与历史模式
 
-操作主菜单暴露 Switch、Detach、两种分屏；Pane operations 子菜单放焦点切换、窗格缩放、尺寸调整，以及历史选择/搜索/粘贴。原有直接快捷键保留；原始 Terminal panes 清单和手动 Apply terminal/keybindings 不在 Python 菜单展示，管理 RPC 仍可调用。
+Leader p 打开设置 Panel，只包含显示、键位、通知、Mod 管理与 About；不混入终端动作。Ctrl+P 打开 Actions，在源窗格下半部覆盖显示当前上下文可执行动作，不改变 PTY 尺寸；上下文变化后旧动作不会执行。点击底栏最左侧 cosmos，或按 Leader Space，打开底部开始菜单，Cosmos 自身入口与 Mod 分组展示。原有直接快捷键保留；原始 Terminal panes 清单和手动 Apply terminal/keybindings 不在设置 Panel 展示，管理 RPC 仍可调用。
 
 普通终端窗格默认 Leader [ 进入 Tmux copy mode，Leader / 打开当前窗格历史搜索，Leader ] 粘贴 Tmux buffer。历史模式中：方向键或 h/j/k/l 移动，PageUp/PageDown 翻页，Home/g 到最早保留内容，End/G 到最新内容，0/$ 到行首/行末，Space/v/Ctrl+Space 开始选区，Enter/y/Alt+w 复制选区并返回，Esc/q 返回；/ 或 Ctrl+s 向前搜索，? 或 Ctrl+r 向后搜索，n/N 前后匹配。Leader ? 查看此模式的实际键位；键位均在统一设置中可改，Leader 本身优先于模式快捷键。
 
 普通窗格上滚进入历史并按三行滚动，下滚在历史模式中继续滚动。Tmux 保留历史、选区、搜索位置和 buffer；Cosmos 按 copy-mode 的 scroll_position 捕获对应视口，并显示选区及当前匹配。当前实现依赖 Tmux 的 capture-pane -M 支持，已在 Tmux 3.6 验证。
 
 复制目标为服务器端 Tmux buffer；不承诺本地系统剪贴板同步。当前提供键盘选区，尚不提供终端内容鼠标拖选。这是单窗格保留历史搜索，不是跨窗格搜索。
+
+
+## 底端内容搜索
+
+PDF 与终端历史共用 features/search/bar.BottomSearch，两行紧凑底栏（标题线与输入行）覆盖在状态栏上方；状态栏隐藏时贴底，不改变终端尺寸。参考 ZhihuViewer 的输入/结果状态/前后匹配/关闭结构，使用 Cosmos 主题。Enter 执行搜索后保持底栏，Esc 关闭并回到原应用；已提交结果保留。终端历史还支持底栏前后按钮及 F3/Shift+F3；PDF 目前只对当前页匹配高亮，没有跨页跳转。Switch 与设置的列表过滤不属于内容搜索，仍位于对应列表。

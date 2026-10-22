@@ -3,12 +3,12 @@
 import io
 from pathlib import Path
 import sys
-from types import SimpleNamespace
-import unittest
-from unittest.mock import patch
+from types import SimpleNamespace  # noqa: E402
+import unittest  # noqa: E402
+from unittest.mock import patch  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python"))
-from cosmos_tui.farewell import show_farewell  # noqa: E402
+from cosmos_tui.ui.farewell import show_farewell  # noqa: E402
 
 
 class FarewellTests(unittest.TestCase):
@@ -16,7 +16,7 @@ class FarewellTests(unittest.TestCase):
         stream = io.StringIO()
         backend = SimpleNamespace(argv=["tmux", "-L", "isolated"], session="study")
         with patch(
-            "cosmos_tui.farewell.subprocess.run",
+            "cosmos_tui.ui.farewell.subprocess.run",
             return_value=SimpleNamespace(returncode=0),
         ) as run:
             show_farewell({"reason": "detach"}, backend, stream)
@@ -33,7 +33,7 @@ class FarewellTests(unittest.TestCase):
         stream = io.StringIO()
         backend = SimpleNamespace(argv=["tmux"], session="main")
         with patch(
-            "cosmos_tui.farewell.subprocess.run",
+            "cosmos_tui.ui.farewell.subprocess.run",
             return_value=SimpleNamespace(returncode=1),
         ):
             show_farewell({"reason": "exit"}, backend, stream)

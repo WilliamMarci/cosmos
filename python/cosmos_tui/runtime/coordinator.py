@@ -1,0 +1,207 @@
+from __future__ import annotations
+
+import logging
+
+from rich.text import Text
+from textual.geometry import Offset
+from textual.widgets import Static
+
+from cosmos_tui.core import rpc
+from cosmos_tui.core.controller import Controller
+from cosmos_tui.features.notifications.toast import NoticeToast
+from cosmos_tui.render.ansi import decode_grid
+from cosmos_tui.render.graphics import Batch
+from cosmos_tui.render.surface import TerminalSurface
+from cosmos_tui.ui.chrome import Frame
+from cosmos_tui.ui.styles import DARK, LIGHT
+
+
+class RuntimeController(Controller):
+    async def on_mount(self):
+        app = self.app
+        app._workspace_screen = app.screen
+        await app.assistant_ui.start()
+        await app.backend.connect()
+        await rpc.call(
+            "ui.attach",
+            {
+                "client": app.client,
+                "width": max(1, app.size.width),
+                "height": max(1, app.size.height),
+            },
+        )
+        app.query_one("#agent-powerline").display = False
+        app.query_one(TerminalSurface).focus()
+        app.set_interval(0.1, app.tick)
+        await self.tick()
+
+    async def on_unmount(self):
+        app = self.app
+        await app.assistant_ui.close()
+        await app.backend.close()
+        try:
+            await rpc.call("ui.detach", {"client": app.client})
+        except (OSError, RuntimeError):
+            pass
+
+    async def tick(self):
+        app = self.app
+        if app.busy or app.closing:
+            return
+        app.busy = True
+        try:
+            await rpc.call("ui.heartbeat", {"client": app.client})
+            app.settings = await rpc.call("settings.get")
+            app.role_colors = LIGHT if app.settings["theme"] == "light" else DARK
+            for frame in app.screen.query(Frame):
+                frame.apply_theme(app.role_colors)
+            terminal = app.query_one(TerminalSurface)
+            status_widget = app.query_one("#status", Static)
+            if status_widget.display != app.settings["status_visible"]:
+                status_widget.display = app.settings["status_visible"]
+            await app.backend.resize(
+                max(1, terminal.size.width), max(1, terminal.size.height)
+            )
+            panes = await app.backend.snapshot()
+            lines = {}
+            images = []
+            snapshot = await rpc.call("ui.snapshot", {"client": app.client})
+            app.views = []
+            app.status_widgets = []
+            app.view_focus = None
+            for layer in snapshot.get("views", []):
+                view = layer["view"]
+                if view["kind"] == "status_widget":
+                    app.status_widgets.append(view)
+                    continue
+                if view["owner"] == "core":
+                    continue
+                target = view.get("target")
+                if target:
+                    pane = next((p for p in panes if p.id == target), None)
+                    if pane is None:
+                        continue
+                    layer["rect"] = {
+                        "x": pane.x,
+                        "y": pane.y,
+                        "width": pane.width,
+                        "height": pane.height,
+                    }
+                app.views.append(layer)
+                if snapshot.get("focus") == view["id"] and (
+                    not target or any(p.id == target and p.active for p in panes)
+                ):
+                    app.view_focus = view["id"]
+
+            for pane in panes:
+                lines[pane.id] = list(decode_grid(tuple(pane.lines)))
+                if pane.viewer:
+                    try:
+                        frame = await app.reader_ui.prepare(pane)
+                        if frame is None:
+                            return
+                        lines[pane.id] = frame.lines
+                        if app.screen is app._workspace_screen and not app.views:
+                            images.append((pane.id, frame.image, pane.x, pane.y))
+                    except Exception as error:
+                        app.message = str(error)
+            if app.search is not None:
+                app.message = "/" + app.search
+            app.panes, app.lines = panes, lines
+            await app.assistant_ui.refresh(panes, terminal)
+            app.graphics.commit(
+                images
+                if app.graphics.enabled and app.screen is app._workspace_screen
+                else []
+            )
+            surface_state = (
+                [(p.id, p.x, p.y, p.width, p.height, p.active) for p in panes],
+                lines,
+                app.views,
+                app.role_colors,
+            )
+            if surface_state != app._surface_state:
+                app._surface_state = surface_state
+                terminal.refresh()
+            if app.graphics.pending:
+                app.call_after_refresh(app.flush_graphics)
+            status = Text(
+                " cosmos ",
+                style=f"bold {app.role_colors['accl']} on {app.role_colors['base']}",
+            )
+            for _, index, active, name in app.backend.tabs:
+                if active == "1":
+                    status.append(
+                        f" {index} {name} ",
+                        style=f"{app.role_colors['on']} on {app.role_colors['acc']}",
+                    )
+                    break
+            for widget in app.status_widgets:
+                for item in widget.get("content", {}).get("lines", [])[:1]:
+                    status.append(
+                        " " + item["text"] + " ",
+                        style=app.role_colors.get(
+                            item["role"], app.role_colors["mute"]
+                        ),
+                    )
+            if status != app._status_content:
+                app._status_content = status
+                status_widget.update(status)
+            notices = await rpc.call("notifications.active", {"client": app.client})
+            for host in (app._workspace_screen, app.screen):
+                if host:
+                    for notice in host.query(NoticeToast):
+                        notice.present_notice(
+                            notices[-1] if notices else None,
+                            app.size.width,
+                            app.size.height,
+                            app.role_colors,
+                        )
+            pane = app.active()
+            # Modal inputs own the physical cursor. Polling a hidden shell must not
+            # relocate its cursor into the switcher / restart input cursor painting.
+            if pane and app.screen is app._workspace_screen:
+                position = Offset(pane.x + pane.cursor[0], pane.y + pane.cursor[1])
+                if app.cursor_position != position:
+                    app.cursor_position = position
+                    if not app.is_headless:
+                        app._display(app.screen, Batch())
+            if not app.is_headless and app.cursor_mode() != app._cursor_mode:
+                app._display(app.screen, Batch())
+        except EOFError:
+            await self.detach("exit")
+        except Exception as error:
+            logging.getLogger(__name__).exception("UI refresh failed")
+            app.message = str(error)
+            status = Text(app.message, style="red")
+            if status != app._status_content:
+                app._status_content = status
+                app.query_one("#status", Static).update(status)
+        finally:
+            app.busy = False
+
+    async def detach(self, reason="detach"):
+        app = self.app
+        app.closing = True
+        app.graphics.commit([])
+        app.flush_graphics()
+        await app.backend.close()
+        try:
+            await rpc.call("ui.detach", {"client": app.client})
+        except (OSError, RuntimeError):
+            pass
+        app.exit({"reason": reason, "session": app.backend.session})
+
+    async def action_error(self, command, error):
+        app = self.app
+        # A rejected user operation is not a fatal frontend exception.
+        text = " ".join(str(error).split())[:240] or "Operation failed"
+        logging.getLogger(__name__).warning("operation %s failed: %s", command, text)
+        app.message = text
+        try:
+            await rpc.call(
+                "notifications.publish",
+                {"text": text, "source": "workspace", "ttl_ms": 5000},
+            )
+        except (OSError, RuntimeError):
+            logging.getLogger(__name__).warning("could not publish operation error")

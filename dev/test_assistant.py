@@ -11,12 +11,13 @@ sys.path[:0] = [
     for name in ("python", "terminal_agent")
 ]
 from textual.app import App  # noqa: E402
-from cosmos_tui.editor import CellEditor  # noqa: E402
-from cosmos_tui.surface_widget import CellSurface  # noqa: E402
-from cosmos_tui.assistant import Assistant  # noqa: E402
+from cosmos_tui.ui.editor import CellEditor  # noqa: E402
+from cosmos_tui.ui.cell_surface import CellSurface  # noqa: E402
+from cosmos_tui.features.assistant.presenter import Assistant  # noqa: E402
 from terminal_agent.ui import InlineUI  # noqa: E402
-from cosmos_tui.app import Cosmos, TerminalSurface  # noqa: E402
-from cosmos_tui.backend import Pane  # noqa: E402
+from cosmos_tui.app import Cosmos  # noqa: E402
+from cosmos_tui.app import TerminalSurface  # noqa: E402
+from cosmos_tui.terminal.tmux import Pane  # noqa: E402
 from rich.text import Text  # noqa: E402
 
 

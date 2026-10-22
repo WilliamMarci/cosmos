@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "python"))
-from cosmos_tui.borders import borders  # noqa: E402
+from cosmos_tui.render.borders import borders  # noqa: E402
 
 
 class BorderTests(unittest.TestCase):

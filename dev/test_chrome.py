@@ -9,8 +9,11 @@ sys.path[:0] = [
     str(Path(__file__).resolve().parents[1] / n) for n in ("python", "terminal_agent")
 ]
 from textual.app import App  # noqa: E402
-from cosmos_tui.app import Cosmos, Palette, Help, DARK  # noqa: E402
-from cosmos_tui.chrome import Frame  # noqa: E402
+from cosmos_tui.app import Cosmos  # noqa: E402
+from cosmos_tui.app import Palette  # noqa: E402
+from cosmos_tui.app import Help  # noqa: E402
+from cosmos_tui.app import DARK  # noqa: E402
+from cosmos_tui.ui.chrome import Frame  # noqa: E402
 from textual.widgets import Input  # noqa: E402
 
 
@@ -35,10 +38,9 @@ class ChromeTests(unittest.IsolatedAsyncioTestCase):
             ],
             mods=[],
         )
-        with patch("cosmos_tui.app.rpc.call", AsyncMock(return_value=snapshot)):
+        with patch("cosmos_tui.core.rpc.call", AsyncMock(return_value=snapshot)):
             app = Probe()
             async with app.run_test(size=(100, 32)) as pilot:
-                await pilot.press("enter")
                 await pilot.pause()
                 self.assertEqual(app.screen.menu, "settings")
                 frame = app.screen.query_one(Frame)
@@ -67,21 +69,14 @@ class ChromeTests(unittest.IsolatedAsyncioTestCase):
             ],
             mods=[],
         )
-        with patch("cosmos_tui.app.rpc.call", AsyncMock(return_value=snapshot)):
+        with patch("cosmos_tui.core.rpc.call", AsyncMock(return_value=snapshot)):
             app = Probe()
             async with app.run_test(size=(100, 32)) as pilot:
                 await pilot.pause()
                 rows = app.screen.rows
                 self.assertFalse(any(row.get("id") == "objects.list" for row in rows))
-                local = {row["key"] for row in rows if row["kind"] == "local"}
-                self.assertTrue({"s", "d", "percent_sign", "quotation_mark"} <= local)
-                self.assertFalse({"c", "n", "b"} & local)
-                self.assertTrue(any(row.get("menu") == "panes" for row in rows))
-                app.screen.menu = "panes"
-                await app.screen.populate()
-                self.assertTrue(
-                    {"z", "o"}
-                    <= {row["key"] for row in app.screen.rows if row["kind"] == "local"}
+                self.assertFalse(
+                    any(row.get("kind") in ("local", "mod") for row in rows)
                 )
                 await app.push_screen(Help("Keybindings", [("Leader s", "Switch")]))
                 await pilot.pause()

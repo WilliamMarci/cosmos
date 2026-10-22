@@ -9,8 +9,9 @@ import xml.etree.ElementTree as ET
 sys.path[:0] = [
     str(Path(__file__).resolve().parents[1] / p) for p in ("python", "terminal_agent")
 ]
-from cosmos_tui.app import Cosmos, Palette  # noqa: E402
-from cosmos_tui.about import About, VERSION, AUTHOR  # noqa: E402
+from cosmos_tui.app import Cosmos  # noqa: E402
+from cosmos_tui.app import Palette  # noqa: E402
+from cosmos_tui.features.navigation.about import About, VERSION, AUTHOR  # noqa: E402
 
 
 class Probe(Cosmos):
@@ -28,7 +29,7 @@ class Probe(Cosmos):
 class AboutTests(unittest.IsolatedAsyncioTestCase):
     async def test_palette_about_shows_logo_metadata_and_returns_to_palette(self):
         snapshot = dict(actions=[], mods=[], settings=Probe.settings)
-        with patch("cosmos_tui.app.rpc.call", new=AsyncMock(return_value=snapshot)):
+        with patch("cosmos_tui.core.rpc.call", new=AsyncMock(return_value=snapshot)):
             app = Probe()
             async with app.run_test(size=(80, 24)) as pilot:
                 await pilot.press(*"about", "enter")

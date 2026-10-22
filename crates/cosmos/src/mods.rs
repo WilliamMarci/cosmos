@@ -18,6 +18,18 @@ pub struct Action {
     pub category: String,
     #[serde(default)]
     pub args: Vec<String>,
+    #[serde(default = "default_surfaces")]
+    pub surfaces: Vec<String>,
+    #[serde(default = "default_contexts")]
+    pub contexts: Vec<String>,
+    #[serde(default)]
+    pub group: Option<String>,
+}
+fn default_surfaces() -> Vec<String> {
+    vec!["start".into(), "actions".into()]
+}
+fn default_contexts() -> Vec<String> {
+    vec!["workspace".into()]
 }
 fn default_category() -> String {
     "mods".into()
@@ -91,8 +103,22 @@ impl Manifest {
         for action in &self.actions {
             if !identifier(&action.id)
                 || !ids.insert(&action.id)
+                || action.label.is_empty()
                 || !printable(&action.label)
                 || !identifier(&action.category)
+                || action.surfaces.is_empty()
+                || action.surfaces.len() > 2
+                || action
+                    .surfaces
+                    .iter()
+                    .any(|s| !["start", "actions"].contains(&s.as_str()))
+                || action.contexts.is_empty()
+                || action.contexts.len() > 32
+                || action.contexts.iter().any(|s| s != "*" && !identifier(s))
+                || action
+                    .group
+                    .as_ref()
+                    .is_some_and(|s| s.is_empty() || !printable(s))
                 || action.args.len() > 128
                 || action
                     .args
@@ -205,7 +231,7 @@ impl Manager {
         }).collect::<Vec<_>>())
     }
     pub fn actions(&self) -> Vec<Value> {
-        self.manifests.values().flat_map(|m| m.actions.iter().map(move|a|json!({"id":format!("mod.{}.{}",m.id,a.id),"label":a.label,"category":"mods","kind":"mod","mod":m.id}))).collect()
+        self.manifests.values().flat_map(|m| m.actions.iter().map(move|a|json!({"id":format!("mod.{}.{}",m.id,a.id),"label":a.label,"category":"mods","kind":"mod","mod":m.id,"surfaces":a.surfaces,"contexts":a.contexts,"group":a.group.as_deref().unwrap_or(&m.id),"enabled": !self.is_active(&m.id)}))).collect()
     }
     pub fn invoke(
         &mut self,
@@ -468,5 +494,35 @@ impl Drop for Manager {
                 let _ = child.wait();
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod menu_tests {
+    use super::*;
+
+    #[test]
+    fn menu_metadata_round_trip_and_legacy_defaults() {
+        let raw = json!({"id":"tools","protocol_major":1,"argv":["/bin/true"],"actions":[
+            {"id":"open","label":"Open tools","surfaces":["start","actions"],"contexts":["viewer"],"group":"Reading"},
+            {"id":"legacy","label":"Legacy entry"}
+        ]});
+        let manifest: Manifest = serde_json::from_value(raw).unwrap();
+        manifest.validate().unwrap();
+        assert_eq!(manifest.actions[1].contexts, vec!["workspace"]);
+        assert_eq!(manifest.actions[1].surfaces, vec!["start", "actions"]);
+        let manager = Manager {
+            manifests: BTreeMap::from([("tools".into(), manifest.clone())]),
+            runtime: BTreeMap::new(),
+            path: PathBuf::new(),
+            logs: PathBuf::new(),
+        };
+        let entries = manager.actions();
+        assert_eq!(entries[0]["group"], "Reading");
+        assert_eq!(entries[0]["contexts"], json!(["viewer"]));
+        assert_eq!(entries[0]["enabled"], true);
+        let mut bad = manifest;
+        bad.actions[0].surfaces = vec!["settings".into()];
+        assert!(bad.validate().is_err());
     }
 }

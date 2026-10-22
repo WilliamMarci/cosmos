@@ -22,6 +22,8 @@ cargo build --locked --offline --release
 
 冻结边界见 [入口与框架冻结记录](design/入口与框架冻结记录.md)，当前能力见 [实施状态](design/当前实施状态.md)。正式 Mod 接口见 [框架 RPC](docs/framework.md)、[UI 区域接口](docs/ui-api.md) 和 [Shell 入口](docs/shell.md)。Git 流程见 [开发说明](docs/development.md)。
 
+模块目录与依赖边界见 [架构说明](docs/architecture.md)。
+
 ## 加载示例 Mod
 
 示例使用 Python 标准库，实现就绪握手、通知、事件订阅和发布。
@@ -101,3 +103,5 @@ panel 启动会先检查协调服务版本与能力。旧服务即使“健康�
 Textual 接管终端画面、面板、帮助、通知、Mod 表面与 Kitty 图片的实际输出，Tmux 保留终端解析与会话。当前使用项目 `.venv` 中固定的 Textual 8.2.8；新环境需创建虚拟环境并安装 `python/requirements.txt`，协调服务仍使用现有 release 二进制。
 
 默认入口尚未切换。Python 端仍需补齐完整 PDF 搜索/缓存、鼠标与所有兼容回归，不能把本轮统一渲染验证说成迁移完成。详见 [迁移方案与验收](design/Python-Textual迁移.md)。
+
+Command-line usage and Bash completion: [docs/cli.md](docs/cli.md).

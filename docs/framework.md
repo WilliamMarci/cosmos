@@ -1,4 +1,4 @@
-# Cosmos 框架接口 v1.2
+# Cosmos 框架接口 v1.3
 
 当前代码提供协调服务、事件、可信 Mod 加载、UI 状态模型和终端面板适配。Python 工作区在统一 compositor 中合成终端、dock/replacement/content 和辅助 UI；Rust 兼容入口单独保留。
 
@@ -24,7 +24,7 @@
 
 ## 2. RPC 与版本
 
-私有 Unix socket，Linux 同 UID 验证，目录 0700/socket 0600，最多 32 个活动连接。JSON-RPC 2.0 换行分帧，最大 1 MiB；连接空闲 5 秒关闭。先发 `initialize {protocol_major:1}`，响应 minor=2 与能力列表。大版本不兼容拒绝，小版本能力按协商判断。
+私有 Unix socket，Linux 同 UID 验证，目录 0700/socket 0600，最多 32 个活动连接。JSON-RPC 2.0 换行分帧，最大 1 MiB；连接空闲 5 秒关闭。先发 `initialize {protocol_major:1}`，响应 minor=3 与能力列表。大版本不兼容拒绝，小版本能力按协商判断。
 
 事件使用 `events.poll` 长轮询，而非无界推送。最长等待 2 秒，等待期间不占全局状态锁。Python SDK 每次请求重新连接和协商，避免空闲连接失效。
 
@@ -89,7 +89,7 @@ stdout/stderr 各有独立日志，单次启动各保留前 1 MiB，超过后继
 
 ## 6. 操作、设置与实际面板
 
-`actions.list` 返回内置和 Mod 操作。`actions.invoke {id,params?}` 使用同一处理逻辑。菜单返回 menu ID，设置操作验证并保存。命令面板默认只显示 actions 分类，设置和 Mods 进入子菜单；Mod 操作出现在 Mods 菜单。
+`actions.list` 返回内置和 Mod 操作。`actions.invoke {id,params?}` 使用同一处理逻辑。菜单返回 menu ID，设置操作验证并保存。Python 的 Leader p 只显示设置管理项；Ctrl+P 显示当前上下文动作，状态栏 cosmos 按钮打开开始菜单。Mod 的菜单位置、上下文与分组由其 action 元数据声明，详见 ui-api.md。
 
 `cosmos panel` 是 Rust 兼容面板入口；Python 工作区的 Leader p 在自己的 UI 层打开紧凑操作面板。箭头/Ctrl-N/P 选择，文字过滤，Enter 执行，Esc 返回，? 调出帮助；无常驻快捷键提示。深浅主题共用角色表，中文宽度按显示列裁切。
 
@@ -122,3 +122,10 @@ Python 工作区通过 Cosmos 合成器在右下角显示紧凑通知，不抢�
 `input.send {client,key}` 只将类型化按键送入当前 Mod 模态视图的有界收件箱，不用于向任意 PTY 注入。示例 key 为 `{type:"char",value:"a"}`、`{type:"ctrl",value:3}`、`{type:"enter"}`、`{type:"paste",value:"text"}`。无 Mod 焦点、core 焦点、超过 128 项队列、控制字符 char、超过 8192 字节粘贴等请求拒绝。Ctrl 数值为 0..31。
 
 `presentation.read_input {client,view,owner}` 取出并清空该视图的输入列表；未知视图或 owner 不匹配拒绝。键盘内容不进入全局事件总线；ui.input 仅携带 client/view/owner 元信息。完整类型化按键枚举以 input.rs 的 Key 为准，包括方向、home/end、page_up/page_down、delete/insert、function、back_tab、escape/backspace、cell_size 和 mouse；并非所有前端都向 Mod 发送全部类型。
+
+
+## Mod 入口与动作元数据
+
+协议 minor 3 的 menu-registration-v1 能力支持 actions 中的 surfaces、contexts、group。surfaces 为非空列表，元素仅 start/actions，默认两者；contexts 为非空字符串列表，默认 workspace，允许 * 或合法标识符，最多 32 项；group 可选，非空可打印字符串，最多 256 字节，默认 Mod id。开始菜单按 Mod 分组，Actions 根据当前上下文过滤。contexts 是 UI 可见范围，不是权限沙箱。
+
+actions.list 和 state.snapshot.actions 返回这些字段及 enabled。动作启动已声明的受管程序并附加 args，不执行任意 Shell 字符串；运行中 Mod 的启动动作暂不显示，竞态以 actions.invoke 的最终校验为准。注册及调用沿用 mods.register 和 actions.invoke；SDK 提供 register_manifest(manifest)、actions()。修改运行中 Mod 的 manifest 需先停止它。旧 action 不带新字段时使用默认值。

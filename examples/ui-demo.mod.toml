@@ -10,3 +10,6 @@ capabilities = ["presentation", "notifications", "events"]
 id = "launch"
 label = "UI components demo"
 category = "mods"
+surfaces = ["start", "actions"]
+contexts = ["workspace"]
+group = "Examples"
