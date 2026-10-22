@@ -146,3 +146,5 @@ group = "My tools"
 
 
 底部开始菜单、Actions 和内容搜索使用 ui.chrome.BottomSheet：只有带标题的顶部横线，没有侧框或底框；SheetShadow 只在上方一行绘制局部阴影。弹层显式设置透明背景与透明 background-tint，避免全局 Screen 样式覆盖透明规则。终端画面和状态栏在弹层外保持可见；不改变 PTY 大小。内容搜索为两行（标题线、输入与按钮）。
+
+Actions、开始菜单和设置 Panel 的列表筛选输入框位于各自容器底部，列表占据上方剩余空间；焦点与方向键选择行为保持一致。
