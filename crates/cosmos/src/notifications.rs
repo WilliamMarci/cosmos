@@ -15,10 +15,16 @@ fn default_level() -> String {
     "info".into()
 }
 
+fn default_count() -> u64 {
+    1
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Notice {
     pub id: u64,
     pub text: String,
+    #[serde(default = "default_count")]
+    pub count: u64,
     #[serde(default = "default_level")]
     pub level: String,
     #[serde(default)]
@@ -101,6 +107,33 @@ impl Center {
         if source.len() > 128 || source.chars().any(char::is_control) {
             return Err("invalid notification source".into());
         }
+        let now = now_ms();
+        let actionable = !actions.is_empty() || p["actionable"].as_bool().unwrap_or(false);
+        let expires_ms = if persistent || ttl == Some(0) || actionable && ttl.is_none() {
+            None
+        } else {
+            Some(now + ttl.unwrap_or(5000).clamp(100, 86400000))
+        };
+        if let Some(index) = self.entries.iter().position(|n| {
+            !n.resolved
+                && n.claim.is_none()
+                && n.expires_ms.is_none_or(|t| t > now)
+                && n.text == text
+                && n.source == source
+                && n.level == level
+                && n.session_id == session_id
+                && n.actions == actions
+                && n.actionable == actionable
+                && n.expires_ms.is_none() == expires_ms.is_none()
+        }) {
+            let mut notice = self.entries.remove(index);
+            notice.count = notice.count.saturating_add(1);
+            notice.expires_ms = expires_ms;
+            notice.dismissed.clear();
+            let result = json!({"id":notice.id,"count":notice.count});
+            self.entries.push(notice);
+            return Ok(result);
+        }
         while self.entries.len() >= capacity {
             let i = self
                 .entries
@@ -115,28 +148,23 @@ impl Center {
             .next
             .checked_add(1)
             .ok_or("notification ID exhausted")?;
-        let now = now_ms();
-        let actionable = !actions.is_empty() || p["actionable"].as_bool().unwrap_or(false);
         self.entries.push(Notice {
             id: self.next,
             text: text.into(),
+            count: 1,
             level: level.into(),
             session_id,
             source: source.into(),
             actionable,
             resolved: false,
             created_ms: now,
-            expires_ms: if persistent || ttl == Some(0) || actionable && ttl.is_none() {
-                None
-            } else {
-                Some(now + ttl.unwrap_or(5000).clamp(100, 86400000))
-            },
+            expires_ms,
             dismissed: HashSet::new(),
             claim: None,
             actions,
             selected_action: None,
         });
-        Ok(json!({"id":self.next}))
+        Ok(json!({"id":self.next,"count":1}))
     }
     pub fn list(&self, client: &str, active: bool) -> Value {
         let now = now_ms();
@@ -224,6 +252,35 @@ impl Center {
 #[cfg(test)]
 mod action_tests {
     use super::*;
+
+    #[test]
+    fn repeats_merge_only_active_matching_origins_and_refresh_deadline() {
+        let mut center = Center::default();
+        let payload = json!({"text":"Failed", "session_id":"$1", "level":"error"});
+        let first = center.publish(&payload, 10).unwrap();
+        center.entries[0].expires_ms = Some(now_ms() + 100);
+        center.publish(&json!({"text":"Other"}), 10).unwrap();
+        let repeated = center.publish(&payload, 10).unwrap();
+        assert_eq!(first["id"], repeated["id"]);
+        assert_eq!(repeated["count"], 2);
+        assert_eq!(center.entries.len(), 2);
+        assert_eq!(center.entries[1].count, 2);
+        assert!(center.entries[1].expires_ms.unwrap() >= now_ms() + 4900);
+        center
+            .publish(
+                &json!({"text":"Failed", "session_id":"$2", "level":"error"}),
+                10,
+            )
+            .unwrap();
+        assert_eq!(center.entries.len(), 3);
+        center.entries[1].expires_ms = Some(now_ms() - 1);
+        let fresh = center.publish(&payload, 10).unwrap();
+        assert_ne!(fresh["id"], first["id"]);
+        assert_eq!(fresh["count"], 1);
+        let mut legacy = serde_json::to_value(&center.entries[0]).unwrap();
+        legacy.as_object_mut().unwrap().remove("count");
+        assert_eq!(serde_json::from_value::<Notice>(legacy).unwrap().count, 1);
+    }
 
     #[test]
     fn levels_deadlines_persistence_and_client_dismissal() {

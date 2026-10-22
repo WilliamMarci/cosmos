@@ -169,6 +169,22 @@ class LoadingTests(unittest.IsolatedAsyncioTestCase):
 
 
 class NotificationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_repeat_suffix_is_amber_and_fits_long_notice(self):
+        app = Probe()
+        async with app.run_test(size=(80, 24)):
+            toast = NoticeToast()
+            await app.mount(toast)
+            for text in ("Failed", "Very long message " * 20):
+                toast.present_notices(
+                    [dict(id=1, text=text, count=12)], 80, 24,
+                    app.role_colors, pane_width=40,
+                )
+                suffix = next(r for r in toast.frame.runs if r.text == " ×12")
+                self.assertEqual(suffix.foreground, COLORS["warning"])
+                self.assertLessEqual(suffix.rect.x + suffix.rect.width, 77)
+                self.assertLessEqual(toast.frame.bounds.height, 2)
+
+
     async def test_stack_order_color_two_line_limit_and_action_identity(self):
         app = Probe()
         notices = [

@@ -74,17 +74,32 @@ class NoticeToast(CellSurface):
                 else ""
             )
             text = (tag + " " if tag else "") + notice["text"]
+            count = notice.get("count", 1)
+            suffix = clip(f" ×{count}", text_width) if count > 1 else ""
+            suffix_width = cell_width(suffix)
             first = clip(text, text_width)
             remaining = text[len(first) :] if text_width else ""
             second = clip(remaining, text_width)
             if len(second) < len(remaining) and text_width > 1:
                 second = clip(second, text_width - 1) + "…"
-            rows = 2 if remaining else 1
+            rows = 2 if remaining or cell_width(first) + suffix_width > text_width else 1
+            if rows == 2 and not remaining:
+                first = clip(text, max(0, text_width - suffix_width))
+                remaining = text[len(first):]
+                second = remaining
             if rows > bottom:
                 if bottom < 1:
                     break
                 rows, second = 1, ""
                 first = clip(first, max(0, text_width - 1)) + "…"
+            if suffix:
+                if rows == 1:
+                    first = clip(first, max(0, text_width - suffix_width))
+                else:
+                    capacity = max(0, text_width - suffix_width)
+                    second = clip(remaining, capacity)
+                    if len(second) < len(remaining) and capacity:
+                        second = clip(second, capacity - 1) + "…"
             content_width = max(cell_width(first), cell_width(second))
             total = available
             x, y = width - total, bottom - rows
@@ -104,6 +119,12 @@ class NoticeToast(CellSurface):
                             palette["base"],
                         )
                     )
+            if suffix:
+                last_text = first if rows == 1 else second
+                runs.append(CellRun(
+                    Rect(x + 2 + cell_width(last_text), y + rows - 1, suffix_width),
+                    suffix, COLORS["warning"], palette["base"],
+                ))
             for index, (action, label) in enumerate(actions):
                 rect = Rect(
                     x + total - button_width + index * 3,

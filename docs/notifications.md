@@ -6,6 +6,8 @@ Notifications are explicit events. Normal rendering/state refresh does not creat
 
 The global stack sits at the lower right above the status bar. All cards have one fixed width based on the current client's active pane: min(pane width, 60 columns, viewport width), with a two-column minimum. Short messages keep the same width. New messages enter at the bottom and push older messages up. Expiration or dismissal removes an entry; the remaining entries close the gap. If the stack exceeds the screen, only the newest entries that fit are drawn; Leader N can access every active entry.
 
+Repeated active, unresolved, unclaimed notices with identical text, source, level, session, actions, actionable flag and persistent/timed lifetime class merge under the same ID. The service increments `count` (initially 1), refreshes the deadline from the latest publication, clears client dismissals and moves the notice to the bottom. Expired/resolved notices start a new count. Different sessions never merge. A count above 1 appears after the content as an amber `×N`, reserved even when the message is truncated. Publication returns `{id,count}`; older persisted records without count load as 1.
+
 Each card is one row by default. Long text wraps to at most two rows and truncates the remainder with an ellipsis. The colored left marker is the right-half block `▐`; content follows, with compact three-column action buttons at the right of the last row. Notifications do not take focus. Colors are info blue, success green, warning amber, error red, progress cyan.
 
 Session-specific messages prefix their content with the stable Tmux session ID as superscript digits: `$1` displays `¹`, `$12` displays `¹²`. Global messages omit this tag. The tag identifies the origin; it does not filter delivery. All clients of the service receive the same notifications, subject to local dismissal and the service display setting.
@@ -34,7 +36,7 @@ api.notify("Continue?", level="warning", session_id="$1", ttl_ms=0,
 
 The SDK signature preserves positional `text, actionable=False, actions=None` and adds keyword-only `level="info", ttl_ms=None, persistent=False, session_id=None`. The in-process `app.notification_events.publish` accepts the same metadata with keyword source/actions and defaults its session ID to the client's current session.
 
-The resulting Notice includes id, text, source, level, session_id, created_ms, expires_ms, actionable, resolved, actions, selected_action and client dismissal/claim state. `expires_ms=null` means no deadline. Older persisted notices without level/session metadata load as info/global.
+The resulting Notice includes id, text, count, source, level, session_id, created_ms, expires_ms, actionable, resolved, actions, selected_action and client dismissal/claim state. `expires_ms=null` means no deadline. Older persisted notices without level/session metadata load as info/global.
 
 `notifications.active {client}` returns unresolved, unexpired, locally visible entries; `notifications.list {client}` includes retained history. Both preserve publication order. `notifications.dismiss {id,client}` hides only for that client. `notifications.act {id,action,client}` resolves the declared action service-wide; other clients remove it. Expired/already resolved/claimed actions cannot be selected. Publishers consume notifications.action events to perform their own operation. No action is evaluated as a shell command by the notification service. Existing claim/complete/release/resolve operations remain available.
 
