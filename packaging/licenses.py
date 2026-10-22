@@ -31,4 +31,7 @@ for package in manifest['package']:
             shutil.copy2(file, destination / file.name)
     notices.append(f"{name}: {metadata.get('license', 'see included license file')}")
 target.mkdir(parents=True, exist_ok=True)
+for notice in (root / 'packaging/notices').glob('*.txt'):
+    shutil.copy2(notice, target / notice.name)
+    notices.append(f"{notice.name}: upstream notice for adapted integration code")
 (target / 'DEPENDENCIES.txt').write_text('\n'.join(notices) + '\n')

@@ -4,7 +4,7 @@ _cosmos_complete() {
     local commands='session new sessions history attach daemon stop doctor config events mod action rpc open cache-clear completion help'
     COMPREPLY=()
     if (( COMP_CWORD == 1 )); then
-        mapfile -t COMPREPLY < <(compgen -W "$commands --help --version --debug --log-level --log-file" -- "$cur")
+        mapfile -t COMPREPLY < <(compgen -W "$commands --help --version --debug --log-level --log-file --mouse-mode" -- "$cur")
         return
     fi
     local position=$COMP_CWORD
@@ -17,6 +17,7 @@ _cosmos_complete() {
         position=$((COMP_CWORD-1))
     fi
     case "$previous" in
+        --mouse-mode) mapfile -t COMPREPLY < <(compgen -W "auto cell pixel" -- "$cur"); return ;;
         --log-level) mapfile -t COMPREPLY < <(compgen -W 'DEBUG INFO WARNING ERROR' -- "$cur"); return ;;
         --log-file|--output|-o|--cwd|open|add) mapfile -t COMPREPLY < <(compgen -f -- "$cur"); compopt -o filenames; return ;;
     esac
@@ -34,8 +35,8 @@ _cosmos_complete() {
         new) mapfile -t COMPREPLY < <(compgen -W '--detached -d --cwd --help' -- "$cur") ;;
         history) mapfile -t COMPREPLY < <(compgen -W '--pane --lines --ansi --json --output -o --help' -- "$cur") ;;
         sessions|list) mapfile -t COMPREPLY < <(compgen -W '--json --help' -- "$cur") ;;
-        attach|--debug|--log-level|--log-file)
-            mapfile -t COMPREPLY < <(compgen -W '--debug --log-level --log-file --help' -- "$cur") ;;
+        attach|--mouse-mode|--debug|--log-level|--log-file)
+            mapfile -t COMPREPLY < <(compgen -W '--debug --log-level --log-file --mouse-mode --help' -- "$cur") ;;
         *) mapfile -t COMPREPLY < <(compgen -W '--help' -- "$cur") ;;
     esac
 }

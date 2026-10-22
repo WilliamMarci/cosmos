@@ -162,3 +162,7 @@ Actions、开始菜单和设置 Panel 的列表筛选输入框位于各自容器
 内置 BottomSearch 的异步 provider(query, direction) 返回紧凑状态文本；direction 为 0（提交）、1（下一）、-1（上一）。PDF provider 对全文文字层检索并更新 pane 阅读状态，UI 不自行检索；输入控件排队提交完整查询。该 Python 适配器是宿主内部接口，不等同于外部 Mod RPC。
 
 settings.get / settings.replace 的根配置增加 viewer_cache_mb（整数 16–1024，默认 128）与 viewer_prefetch（布尔，默认 true）。Settings → Reader 的清理按钮仅清理当前客户端内存资源；现有 viewer.cache.clear RPC 清理协调服务缓存，二者作用域不同。阅读打开/状态/关闭 RPC 与新增导航状态见 viewer.md。
+
+### Client-only input settings
+
+Settings → Input → Mouse mode is local to one UI connection; it is not part of settings.get/settings.replace or the Mod RPC contract. Auto/Cell/Pixel selection does not modify Kitty image rendering. See mouse.md for mode negotiation, startup arguments and lifecycle.

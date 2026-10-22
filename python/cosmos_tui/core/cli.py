@@ -29,12 +29,24 @@ def parser():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     cli.add_argument("--version", action="version", version=f"Cosmos {VERSION}")
+    cli.add_argument(
+        "--mouse-mode",
+        choices=["auto", "cell", "pixel"],
+        default=argparse.SUPPRESS,
+        help="mouse coordinates for this client (default: auto)",
+    )
     commands = cli.add_subparsers(dest="command", metavar="COMMAND")
     attach = commands.add_parser(
         "attach", help="create or reconnect to a retained session"
     )
     attach.add_argument(
         "session", nargs="?", default="main", help="session name (default: main)"
+    )
+    attach.add_argument(
+        "--mouse-mode",
+        choices=["auto", "cell", "pixel"],
+        default=argparse.SUPPRESS,
+        help="mouse coordinates for this client (default: auto)",
     )
     attach.add_argument("--debug", action="store_true", help="enable DEBUG diagnostics")
     attach.add_argument(
@@ -133,11 +145,17 @@ def parser():
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     cli, commands = parser()
+    mouse_option = []
+    if argv and argv[0].startswith("--mouse-mode="):
+        mouse_option = [argv.pop(0)]
+    elif argv and argv[0] == "--mouse-mode":
+        mouse_option = argv[:2]
+        del argv[:2]
     if not argv or (
         argv[0] not in commands and argv[0] not in ("-h", "--help", "--version")
     ):
         argv.insert(0, "attach")
-    args = cli.parse_args(argv)
+    args = cli.parse_args(mouse_option + argv)
     if args.command == "help":
         (commands[args.topic] if args.topic else cli).print_help()
         return

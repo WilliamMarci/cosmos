@@ -43,8 +43,13 @@ class Cosmos(App, inherit_bindings=False):
     CSS = WORKSPACE_CSS
     BINDINGS = leader_bindings()
 
-    def __init__(self, session="main"):
-        super().__init__(ansi_color=True)
+    def __init__(self, session="main", *, mouse_mode="auto"):
+        from cosmos_tui.terminal.mouse import CosmosLinuxDriver, MODES
+
+        if mouse_mode not in MODES:
+            raise ValueError("mouse_mode must be auto, cell or pixel")
+        self.mouse_mode = mouse_mode
+        super().__init__(ansi_color=True, driver_class=CosmosLinuxDriver)
         self.backend = Tmux(session)
         self.panes = []
         self.lines = {}
@@ -101,6 +106,16 @@ class Cosmos(App, inherit_bindings=False):
         if not getattr(screen, "preserve_workspace_graphics", False):
             self.graphics.commit([])
         return super().push_screen(*args, **kwargs)
+
+    def set_mouse_mode(self, mode):
+        from cosmos_tui.terminal.mouse import MODES
+
+        if mode not in MODES:
+            raise ValueError("mouse_mode must be auto, cell or pixel")
+        self.mouse_mode = mode
+        apply = getattr(self._driver, "apply_mouse_mode", None)
+        if apply:
+            apply()
 
     def active(self):
         return next((p for p in self.panes if p.active), None)

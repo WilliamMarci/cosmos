@@ -81,7 +81,7 @@ def run(args):
         asyncio.run(prepare())
     except (OSError, RuntimeError, TimeoutError) as error:
         raise RuntimeError(str(error)) from error
-    app = Cosmos(args.session)
+    app = Cosmos(args.session, mouse_mode=getattr(args, "mouse_mode", "auto"))
     result = app.run()
     if not app._exception:
         show_farewell(result, app.backend)

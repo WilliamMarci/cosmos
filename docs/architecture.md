@@ -76,3 +76,5 @@ BottomSearch 与 PageJump 声明 preserve_workspace_graphics=True，宿主打开
 ui/placement.bottom_input_rect 统一计算底端输入几何。阅读器传入基于稳定 pane ID 与文件路径的动态 bounds；运行时快照更新后重新定位搜索/跳页输入，区域包含内容、输入和阴影，源对象失效时退出。控件可共享，定位作用域不必全局：阅读输入属于 session_window，全局历史输入保持 bottom_powerline。
 
 PaneInputSurface 在应用输入显示时裁掉来源阅读图像底部的对应行，避免 Kitty/Ghostty 图形覆盖输入背景；裁剪结果随源帧与行数复用。该裁剪只改变呈现，不改变阅读布局或底层 PTY。
+
+terminal/mouse.py owns client-local mouse policy, DEC 1016 probing and a pinned Textual Linux input adapter. App owns the requested mouse_mode, and Settings → Input delegates to set_mouse_mode without settings.replace. The parser's cell/pixel conversion follows the selected driver mode even after in-band resize reports. CLI --mouse-mode configures the UI instance through runtime/bootstrap; graphics detection remains independent.

@@ -99,6 +99,21 @@ class Palette(CosmosModal):
                 ),
                 dict(label="Clear this client's reader cache", kind="reader_clear"),
             ]
+        if self.menu == "input_settings":
+            rows = [
+                dict(label="Mouse mode", kind="menu", menu="mouse_settings"),
+                dict(label="Input method", kind="menu", menu="ime_settings"),
+            ]
+        if self.menu == "mouse_settings":
+            rows = [
+                dict(
+                    label=mode.title()
+                    + (" · current" if self.app.mouse_mode == mode else ""),
+                    kind="mouse_mode",
+                    mode=mode,
+                )
+                for mode in ("auto", "cell", "pixel")
+            ]
         if self.menu == "ime_settings":
             current = snapshot.get("settings", {}).get("ime_number_style", "normal")
             rows = [
@@ -130,7 +145,7 @@ class Palette(CosmosModal):
         if self.menu == "settings":
             rows.append(dict(label="Theme", kind="theme"))
             rows.append(dict(label="Reader", kind="menu", menu="reader_settings"))
-            rows.append(dict(label="Input method", kind="menu", menu="ime_settings"))
+            rows.append(dict(label="Input", kind="menu", menu="input_settings"))
             rows.append(dict(label="About", kind="about"))
         self.rows = [a for a in rows if query in a["label"].casefold()]
         listing = self.query_one(ListView)
@@ -171,6 +186,10 @@ class Palette(CosmosModal):
         if index is None or index >= len(self.rows):
             return
         row = self.rows[index]
+        if row["kind"] == "mouse_mode":
+            self.app.set_mouse_mode(row["mode"])
+            await self.populate()
+            return
         if row["kind"] == "reader_clear":
             self.app.reader_ui.clear_cache()
             return

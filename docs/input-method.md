@@ -33,7 +33,7 @@ The launcher supports package-local shared libraries through `lib/`. The current
 
 ## Candidate presentation settings
 
-Settings → Input method selects candidate number glyphs: normal `1 2 3`, superscript `¹ ² ³`, or subscript `₁ ₂ ₃`. These are glyph variants, not changes to the terminal font size. The service persists this as `ime_number_style = "normal" | "superscript" | "subscript"` in Cosmos configuration. A coordinator built before this field was introduced must be stopped and restarted before it can save the new setting; tmux applications are retained.
+Settings → Input → Input method selects candidate number glyphs: normal `1 2 3`, superscript `¹ ² ³`, or subscript `₁ ₂ ₃`. These are glyph variants, not changes to the terminal font size. The service persists this as `ime_number_style = "normal" | "superscript" | "subscript"` in Cosmos configuration. A coordinator built before this field was introduced must be stopped and restarted before it can save the new setting; tmux applications are retained.
 
 Numbers use terminal ANSI yellow (the theme's amber). The right edge has one-cell pagination triangles: `◂ ▸` when available, `◃ ▹` when unavailable. Click enabled triangles or use PageUp/PageDown. Numbers continue to select their candidates regardless of glyph style. Preedit uses the engine's UTF-8 byte cursor/selection offsets converted to character positions; arrow keys edit at the visible caret, and separate word segments are underlined with gaps at spaces.
 

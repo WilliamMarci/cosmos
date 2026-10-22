@@ -66,3 +66,7 @@ History defaults to **all retained output plus the current screen, for every pan
 This is a snapshot of tmux's retained terminal output, not a command audit log, Bash history, or an archive of previous Cosmos launches. Evicted scrollback and closed panes cannot be exported. Live programs may continue producing output while panes are captured; the export is not an atomic cross-pane snapshot. A missing session is an error; an empty session list prints nothing (`[]` with `--json`).
 
 The new commands, nested session operations and export options are included in Bash completion. Session names and live Mod IDs are not enumerated by completion.
+
+## Client mouse coordinates
+
+`cosmos --mouse-mode auto|cell|pixel` sets this connection's mouse mode. The option also works on attach and session attach. Auto defaults to Cell until capability and geometry are confirmed; Cell is intended for compatibility with remote/mobile clients. Settings → Input → Mouse mode changes the current client immediately. No coordinator setting is modified, and mouse selection is independent of image rendering. See mouse.md for negotiation and fallback details.
