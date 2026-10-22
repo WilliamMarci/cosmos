@@ -44,13 +44,13 @@ class EntryPicker(CosmosModal):
                 "Actions" if isinstance(self, ActionDrawer) else "Cosmos",
                 "global.actions" if isinstance(self, ActionDrawer) else "global.start",
             )
+            yield ListView(id="entry-list")
             yield CosmosInput(
                 placeholder="Filter actions"
                 if isinstance(self, ActionDrawer)
                 else "Find an entry",
                 id="entry-filter",
             )
-            yield ListView(id="entry-list")
 
     async def on_mount(self):
         self.screen_size = self.app.size
