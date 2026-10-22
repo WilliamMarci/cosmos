@@ -1,0 +1,24 @@
+/target/
+/dist/
+__pycache__/
+*.pyc
+
+/.venv/
+
+/vendor/*
+!/vendor/README.md
+!/vendor/sources.json
+!/vendor/sync.py
+
+# Local tooling and generated native modules
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+.build/
+*.log
+
+# Local secrets and runtime validation output
+.env
+.env.*
+!.env.example
+/terminal_agent/dev/live-smoke.json

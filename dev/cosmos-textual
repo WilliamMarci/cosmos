@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cosmos_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+if [[ -x "$cosmos_root/bin/cosmos" ]]; then
+    export COSMOS_BINARY="${COSMOS_BINARY:-$cosmos_root/bin/cosmos}"
+fi
+export PYTHONPATH="$cosmos_root/python:$cosmos_root/terminal_agent${PYTHONPATH:+:$PYTHONPATH}"
+exec "$cosmos_root/.venv/bin/python" -m cosmos_tui "$@"

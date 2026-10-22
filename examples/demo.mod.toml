@@ -1,0 +1,14 @@
+id = "demo"
+protocol_major = 1
+argv = ["python3", "demo.py"]
+cwd = "."
+autostart = false
+ready_required = true
+ready_timeout_ms = 5000
+restart_limit = 1
+capabilities = ["notifications", "events"]
+
+[[actions]]
+id = "launch"
+label = "Launch demo Mod"
+category = "mods"

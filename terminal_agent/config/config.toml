@@ -1,0 +1,10 @@
+# ~/.config/terminal-agent/config.toml
+executable = "opencode"
+inherit_opencode = true
+model = ""
+timeout = 120
+
+# 空模型继承 OpenCode 配置；若未设置，采用 TUI 最近使用的模型。
+# 会话、后端数据库与工作区：${XDG_STATE_HOME:-~/.local/state}/terminal-agent
+# state_dir = "/absolute/path/to/terminal-agent-state"
+persist_sessions = true

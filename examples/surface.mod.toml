@@ -1,0 +1,12 @@
+id = "surface"
+protocol_major = 1
+argv = ["python3", "surface.py"]
+cwd = "."
+autostart = false
+ready_required = true
+capabilities = ["presentation"]
+
+[[actions]]
+id = "launch"
+label = "Open interactive Mod surface"
+category = "mods"

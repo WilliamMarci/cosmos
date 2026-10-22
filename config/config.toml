@@ -1,0 +1,7 @@
+version = 1
+theme = "dark"
+status_visible = true
+leader = "C-b"
+notification_history = 200
+notifications_enabled = true
+notification_timeout_ms = 5000

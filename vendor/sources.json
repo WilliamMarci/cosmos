@@ -1,0 +1,100 @@
+[
+  {
+    "name": "mupdf",
+    "url": "https://github.com/ArtifexSoftware/mupdf.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "ce44d4cc6b93f9af6dde3a07245305be6e0207d2",
+    "shallow": true
+  },
+  {
+    "name": "textual",
+    "url": "https://github.com/Textualize/textual.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "5e5b7ef58b8c5572c13a3ff9027d756623661495",
+    "shallow": true
+  },
+  {
+    "name": "opencode",
+    "url": "https://github.com/anomalyco/opencode.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "c93aaae37157d785f76a8e9a9243a6560e286468",
+    "shallow": true
+  },
+  {
+    "name": "btop",
+    "url": "https://github.com/aristocratos/btop.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "89fcdf4094e89f8ac215ee6c3ee74aeffb618e86",
+    "shallow": true
+  },
+  {
+    "name": "ibus",
+    "url": "https://github.com/ibus/ibus.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "d464316d9b9613005c5573a010fec7f9b40b93b6",
+    "shallow": true
+  },
+  {
+    "name": "kitty",
+    "url": "https://github.com/kovidgoyal/kitty.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "0f2809813163adcfa564c112d12c0c23f5fbb345",
+    "shallow": true
+  },
+  {
+    "name": "neovim",
+    "url": "https://github.com/neovim/neovim.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "d714648b8e7c476b7b5c1f661aa192b179bfc1d3",
+    "shallow": true
+  },
+  {
+    "name": "ratatui",
+    "url": "https://github.com/ratatui/ratatui.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "f57b06ffb72085644b35e71d296fd90b777dc073",
+    "shallow": true
+  },
+  {
+    "name": "ratatui-image",
+    "url": "https://github.com/ratatui/ratatui-image.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "5d350c695312a15854bf747c860ab704c8d8b522",
+    "shallow": true
+  },
+  {
+    "name": "ibus-rime",
+    "url": "https://github.com/rime/ibus-rime.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "57fba74724611b3c21e36656123fb62cf10b759c",
+    "shallow": true
+  },
+  {
+    "name": "librime",
+    "url": "https://github.com/rime/librime.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "1b3417d2b6a11b5e50e0e1fa9dc396056aa11dce",
+    "shallow": true
+  },
+  {
+    "name": "yazi",
+    "url": "https://github.com/sxyazi/yazi.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "7c45837d553b6cb8032bd7fec2106fdb628e4017",
+    "shallow": true
+  },
+  {
+    "name": "tmux",
+    "url": "https://github.com/tmux/tmux.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "a864c419900182fe624abf73db72ae6f1b0ab9a5",
+    "shallow": true
+  },
+  {
+    "name": "vim",
+    "url": "https://github.com/vim/vim.git",
+    "purpose": "upstream reference; not automatically built or imported",
+    "commit": "f9b3d0d8dd1a4345375fb401861d5f60ff7c7df1",
+    "shallow": true
+  }
+]
