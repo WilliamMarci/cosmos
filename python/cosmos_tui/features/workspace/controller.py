@@ -11,6 +11,7 @@ from cosmos_tui.features.notifications.toast import NoticeToast
 from cosmos_tui.features.search.bar import BottomSearch
 from cosmos_tui.features.settings.keybindings import KeyBindingEditor
 from cosmos_tui.features.settings.panel import Palette
+from cosmos_tui.features.theme.panel import ThemePanel
 from cosmos_tui.input import keymap
 from cosmos_tui.ui.help import Help
 from cosmos_tui.ui.menus import CompactMenu
@@ -116,6 +117,7 @@ class WorkspaceController(Controller):
                 app.screen,
                 (
                     Palette,
+                    ThemePanel,
                     CompactMenu,
                     About,
                     BottomSearch,

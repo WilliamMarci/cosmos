@@ -66,3 +66,5 @@ PDF 与终端历史共用 features/search/bar.BottomSearch，两行紧凑底栏�
 默认状态栏已按色块分为左/中/右区域；动态开始按钮及可点击输入指示详见 [status-bar.md](status-bar.md)。
 
 Leader ? 的快捷键帮助为滚动列表，下方保留一行首按/后按图例及可视化键盘；空间不足时隐藏键盘，保留列表。键位设置使用功能分组，根列表输入筛选可跨组搜索。语言默认快捷键为 Leader i；Actions 有独立 Enable IME / Disable IME 入口。
+
+设置中的 Theme 提供终端内容/UI 两栏及底部统一预览，保存后生效，取消不改动；颜色继承边界见 [themes.md](themes.md)。

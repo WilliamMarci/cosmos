@@ -5,6 +5,7 @@ from textual.widgets import Input, Label, ListItem, ListView, Static
 
 from cosmos_tui.core import rpc
 from cosmos_tui.features.navigation.about import About
+from cosmos_tui.features.theme.panel import ThemePanel
 from cosmos_tui.features.settings.keybindings import KeyBindingEditor
 from cosmos_tui.input import keymap
 from cosmos_tui.input.groups import GROUPS, group
@@ -101,6 +102,7 @@ class Palette(CosmosModal):
                 for m in snapshot["mods"]
             ]
         if self.menu == "settings":
+            rows.append(dict(label="Theme", kind="theme"))
             rows.append(dict(label="Input method", kind="menu", menu="ime_settings"))
             rows.append(dict(label="About", kind="about"))
         self.rows = [a for a in rows if query in a["label"].casefold()]
@@ -142,6 +144,9 @@ class Palette(CosmosModal):
         if index is None or index >= len(self.rows):
             return
         row = self.rows[index]
+        if row["kind"] == "theme":
+            self.app.push_screen(ThemePanel())
+            return
         if row["kind"] == "ime_style":
             settings = await rpc.call("settings.get")
             settings["ime_number_style"] = row["style"]

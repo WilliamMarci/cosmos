@@ -14,6 +14,7 @@ from cosmos_tui.render.graphics import Batch
 from cosmos_tui.render.surface import TerminalSurface
 from cosmos_tui.ui.chrome import Frame
 from cosmos_tui.ui.styles import DARK, LIGHT
+from cosmos_tui.features.theme.controller import apply_interface
 
 
 class RuntimeController(Controller):
@@ -54,6 +55,7 @@ class RuntimeController(Controller):
             await rpc.call("ui.heartbeat", {"client": app.client})
             app.settings = await rpc.call("settings.get")
             app.role_colors = LIGHT if app.settings["theme"] == "light" else DARK
+            apply_interface(app)
             for frame in app.screen.query(Frame):
                 frame.apply_theme(app.role_colors)
             terminal = app.query_one(TerminalSurface)
@@ -120,6 +122,7 @@ class RuntimeController(Controller):
                 lines,
                 app.views,
                 app.role_colors,
+                app.settings.get("terminal_theme", "inherit"),
             )
             if surface_state != app._surface_state:
                 app._surface_state = surface_state

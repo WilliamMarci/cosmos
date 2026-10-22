@@ -14,6 +14,7 @@ from cosmos_tui.features.navigation.switcher import Switcher
 from cosmos_tui.features.search.bar import BottomSearch
 from cosmos_tui.features.settings.keybindings import KeyBindingEditor
 from cosmos_tui.features.settings.panel import Palette
+from cosmos_tui.features.theme.panel import ThemePanel
 from cosmos_tui.input import keymap
 from cosmos_tui.input.shortcuts import MODIFIER_KEYS, leader_key
 from cosmos_tui.ui.help import Help
@@ -108,6 +109,8 @@ class InputRouter(Controller):
             return "key_settings"
         if isinstance(app.screen, Switcher):
             return "switch"
+        if isinstance(app.screen, ThemePanel):
+            return "theme_settings"
         if isinstance(app.screen, Palette):
             return "palette"
         if isinstance(app.screen, CompactMenu):

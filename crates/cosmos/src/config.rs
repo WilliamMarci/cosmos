@@ -8,6 +8,7 @@ use std::{
 pub struct Config {
     pub version: u32,
     pub theme: String,
+    pub terminal_theme: String,
     pub status_visible: bool,
     pub leader: String,
     pub notification_history: usize,
@@ -23,6 +24,7 @@ impl Default for Config {
         Self {
             version: 1,
             theme: "dark".into(),
+            terminal_theme: "inherit".into(),
             status_visible: true,
             leader: "C-b".into(),
             notification_history: 200,
@@ -42,6 +44,11 @@ impl Config {
         }
         if !["dark", "light"].contains(&self.theme.as_str()) {
             return Err("theme must be dark or light".into());
+        }
+        if !["inherit", "ubuntu", "cosmos-dark", "cosmos-light"]
+            .contains(&self.terminal_theme.as_str())
+        {
+            return Err("unsupported terminal_theme".into());
         }
         if !["C-b", "C-a"].contains(&self.leader.as_str()) {
             return Err("foundation currently supports C-b or C-a".into());

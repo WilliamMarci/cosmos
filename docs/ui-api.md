@@ -154,3 +154,5 @@ Actions、开始菜单和设置 Panel 的列表筛选输入框位于各自容器
 状态栏的默认布局、动态开始按钮、颜色配置与点击区域见 [status-bar.md](status-bar.md)。状态 Mod 的单行内容位于可用中心区，不覆盖右侧输入法/时钟。
 
 进程内 CellRun 新增可选 underline 与 reverse（默认 false），用于共享渲染层绘制输入法分段下划线和编辑光标；既有字段和位置参数保持兼容。输入法的两行布局位于 features/ime/layout.py，以 Rime context、可用 Rect、源 cursor 和主题生成 UIFrame；编号与分页命中区域同帧提交。
+
+终端颜色与 Cosmos UI 主题独立：`terminal_theme` 控制默认颜色和 ANSI 16 色，`theme` 控制语义角色。Mod presentation 的 role 色仍取 Cosmos UI 主题，不跟随终端预设。Theme 面板及配置见 [themes.md](themes.md)。

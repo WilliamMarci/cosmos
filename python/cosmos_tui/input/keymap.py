@@ -272,3 +272,11 @@ for name, label, key in [
     ("page_down", "Next shortcut page", "pagedown"),
 ]:
     register("help." + name, "help", label, [key], key)
+
+for name, label, key in [
+    ("next", "Next theme control", "tab"),
+    ("previous", "Previous theme control", "shift+tab"),
+    ("save", "Save themes", "ctrl+s"),
+    ("cancel", "Cancel theme selection", "escape"),
+]:
+    register("theme_settings." + name, "theme_settings", label, [key], key)

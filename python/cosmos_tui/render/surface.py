@@ -7,6 +7,7 @@ from textual.strip import Strip
 from textual.widget import Widget
 
 from cosmos_tui.features.history.selection import selection_range
+from cosmos_tui.features.theme.palettes import terminal_palette, terminal_style
 from cosmos_tui.render.borders import borders
 from cosmos_tui.ui.cells import cell_width
 from cosmos_tui.ui.chrome import frame_border
@@ -20,7 +21,8 @@ class TerminalSurface(Widget):
     def render_line(self, y):
         width = self.size.width
         palette = self.app.role_colors
-        style = Style(color=palette["fg"], bgcolor=palette["bg"])
+        terminal = terminal_palette(self.app.settings.get("terminal_theme", "inherit"))
+        style = Style(color=terminal["fg"], bgcolor=terminal["bg"])
         border_row = borders(
             width,
             self.size.height,
@@ -54,9 +56,18 @@ class TerminalSurface(Widget):
             text = lines[row] if row < len(lines) else Text("", style=style)
             text = text.copy()
             text.stylize_before(style)
+            pane_terminal = (
+                terminal
+                if not pane.viewer
+                else dict(fg=palette["fg"], bg=palette["bg"], ansi=None)
+            )
             strip = (
                 Strip(
-                    Segment(segment.text, segment.style or style, segment.control)
+                    Segment(
+                        segment.text,
+                        terminal_style(segment.style, pane_terminal),
+                        segment.control,
+                    )
                     for segment in text.render(self.app.console, end="")
                 )
                 .crop(0, pane.width)

@@ -44,7 +44,7 @@ class Cosmos(App, inherit_bindings=False):
     BINDINGS = leader_bindings()
 
     def __init__(self, session="main"):
-        super().__init__()
+        super().__init__(ansi_color=True)
         self.backend = Tmux(session)
         self.panes = []
         self.lines = {}

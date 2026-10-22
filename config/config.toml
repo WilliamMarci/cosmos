@@ -1,5 +1,6 @@
 version = 1
 theme = "dark"
+terminal_theme = "inherit"
 status_visible = true
 leader = "C-b"
 notification_history = 200
