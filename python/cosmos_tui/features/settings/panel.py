@@ -116,6 +116,36 @@ class Palette(CosmosModal):
                 ),
                 dict(label="Clear this client's reader cache", kind="reader_clear"),
             ]
+        if self.menu == "status_settings":
+            rows = [
+                choice(
+                    "Path depth",
+                    "status_path_depth",
+                    [(0, "All")] + [(n, str(n)) for n in (1, 2, 3, 4, 5, 8)],
+                    3,
+                ),
+                choice(
+                    "Path maximum length",
+                    "status_path_max_length",
+                    [(n, str(n)) for n in (20, 30, 40, 60, 80, 120)],
+                    40,
+                ),
+                choice(
+                    "Path alignment",
+                    "status_path_align",
+                    [(v, v.title()) for v in ("left", "center", "right")],
+                    "right",
+                ),
+                choice(
+                    "Block separator",
+                    "status_separator",
+                    [
+                        (v, v.title())
+                        for v in ("powerline", "slash", "vertical", "none")
+                    ],
+                    "powerline",
+                ),
+            ]
         if self.menu == "input_settings":
             rows = [
                 dict(label="Mouse mode", kind="menu", menu="mouse_settings"),
@@ -219,6 +249,7 @@ class Palette(CosmosModal):
         if self.menu == "settings":
             rows.append(dict(label="Theme", kind="theme"))
             rows.append(dict(label="Reader", kind="menu", menu="reader_settings"))
+            rows.append(dict(label="Status bar", kind="menu", menu="status_settings"))
             rows.append(dict(label="Input", kind="menu", menu="input_settings"))
             rows.append(dict(label="About", kind="about"))
         self.rows = [a for a in rows if query in a["label"].casefold()]

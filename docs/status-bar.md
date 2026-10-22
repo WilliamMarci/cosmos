@@ -1,12 +1,12 @@
 # Default status bar
 
-The bar is composed by `features/status/controller.py` and `features/status/bar.py`. Segments are separated by background colors and spacing, never literal `|` characters.
+The bar is composed by `features/status/controller.py` and `features/status/bar.py`. Segments use distinct background levels and configurable separators. Defaults follow the Cosmos palette, rather than copying an external editor theme.
 
-- Left: clickable start button, then the current Tmux window index in superscript and its name. The index remains the actual backend index; it is not renumbered.
+- Left: clickable start button, then the current Tmux window index in normal-size amber digits and its name on a separate background level. The index remains the actual backend index; it is not renumbered.
 - Center: registered Mod status widgets, shown at the screen center when they fit without overlapping the left or right groups.
-- Right: reader details when applicable, path and Git branch when available, independently clickable input language and width, then local time/date (`HH:MM Mon DD`). Home paths are abbreviated as `~`.
+- Right by default: a slightly brighter gray path block and Git branch when available, independently clickable input language and width, then local time/date (`HH:MM Mon DD`). Home paths are abbreviated as `~`.
 
-Directory/program and Git branch are refreshed on pane changes and at most once every two seconds. Git uses read-only `symbolic-ref`; non-repositories and detached HEAD have no branch label. Long path/details are dropped before essential controls; tight widths truncate remaining text. The bar respects the existing visibility setting.
+Directory/program and Git branch are refreshed on pane changes and at most once every two seconds. Git uses read-only `symbolic-ref`; non-repositories and detached HEAD have no branch label. Paths retain their most recent components and prefix omitted components with `…/`; remaining long text is shortened from the left with an ellipsis. Essential clock/IME controls reserve space before the path. Tight widths truncate remaining text. The bar respects the existing visibility setting.
 
 ## Start button
 
@@ -38,4 +38,15 @@ The example deliberately overrides the default COSMOS gradient with solid blue; 
 
 `中` / `En` toggles Chinese/English. `●` / `◐` toggles full-width/half-width; the full circle means full-width. Each has its own hit region, including while a Cosmos modal is open. They use monochrome terminal glyphs.
 
-The reader footer keeps its filename on the left and aligns collection/page index, actual rendered scale percentage and raster pixel size on the right, before its collapse control. Raster dimensions for PDF refer to the rendered page bitmap. The status bar repeats available reader metadata in its right group; it favors that over long paths at narrow widths.
+The reader footer keeps its filename on the left and aligns collection/page index, actual rendered scale percentage and raster pixel size on the right, before its collapse control. Raster dimensions for PDF refer to the rendered page bitmap. The global Cosmos status bar does not repeat page/pixel/zoom details; they remain local to the reader footer.
+
+## Path and separator settings
+
+Settings → Status bar provides left/right choice controls for these shared fields:
+
+- `status_path_depth`: recent path components, default 3; 0 shows all, configuration permits 0–32.
+- `status_path_max_length`: path/branch block content width in terminal cells, default 40, range 8–240. The bar reduces this further when space is tight.
+- `status_path_align`: left, center, or right (default). The center block shares available space with registered Mod widgets.
+- `status_separator`: powerline (default ``), slash (`╱`), vertical (`│`), or none. Select another style if the terminal font lacks Powerline glyphs.
+
+These fields are validated and persisted through settings.replace. Existing configuration files load the defaults. Upgrading a running coordinator requires a restart before the fields can be saved.

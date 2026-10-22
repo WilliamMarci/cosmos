@@ -13,6 +13,10 @@ pub struct Config {
     pub viewer_image_max_mb: usize,
     pub viewer_prefetch: bool,
     pub status_visible: bool,
+    pub status_path_depth: usize,
+    pub status_path_max_length: usize,
+    pub status_path_align: String,
+    pub status_separator: String,
     pub leader: String,
     pub leader2: String,
     pub leader3: String,
@@ -34,6 +38,10 @@ impl Default for Config {
             viewer_image_max_mb: 32,
             viewer_prefetch: true,
             status_visible: true,
+            status_path_depth: 3,
+            status_path_max_length: 40,
+            status_path_align: "right".into(),
+            status_separator: "powerline".into(),
             leader: "C-b".into(),
             leader2: "C-a".into(),
             leader3: "C-m".into(),
@@ -49,6 +57,13 @@ impl Default for Config {
 }
 impl Config {
     pub fn validate(&self) -> Result<(), String> {
+        if self.status_path_depth > 32
+            || !(8..=240).contains(&self.status_path_max_length)
+            || !["left", "center", "right"].contains(&self.status_path_align.as_str())
+            || !["powerline", "slash", "vertical", "none"].contains(&self.status_separator.as_str())
+        {
+            return Err("invalid status bar path or separator settings".into());
+        }
         if self.version != 1 {
             return Err("unsupported configuration version".into());
         }

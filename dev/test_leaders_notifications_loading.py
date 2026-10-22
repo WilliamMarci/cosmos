@@ -137,6 +137,12 @@ class LoadingTests(unittest.IsolatedAsyncioTestCase):
                     json.dumps({"path": str(paths[1])}).encode()
                 ).decode()
                 loading = app.reader_ui.loading
+                # Navigation uses current wire state even before any frame exists.
+                await app.reader_ui.on_key(Key("right_square_bracket", "]"), pane)
+                self.assertEqual(
+                    json.loads(base64.b64decode(pane.viewer))["path"], str(paths[2])
+                )
+                await app.reader_ui.on_key(Key("left_square_bracket", "["), pane)
                 loading.frame(pane)
                 await loading.pending[pane.id]
                 self.assertIn("40.0 MiB", loading.errors[pane.id][1])
@@ -160,6 +166,23 @@ class LoadingTests(unittest.IsolatedAsyncioTestCase):
                 app.reader_ui.media.image_max_mb = 32
                 with self.assertRaisesRegex(ValueError, "40.0 MiB"):
                     app.reader_ui.media.thumbnail({"path": str(paths[1])}, (20, 20))
+                # A huge-pixel neighboring thumbnail must not reject a valid current image.
+                import struct
+                import zlib
+
+                data = bytearray(paths[0].read_bytes())
+                data[16:24] = struct.pack(">II", 8000, 5600)
+                data[29:33] = struct.pack(">I", zlib.crc32(data[12:29]))
+                paths[1].write_bytes(data)
+                app.reader_ui.media.release()
+                app.reader_ui.reader.cache.clear()
+                pane.viewer = base64.b64encode(
+                    json.dumps({"path": str(paths[2])}).encode()
+                ).decode()
+                loading.frame(pane)
+                await loading.pending[pane.id]
+                self.assertNotIn(pane.id, loading.errors)
+                self.assertEqual(app.reader_ui.frames[pane.id].selected, 2)
             await app.reader_ui.close()
 
     async def test_pending_and_failed_viewers_never_return_shell_content(self):

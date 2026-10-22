@@ -29,7 +29,8 @@ class StatusTests(unittest.IsolatedAsyncioTestCase):
             )
             text = bar._content
             self.assertEqual(text.cell_len, 100)
-            self.assertIn("¹ bash", text.plain)
+            self.assertIn("1 bash", text.plain)
+            self.assertNotIn("¹", text.plain)
             self.assertIn("~/Program (main)", text.plain)
             self.assertTrue(text.plain.endswith("12:00 Oct 22 "))
             self.assertNotIn("|", text.plain)
@@ -90,7 +91,54 @@ class StatusTests(unittest.IsolatedAsyncioTestCase):
                 app.reader_ui.pages[pane.id] = 4
                 await app.status.refresh()
                 self.assertTrue(bar._content.plain.startswith(" " + label + " "))
-                self.assertIn("800×600px · 50%", bar._content.plain)
+                self.assertNotIn("800×600px", bar._content.plain)
+                self.assertNotIn("50%", bar._content.plain)
+
+    async def test_path_depth_length_alignment_and_separators(self):
+        from cosmos_tui.features.status.bar import short_path
+
+        self.assertEqual(short_path("/one/two/three/four", 2, 40), "…/three/four")
+        self.assertLessEqual(len(short_path("/very/long/path", 0, 8)), 8)
+        app = Probe()
+        async with app.run_test(size=(100, 30)):
+            bar = app.query_one("#status", StatusBar)
+            for align in ("left", "center", "right"):
+                for separator, glyph in (
+                    ("slash", "╱"),
+                    ("vertical", "│"),
+                    ("powerline", ""),
+                    ("none", ""),
+                ):
+                    app.settings.update(
+                        status_path_depth=2,
+                        status_path_max_length=20,
+                        status_path_align=align,
+                        status_separator=separator,
+                    )
+                    bar.present(
+                        label="COSMOS",
+                        index=3,
+                        name="bash",
+                        path="/one/two/three/four",
+                        branch="",
+                        clock="12:00",
+                    )
+                    self.assertEqual(bar._content.cell_len, 100)
+                    self.assertIn("…/three/four", bar._content.plain)
+                    if glyph:
+                        self.assertIn(glyph, bar._content.plain)
+                    index = bar._content.plain.index("3 bash")
+                    self.assertIn(
+                        "#e8a662",
+                        str(bar._content.get_style_at_offset(app.console, index)),
+                    )
+                    path_x = bar._content.plain.index("…/three/four")
+                    if align == "left":
+                        self.assertLess(path_x, 30)
+                    if align == "center":
+                        self.assertTrue(35 < path_x < 60)
+                    if align == "right":
+                        self.assertGreater(path_x, 60)
 
     def test_config_priority_and_selected_schema(self):
         with (

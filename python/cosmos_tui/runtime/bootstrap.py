@@ -17,6 +17,10 @@ REQUIRED_CAPABILITIES = {
     "leader-presets-v1",
 }
 REQUIRED_SETTINGS = {
+    "status_path_depth",
+    "status_path_max_length",
+    "status_path_align",
+    "status_separator",
     "viewer_image_max_mb",
     "viewer_cache_mb",
     "viewer_prefetch",

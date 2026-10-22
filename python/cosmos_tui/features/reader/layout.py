@@ -176,7 +176,7 @@ class Reader:
                         outline=palette["accl"],
                         width=1,
                     )
-            except (OSError, ValueError, RuntimeError):
+            except (OSError, ValueError, RuntimeError, Image.DecompressionBombError):
                 draw.rectangle(
                     (x * cw + 2, y * ch + 2, (x + w) * cw - 3, (y + h) * ch - 3),
                     fill=palette["bg"],

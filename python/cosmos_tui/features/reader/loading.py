@@ -76,6 +76,8 @@ class LoadingFrames:
                 self.errors.pop(pane.id, None)
                 self.missing.pop(pane.id, None)
         except Exception as error:
+            if self.key(pane) != key:
+                return
             detail = str(error)
             try:
                 path = json.loads(base64.b64decode(pane.viewer))["path"]

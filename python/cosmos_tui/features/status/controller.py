@@ -74,14 +74,6 @@ class StatusController(Controller):
                 else ("image", "IMAGE")
             )
             path = state["path"]
-            frame = app.reader_ui.frames.get(pane.id)
-            if frame:
-                details = f"{frame.source_size[0]}×{frame.source_size[1]}px · {frame.scale * 100:.0f}%"
-            if mode == "doc":
-                details = (
-                    f"{state.get('page', 1)}/{app.reader_ui.pages.get(pane.id, 1)} · "
-                    + details
-                )
         elif Path(program).name in ("opencode", "claude", "codex"):
             mode, label = "agent", "AGENT"
         elif Path(program).name == "yazi":

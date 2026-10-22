@@ -384,8 +384,9 @@ class ReaderController(Controller):
             await self.update_viewer(pane, state)
             event.stop()
             return
-        if not event.ctrl and len(frame.entries) > 1:
-            state = self.reader.change(state, frame.selected + direction, frame.entries)
+        entries, selected = self.reader.collection(state, self.pages.get(pane.id, 1))
+        if not event.ctrl and len(entries) > 1:
+            state = self.reader.change(state, selected + direction, entries)
         else:
             old_scale = self.view_scale(pane, state, frame)
             state["zoom"] = min(
@@ -494,13 +495,12 @@ class ReaderController(Controller):
             state["zoom"] = 1
             state["pan"] = [0, 0]
         elif event.character in ("[", "]"):
-            frame = self.frames.get(pane.id)
-            if frame:
-                state = self.reader.change(
-                    state,
-                    frame.selected + (1 if event.character == "]" else -1),
-                    frame.entries,
-                )
+            entries, selected = self.reader.collection(
+                state, self.pages.get(pane.id, 1)
+            )
+            state = self.reader.change(
+                state, selected + (1 if event.character == "]" else -1), entries
+            )
         elif event.key in ("up", "down", "left", "right"):
             frame = self.frames.get(pane.id)
             if frame:

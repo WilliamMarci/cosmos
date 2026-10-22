@@ -4,7 +4,18 @@ from rich.text import Text
 from rich.style import Style
 from textual.widgets import Static
 
-SUPERSCRIPT = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
+
+def short_path(path, depth, maximum):
+    if maximum <= 0:
+        return ""
+    parts = path.split("/")
+    if depth and len([p for p in parts if p]) > depth:
+        path = "…/" + "/".join(parts[-depth:])
+    if Text(path).cell_len > maximum:
+        while path and Text("…" + path).cell_len > maximum:
+            path = path[1:]
+        path = "…" + path
+    return path
 
 
 class StatusBar(Static):
@@ -68,13 +79,57 @@ class StatusBar(Static):
             )
         self.start_width = min(width, start.cell_len)
         self.hits.append((0, self.start_width, "start"))
-        left = start + Text(f" {str(index).translate(SUPERSCRIPT)} {name} ", style=base)
+        light = app.settings.get("theme", "dark") == "light"
+        session_bg = "#d0d4dc" if light else "#292d38"
+        path_bg = "#bfc5cf" if light else "#363c48"
+        separator = dict(powerline="", slash="╱", vertical="│", none="").get(
+            app.settings.get("status_separator", "powerline"), ""
+        )
+
+        def divide(before, after):
+            return Text(separator, style=Style(color=before, bgcolor=after))
+
+        left = start + divide(palette["base"], session_bg)
+        left += Text(f" {index}", style=Style(color="#e8a662", bgcolor=session_bg))
+        left += Text(f" {name} ", style=Style(color=palette["fg"], bgcolor=session_bg))
+        left += divide(session_bg, palette["base"])
         language = "中" if app.ime.enabled else "En"
         right = Text(style=base)
-        if details:
-            right.append(" " + details + " ", style=palette["accl"])
+        path = short_path(
+            path,
+            app.settings.get("status_path_depth", 3),
+            app.settings.get("status_path_max_length", 40),
+        )
+        if branch:
+            path += f" ({branch})"
+        # Reserve the clock and IME hit targets before allocating path space.
+        budget = max(
+            0,
+            width
+            - min(left.cell_len, self.start_width + 12)
+            - len(clock)
+            - 10
+            - 2 * len(separator),
+        )
+        path = (
+            short_path(
+                path, 0, min(app.settings.get("status_path_max_length", 40), budget)
+            )
+            if budget
+            else ""
+        )
+        path_text = Text(style=base)
         if path:
-            right.append(" " + path + (f" ({branch})" if branch else "") + " ")
+            path_text = divide(palette["base"], path_bg)
+            path_text += Text(
+                " " + path + " ", style=Style(color=palette["fg"], bgcolor=path_bg)
+            )
+            path_text += divide(path_bg, palette["base"])
+        alignment = app.settings.get("status_path_align", "right")
+        if alignment == "left":
+            left += path_text
+        elif alignment == "right":
+            right += path_text
         language_offset = right.cell_len
         right.append(
             " " + language + " ",
@@ -89,19 +144,6 @@ class StatusBar(Static):
         right.append(
             " " + clock + " ", style=Style(color=palette["fg"], bgcolor=palette["bg"])
         )
-        # Drop long paths/details before reducing essential left and right controls.
-        if left.cell_len + right.cell_len > width and (path or details):
-            return self.present(
-                label=label,
-                index=index,
-                name=name,
-                path="",
-                branch="",
-                details=details if path else "",
-                center=center,
-                clock=clock,
-                mode=mode,
-            )
         if right.cell_len > max(0, width - self.start_width):
             right = right[: max(0, width - self.start_width)]
         left.truncate(
@@ -109,7 +151,7 @@ class StatusBar(Static):
         )
         right_x = max(left.cell_len, width - right.cell_len)
         middle = Text(" " * max(0, right_x - left.cell_len), style=base)
-        center_text = Text(style=base)
+        center_text = path_text.copy() if alignment == "center" else Text(style=base)
         for text, role in center:
             center_text.append(
                 " " + text + " ", style=palette.get(role, palette["mute"])
