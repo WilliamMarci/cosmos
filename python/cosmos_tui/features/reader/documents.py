@@ -93,7 +93,9 @@ def encoded(text):
 
 
 def decoded(value):
-    text = Text(value["text"], style=value.get("style") or None)
+    # Rich requires an empty style string; None survives parsing but crashes
+    # when a disk-restored row is rendered through Console.get_style().
+    text = Text(value["text"], style=value.get("style") or "")
     for start, end, style in value.get("spans", []):
         text.stylize(style, start, end)
     return text

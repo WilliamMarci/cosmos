@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import json
+import logging
 import time
 import textwrap
 from pathlib import Path
@@ -106,6 +107,9 @@ class LoadingFrames:
             except (OSError, ValueError):
                 pass
             if previous != (key, detail):
+                logging.getLogger(__name__).exception(
+                    "Reader render failed for pane %s", pane.id
+                )
                 await self.controller.app.action_error(
                     "reader", error, session_id=session_id
                 )

@@ -184,6 +184,44 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(app.reader_ui.state(pane)["columns"], 3)
             await app.reader_ui.close()
 
+    def test_disk_restored_documents_render_plain_and_styled_text(self):
+        from test_next_readers_mods import book
+        from cosmos_tui.features.reader.documents import decoded
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, XDG_CACHE_HOME=directory),
+        ):
+            root = Path(directory)
+            markdown = root / "cached.md"
+            markdown.write_text(
+                "# Title\n\nPlain paragraph with **bold** and *italic* text.\n\nAnother paragraph."
+            )
+            epub = root / "cached.epub"
+            book(epub)
+            pane = Pane("%0", 0, 0, 90, 30, True, [], "", (0, 0))
+            for path in (markdown, epub):
+                state = dict(path=str(path), columns=1)
+                first, first_pages = Documents(Media()).render(
+                    pane, state, DARK, (10, 20)
+                )
+                # Fresh parser/layout caches must still render from persisted blocks.
+                with patch(
+                    "cosmos_tui.features.reader.documents.parse_html",
+                    side_effect=AssertionError("Expected disk cache hit"),
+                ):
+                    reopened, reopened_pages = Documents(Media()).render(
+                        pane, state, DARK, (10, 20)
+                    )
+                self.assertEqual(first_pages, reopened_pages)
+                self.assertEqual(
+                    [t.plain for t in first.lines], [t.plain for t in reopened.lines]
+                )
+                self.assertEqual(first.image.tobytes(), reopened.image.tobytes())
+            for value in (None, ""):
+                text = decoded(dict(text="Unstyled", style=value))
+                self.assertEqual(text.style, "")
+
     def test_icons_natural_size_images_fold_and_wide_tables(self):
         with (
             tempfile.TemporaryDirectory() as directory,
