@@ -1,6 +1,5 @@
 """Reflow and viewport composition for rich documents, independent of Textual."""
 
-from pathlib import Path
 import re
 import zipfile
 
@@ -80,12 +79,16 @@ def reflow(doc, path, width, state, cell):
                 rows.extend(Row(t, block=source.block) for t in parts)
                 rows.append(Row(Text(""), block=source.block, table=True))
         else:
-            rows.extend(
-                Row(t, heading=source.heading and i == 0, block=source.block)
-                for i, t in enumerate(
-                    source.text.wrap(doc.console, width, overflow="fold")
+            wrapped = source.text.wrap(doc.console, width, overflow="fold")
+            for i, text in enumerate(wrapped):
+                rows.append(
+                    Row(text, heading=source.heading and i == 0, block=source.block)
                 )
-            )
+                if text.plain.strip():
+                    rows.extend(
+                        Row(Text(""), block=source.block)
+                        for _ in range(max(0, state.get("line_space", 1) - 1))
+                    )
         if len(rows) > 200000:
             raise ValueError("Reflowed document exceeds 200000 rows")
     return rows
@@ -199,7 +202,6 @@ def render(doc, pane, state, palette, cell):
                         state.get("hover"),
                         palette,
                         put,
-                        state.get("_separator", "powerline"),
                         canvas,
                         cell,
                     )
@@ -253,12 +255,11 @@ def render(doc, pane, state, palette, cell):
             0,
             0,
             Text(
-                " Outline [fold]".ljust(sidebar),
+                " Outline".ljust(sidebar),
                 style=f"{palette['accl']} on {palette['base']}",
             ),
             sidebar,
         )
-        hits.append((0, 0, sidebar, 1, ("sidebar", 0)))
         offset = max(
             0, min(max(0, len(headings) - height + 1), active - (height - 2) // 2)
         )
@@ -281,55 +282,23 @@ def render(doc, pane, state, palette, cell):
 
         canvas, lines, hits = render_inspector(doc, pane, state, palette, cell)
     else:
-        from cosmos_tui.features.reader.controls import draw_buttons
+        from cosmos_tui.features.reader.options import draw_footer, draw_menu
 
-        lines[-1] = Text(
-            " " * pane.width, style=f"{palette['fg']} on {palette['base']}"
+        chapter = headings[active][1].text.plain if headings else ""
+        footer_hits = draw_footer(
+            canvas, lines, pane, state, palette, cell, page, pages, chapter, put
         )
-        columns_label = (
-            "Auto" if state.get("columns", "auto") == "auto" else str(state["columns"])
-        )
-        items = [
-            ("columns", "Cols " + columns_label),
-            ("mode", "Scroll" if state.get("reading_mode") == "scroll" else "Paged"),
-            ("sidebar", "Outline"),
-        ]
-        control_width = min(pane.width, sum(len(label) + 3 for _, label in items))
+        hits.extend(footer_hits)
         hits.extend(
-            draw_buttons(
-                lines,
-                0,
-                height,
-                control_width,
-                items,
-                0,
-                state.get("hover"),
-                palette,
-                put,
-                state.get("_separator", "powerline"),
+            draw_menu(
                 canvas,
+                lines,
+                pane,
+                dict(state, _footer_hits=footer_hits),
+                palette,
                 cell,
+                put,
             )
-        )
-        details = f" {page}/{pages} "
-        name = Text(
-            " " + Path(state["path"]).name,
-            style=f"{palette['fg']} on {palette['base']}",
-        )
-        name.truncate(max(0, pane.width - control_width - len(details)))
-        put(
-            lines,
-            control_width,
-            height,
-            name,
-            max(0, pane.width - control_width - len(details)),
-        )
-        put(
-            lines,
-            max(control_width, pane.width - len(details)),
-            height,
-            Text(details, style=f"{palette['fg']} on {palette['base']}"),
-            max(0, pane.width - control_width),
         )
     return ReadingFrame(
         canvas,

@@ -140,14 +140,14 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
                 self.assertNotIn("[columns", frame.lines[-1].plain)
                 from PIL import ImageColor
 
-                button_hits = [h for h in frame.hits if h[-1][0] == "mode"]
+                button_hits = [h for h in frame.hits if h[-1][0] == "options"]
                 bx, by = button_hits[-1][:2]
                 cw, ch = app.reader_ui.cell_pixels()
                 self.assertEqual(
                     frame.image.getpixel((bx * cw, by * ch)),
-                    ImageColor.getrgb(app.role_colors["mute"]),
+                    ImageColor.getrgb(app.role_colors["base"]),
                 )
-                self.assertTrue(any(h[-1] == ("columns", 0) for h in frame.hits))
+                self.assertTrue(any(h[-1] == ("options", 0) for h in frame.hits))
                 await pilot.press("full_stop")
                 after = app.reader_ui.state(pane)
                 self.assertEqual(after["page"], 2)
@@ -182,6 +182,69 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
                 app.screen.choose()
                 await pilot.pause()
                 self.assertEqual(app.reader_ui.state(pane)["columns"], 3)
+            await app.reader_ui.close()
+
+    async def test_footer_information_and_client_local_upward_options_menu(self):
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, XDG_CACHE_HOME=directory),
+        ):
+            path = Path(directory) / "reader.html"
+            path.write_text(
+                "<h1>Current chapter</h1><p>First paragraph</p><p>Second paragraph</p><img src='image.png'>"
+            )
+            Image.new("RGB", (400, 800), "blue").save(Path(directory) / "image.png")
+            app = Probe()
+            async with app.run_test(size=(100, 32)) as pilot:
+                pane = app.active()
+                pane.viewer = base64.b64encode(
+                    json.dumps(dict(path=str(path))).encode()
+                ).decode()
+                frame = await app.reader_ui.prepare(pane)
+                footer = frame.lines[-1].plain
+                self.assertIn("reader.html", footer)
+                self.assertIn("Current chapter", footer)
+                self.assertIn("%", footer)
+                self.assertNotIn("[", "".join(t.plain for t in frame.lines))
+                self.assertNotIn("", footer)
+                sidebar = next(h for h in frame.hits if h[-1][0] == "sidebar")
+                self.assertEqual(sidebar[0] + sidebar[2], pane.width)
+                await action(app.reader_ui, pane, app.reader_ui.state(pane), "sidebar")
+                hidden = await app.reader_ui.prepare(pane)
+                self.assertEqual(hidden.main_x, 0)
+                self.assertTrue(any(h[-1][0] == "sidebar" for h in hidden.hits))
+                await pilot.press("r")
+                self.assertTrue(app.reader_ui.options[pane.id]["open"])
+                popup = await app.reader_ui.prepare(pane)
+                menu_hits = [h for h in popup.hits if h[-1][0].startswith("option_")]
+                self.assertEqual(len({h[1] for h in menu_hits}), 4)
+                self.assertTrue(
+                    all(h[2] <= 27 and h[1] < pane.height - 1 for h in menu_hits)
+                )
+                self.assertNotIn(
+                    "_options_open", json.loads(base64.b64decode(pane.viewer))
+                )
+                await pilot.press("down", "right", "down", "right", "down", "right")
+                state = app.reader_ui.state(pane)
+                self.assertEqual(state["reading_mode"], "scroll")
+                self.assertEqual(state["line_space"], 2)
+                self.assertEqual(state["image_rows"], 12)
+                self.assertTrue(state["_options_open"])
+                await pilot.press("escape")
+                self.assertFalse(app.reader_ui.options[pane.id]["open"])
+                self.assertTrue(pane.viewer)
+                folded = await app.reader_ui.prepare(pane)
+                self.assertFalse(
+                    any(h[-1][0].startswith("option_") for h in folded.hits)
+                )
+                for width in (4, 12, 24, 80):
+                    pane.width = width
+                    narrow, _ = app.reader_ui.documents.render(
+                        pane, dict(state, _options_open=True), DARK, (10, 20)
+                    )
+                    self.assertTrue(
+                        all(0 <= x and x + w <= width for x, y, w, h, _ in narrow.hits)
+                    )
             await app.reader_ui.close()
 
     def test_disk_restored_documents_render_plain_and_styled_text(self):

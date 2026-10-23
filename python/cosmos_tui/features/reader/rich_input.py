@@ -16,7 +16,33 @@ def seek(doc, pane, state, line):
 
 async def action(controller, pane, state, name, value=0):
     doc = controller.documents
-    if name == "columns":
+    if name not in ("options", "option_previous", "option_next"):
+        if pane.id in controller.options:
+            controller.options[pane.id]["open"] = False
+        state["_options_open"] = False
+    if name == "options":
+        menu = controller.options.setdefault(pane.id, {"open": False, "index": 0})
+        menu["open"] = not menu["open"]
+        state["_options_open"] = menu["open"]
+    elif name in ("option_previous", "option_next"):
+        from cosmos_tui.features.reader.options import choices
+
+        menu = controller.options.setdefault(pane.id, {"open": True, "index": 0})
+        menu["index"] = int(value)
+        field, _, values, current = choices(state, int(value))
+        _, _, _, _, _, start = await asyncio.to_thread(position, doc, pane, state)
+        values = list(values)
+        if current not in values:
+            values.append(current)
+        state[field] = values[
+            (values.index(current) + (-1 if name == "option_previous" else 1))
+            % len(values)
+        ]
+        if field == "inline_rows":
+            state["image_rows"] = state[field]
+        seek(doc, pane, state, start)
+        state.update(_options_open=True, _option_index=menu["index"])
+    elif name == "columns":
         _, _, _, _, _, old_start = await asyncio.to_thread(position, doc, pane, state)
         choices = ["auto", 1, 2, 3]
         current = state.get("columns", "auto")
@@ -53,6 +79,27 @@ async def action(controller, pane, state, name, value=0):
 
 async def key(controller, event, pane, state):
     char, key = event.character, event.key
+    if state.get("_options_open"):
+        menu = controller.options.setdefault(pane.id, {"open": True, "index": 0})
+        if key in ("q", "escape") or char == "r":
+            await action(controller, pane, state, "options")
+        elif key in ("up", "down", "tab", "shift+tab"):
+            menu["index"] = (
+                menu["index"] + (-1 if key in ("up", "shift+tab") else 1)
+            ) % 4
+            await controller.update_viewer(pane, state)
+        elif key in ("left", "right", "enter"):
+            await action(
+                controller,
+                pane,
+                state,
+                "option_previous" if key == "left" else "option_next",
+                menu["index"],
+            )
+        return True
+    if char == "r":
+        await action(controller, pane, state, "options")
+        return True
     if state.get("inspector") is not None:
         if char == "?":
             return False

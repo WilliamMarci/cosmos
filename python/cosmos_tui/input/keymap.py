@@ -107,6 +107,7 @@ for name, label, keys, target in [
     ("outline", "Switch thumbnails / outline", ["o"], "o"),
     ("navigation_focus", "Next paragraph / focus outline", ["tab"], "tab"),
     ("paragraph_previous", "Previous paragraph", ["shift+tab"], "shift+tab"),
+    ("reading_options", "Reading options", ["r"], "r"),
     ("columns", "Cycle rich document columns", ["c"], "c"),
     ("reading_mode", "Toggle paged / scroll reading", ["v"], "v"),
     ("inspect", "Open selected image / table", ["enter"], "enter"),

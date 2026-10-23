@@ -214,6 +214,7 @@ class Documents:
             columns,
             cell,
             state.get("image_rows", 8),
+            state.get("line_space", 1),
             state.get("icon_edge", 64),
             tuple(state.get("collapsed_images", [])),
             "wrapped-v2",

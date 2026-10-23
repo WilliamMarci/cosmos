@@ -11,9 +11,11 @@ def defaults(state, settings):
             state["columns"] = int(state["columns"])
         state.setdefault("reading_mode", settings.get("viewer_rich_mode", "pages"))
         # Rendering limits follow current settings; columns/mode are pane overrides.
-        state["image_rows"] = settings.get("viewer_inline_image_rows", 8)
+        state["image_rows"] = state.get(
+            "inline_rows", settings.get("viewer_inline_image_rows", 8)
+        )
+        state.setdefault("line_space", 1)
         state["icon_edge"] = settings.get("viewer_icon_max_px", 64)
-        state["_separator"] = settings.get("status_separator", "powerline")
     return state
 
 
@@ -23,6 +25,7 @@ def commands(controller, pane, candidates):
     state = controller.state(pane)
     rich = Path(state["path"]).suffix.lower() in FORMATS
     rich_only = {
+        "reading_options",
         "columns",
         "reading_mode",
         "paragraph_previous",
@@ -67,6 +70,7 @@ def commands(controller, pane, candidates):
         available = {
             "close",
             "help",
+            "reading_options",
             "columns",
             "reading_mode",
             "previous",

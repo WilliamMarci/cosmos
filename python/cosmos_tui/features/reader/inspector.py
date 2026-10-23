@@ -89,7 +89,6 @@ def render_inspector(doc, pane, state, palette, cell):
         state.get("hover"),
         palette,
         put,
-        state.get("_separator", "powerline"),
         canvas,
         cell,
     )

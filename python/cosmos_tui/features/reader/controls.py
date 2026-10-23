@@ -1,18 +1,18 @@
-"""Solid-color reader controls sharing status-bar block and separator primitives."""
+"""Independent rectangular reader actions without decorative separators."""
 
-from cosmos_tui.ui.blocks import color_block, transition
+from cosmos_tui.ui.blocks import color_block
 
 
 def buttons(image=False, folded=False, expanded=False):
     if expanded:
-        return [("back", "Back"), ("copy", "Copy")]
+        return [("back", "←"), ("copy", "⎘")]
     if image:
         return [
-            ("fold", "▸ Show" if folded else "▾ Fold"),
-            ("expand", "Expand"),
-            ("copy", "Copy"),
+            ("fold", "▸" if folded else "▾"),
+            ("expand", "↗"),
+            ("copy", "⎘"),
         ]
-    return [("table", "Table"), ("copy", "Copy")]
+    return [("table", "Table"), ("copy", "⎘")]
 
 
 def draw_buttons(
@@ -25,35 +25,15 @@ def draw_buttons(
     hover,
     palette,
     put,
-    separator="powerline",
     canvas=None,
     cell=(10, 20),
 ):
     hits, offset = [], 0
     for index, (action, label) in enumerate(items):
         hovered = hover == [action, block]
-        # Flat monochrome text; alternating solid blocks use the same theme roles
-        # and neighboring-background joins as the global status bar.
-        background = (
-            palette["acc"]
-            if hovered
-            else palette["base"]
-            if index % 2 == 0
-            else palette["mute"]
-        )
-        foreground = "black" if index % 2 and not hovered else palette["fg"]
+        background = palette["acc"] if hovered else palette["base"]
+        foreground = palette["on"] if hovered else palette["fg"]
         text = color_block(label, foreground, background)
-        after = palette["bg"]
-        if index + 1 < len(items):
-            next_action = items[index + 1][0]
-            after = (
-                palette["acc"]
-                if hover == [next_action, block]
-                else palette["base"]
-                if (index + 1) % 2 == 0
-                else palette["mute"]
-            )
-        text += transition(separator, background, after)
         length = min(text.cell_len, max(0, width - offset))
         if not length:
             break

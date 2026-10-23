@@ -37,11 +37,17 @@ class ReaderController(Controller):
         self.prefetch_token = None
         self.prepared_paths = {}
         self.frame_keys = {}
+        self.options = {}
 
     def state(self, pane):
         from cosmos_tui.features.reader.preferences import defaults
 
-        return defaults(json.loads(base64.b64decode(pane.viewer)), self.app.settings)
+        state = defaults(json.loads(base64.b64decode(pane.viewer)), self.app.settings)
+        menu = self.options.get(pane.id, {})
+        state.update(
+            _options_open=menu.get("open", False), _option_index=menu.get("index", 0)
+        )
+        return state
 
     def pane_bounds(self, pid, path):
         for pane in self.app.panes:
@@ -158,6 +164,8 @@ class ReaderController(Controller):
             pane.width,
             pane.height,
             state.get("columns", "auto"),
+            state.get("line_space", 1),
+            state.get("image_rows", 8),
             tuple(state.get("collapsed_images", [])),
             self.cell_pixels(),
         )
@@ -356,7 +364,12 @@ class ReaderController(Controller):
                 max(-limit, min(limit, value))
                 for value, limit in zip(state.get("pan", [0, 0]), limits)
             ]
-        wire = base64.b64encode(json.dumps(state).encode()).decode()
+        saved = {
+            k: v
+            for k, v in state.items()
+            if k not in ("_options_open", "_option_index", "_footer_hits")
+        }
+        wire = base64.b64encode(json.dumps(saved).encode()).decode()
         self.revisions[pane.id] = self.revisions.get(pane.id, 0) + 1
         await app.backend.request(f"set-option -p -t {pane.id} @cosmos_viewer {wire}")
         pane.viewer = wire
@@ -417,6 +430,11 @@ class ReaderController(Controller):
                 await self.update_viewer(pane, state)
                 return
         if Path(state["path"]).suffix.lower() in DOCUMENTS:
+            if state.get("_options_open"):
+                from cosmos_tui.features.reader.rich_input import action
+
+                await action(self, pane, state, "options")
+                return
             if state.get("inspector") is not None:
                 from cosmos_tui.features.reader.inspector import source
 
@@ -618,6 +636,7 @@ class ReaderController(Controller):
                 return
         if event.key in ("q", "escape"):
             self.revisions[pane.id] = self.revisions.get(pane.id, 0) + 1
+            self.options.pop(pane.id, None)
             self.frames.pop(pane.id, None)
             self.pages.pop(pane.id, None)
             self.searches.pop(pane.id, None)
