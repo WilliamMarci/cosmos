@@ -149,6 +149,12 @@ class Palette(CosmosModal):
         if self.menu == "input_settings":
             rows = [
                 dict(label="Mouse mode", kind="menu", menu="mouse_settings"),
+                choice(
+                    "Mouse passthrough",
+                    "mouse_passthrough",
+                    [(False, "Off"), (True, "On")],
+                    True,
+                ),
                 dict(label="Input method", kind="menu", menu="ime_settings"),
             ]
         if self.menu == "mouse_settings":

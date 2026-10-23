@@ -19,6 +19,22 @@ from cosmos_tui.ui.menus import CompactMenu
 
 
 class WorkspaceController(Controller):
+    async def toggle_mouse_passthrough(self):
+        app = self.app
+        try:
+            settings = await rpc.call("settings.get")
+            value = not settings.get("mouse_passthrough", True)
+            settings["mouse_passthrough"] = value
+            await rpc.call("settings.replace", settings)
+            actual = await rpc.call("settings.get")
+            if actual.get("mouse_passthrough") != value:
+                raise RuntimeError(
+                    "Coordinator did not retain mouse_passthrough; update/restart the coordinator and retry"
+                )
+            app.settings = actual
+        except (RuntimeError, OSError, ValueError) as error:
+            await app.action_error("mouse passthrough", error)
+
     async def action_leader_key(self, key):
         app = self.app
         logging.getLogger(__name__).debug("action_leader_key %s", key)
@@ -56,6 +72,9 @@ class WorkspaceController(Controller):
             return
         if key == "ime_width":
             await app.ime.toggle_width()
+            return
+        if key == "mouse_passthrough":
+            await self.toggle_mouse_passthrough()
             return
         if key == "quit":
             await app.detach("exit")

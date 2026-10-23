@@ -1,107 +1,71 @@
-# Cosmos
+# Cosmos — Arche 0.1.0
 
-运行在工作主机上的终端工作壳。通过普通 SSH 登录后运行 Cosmos，即可创建或重连持续会话；连接电脑无需配套 Cosmos。
+**首个开发版 · 2026-10-23 · Author: William Marci**
 
-当前已打通默认自有工作区，并完成框架层：本机 IPC、持久配置、事件回放与长轮询、可信 Mod 加载与生命周期、UI/焦点/内容版本模型、独立面板控制器、字符合成器与按键解码，以及可操作的终端面板。Cosmos 自行实现这些逻辑；当前仅通过可替换后端使用系统 Tmux 的稳定会话能力，独立 socket，不改用户原有服务。
+Cosmos 是运行在工作主机上的终端工作壳。通过普通 SSH 登录后运行 Cosmos，即可创建或重连持续会话；连接电脑无需安装配套 Cosmos。Arche 是开发版代号，不表示原定完整首版已经交付。版本范围与依赖见 [发布说明](RELEASE.md)。
 
-## 当前开发入口与状态
+## 运行
 
-唯一 UI 入口是根目录 `./cosmos [SESSION] [--debug]`（环境初始化见 [Python 入口说明](python/README.md)）。`dev/cosmos-textual` 仅作兼容跳转。Python + Textual 与 Cosmos 自绘接口负责界面；Tmux 负责持续会话及 VT 解析。
+唯一 UI 入口为根目录 `./cosmos`，使用 Python + Textual 与 Cosmos 自绘接口；隔离 Tmux 服务负责持续会话和终端解析。Rust 保留协调服务与管理 CLI，旧 Rust UI 已停用。`dev/cosmos-textual` 仅为兼容跳转。
 
-Rust 暂留协调服务与管理 CLI；旧 Rust UI 已停用。`target/release/cosmos` 无参数及 `attach/workspace` 转到同一个 Python UI；`panel/native/view` 不再启动旧界面。源码首次运行需构建协调服务：
+源码或解压包需要 Python 3.11+、Tmux；PDF 另需 Poppler。源码首次运行：
 
 ```bash
 cargo build --locked --offline --release
+uv venv .venv
+uv pip install --python .venv/bin/python -r python/requirements.txt
+./cosmos --version
 ./cosmos
-./cosmos study --debug
 ```
 
-`Leader d` 分离后显示 Logo、会话状态及重连命令；Shell 中退出最后一个应用导致会话结束时显示 exit。关闭客户端不等于停止服务。
-
-管理命令仍使用 `./target/release/cosmos daemon|doctor|mod|rpc|stop`；`stop` 关闭协调服务与其管理的 Mods，保留 Tmux 应用。分屏、设置与帮助使用 Python UI 内的统一键位设置。
-
-冻结边界见 [入口与框架冻结记录](design/入口与框架冻结记录.md)，当前能力见 [实施状态](design/当前实施状态.md)。正式 Mod 接口见 [框架 RPC](docs/framework.md)、[UI 区域接口](docs/ui-api.md) 和 [Shell 入口](docs/shell.md)。Git 流程见 [开发说明](docs/development.md)。
-
-模块目录与依赖边界见 [架构说明](docs/architecture.md)。
-
-## 加载示例 Mod
-
-示例使用 Python 标准库，实现就绪握手、通知、事件订阅和发布。
+解压包使用内置 `bin/cosmos` 协调服务，不需构建 Rust，但仍需初始化 Python 环境及安装系统依赖。原生 Bash 命令助手首次加载需要 C 编译器；IME 需要 librime 和已编译 Rime 数据。详见 [运行环境](python/README.md)。当前构建包尚未自包含这些依赖。
 
 ```bash
-./target/release/cosmos mod add examples/demo.mod.toml
-./target/release/cosmos mod start demo
-./target/release/cosmos mod list
-./target/release/cosmos mod stop demo
-./target/release/cosmos mod remove demo
+cosmos attach -s work
+cosmos new -s research
+cosmos list
+cosmos history -s work --output history.txt
+source <(cosmos completion bash)
 ```
 
-Mod 注册持久保存，显式启动，autostart 可选。支持协议兼容检查、就绪超时、优雅停止后强制清理、有限失败重启及有界日志。仅运行可信程序；能力声明不构成系统沙箱。
+会话命令支持唯一前缀和兼容别名，完整用法见 [CLI 文档](docs/cli.md)。`Leader d` 分离客户端，应用继续运行；`cosmos stop` 停止协调服务及其管理的 Mod，保留 Tmux 应用。请从外层 Shell 连接，避免在同一会话中捕获客户端自身。
 
-## 配置与接口
+## 已实现的开发版能力
 
-配置：`${XDG_CONFIG_HOME:-~/.config}/cosmos/config.toml`，样例在 config/。状态与注册：`${XDG_STATE_HOME:-~/.local/state}/cosmos/`。
+- 持续会话、窗口/窗格切换、分屏、调整大小、焦点分割线、历史回滚与单窗格搜索。
+- Settings、Ctrl+P 上下文 Actions、COSMOS 开始菜单、分组键位编辑和可视键盘预览。
+- 图片/PDF 阅读、缩略图、缩放平移、PDF 搜索高亮、跳页、大纲、内存缓存与相邻页预读。
+- terminal_agent 命令生成助手及 Cosmos 自绘输入；分屏启动 OpenCode。
+- librime 输入法、逐输入目标组字、候选与全半角；命令助手自绘编辑器也支持 IME。
+- 分级通知、来源会话标记、重复计数、终端响铃通知，以及可配置状态栏。
+- 可信 Mod 注册和生命周期、事件回放、公开 RPC/SDK 与部分 UI 扩展接口。
 
-设置界面、CLI 和 Mod 共用 RPC。面板主题实时更新；自有工作区实时读取状态栏和 Leader 设置；原生兼容界面修改后选择 Apply 或调用 `settings.apply`。当前仅支持 Ctrl-B/Ctrl-A Leader，完整键位编辑器后续接入。
+默认 Leader 为 Ctrl+B；`Leader p` 打开设置，`Leader m` 打开开始菜单，`Leader s` 切换窗口/会话，`Leader ?` 查看上下文快捷键。输入法通过 `Leader i` 切换。Leader2/3、具体动作及别名可在设置中调整。默认静默，不常驻显示全部按键。
 
-框架细节与 manifest、事件、UI、通知协议见 [公开接口](docs/framework.md)。Python 适配在 sdk/python/，内部模块在 crates/cosmos/src/。
+在 Cosmos Bash 中使用 `open FILE` 或 `cosmos open FILE` 打开 PNG/JPEG/WebP/PDF。Kitty 与 Ghostty 支持图形输出，其他终端可字符降级。阅读详情见 [Reader](docs/viewer.md)。
 
-## 验证与构建包
+## 配置与扩展
+
+配置位于 `${XDG_CONFIG_HOME:-~/.config}/cosmos/config.toml`，运行状态位于 `${XDG_STATE_HOME:-~/.local/state}/cosmos/`。配置样例在 config/。设置保存后即时读回，不需要旧界面的 Apply 操作。启动时核对实际后台服务的能力与配置字段；升级服务需分离客户端后停止并重新启动，打开新终端不会替换常驻服务。
 
 ```bash
-cargo clippy --locked --offline --all-targets -- -D warnings
+cosmos mod add examples/demo.mod.toml
+cosmos mod start demo
+cosmos mod list
+```
+
+Mod 注册持久保存，显式启动或配置 autostart；能力声明不构成系统沙箱。通过 UI 的 Settings → Mods 管理已注册程序，Mod 视图由当前 Python 宿主呈现，不使用旧 `cosmos panel` 入口。
+
+正式文档：[框架 RPC](docs/framework.md)、[UI 接口](docs/ui-api.md)、[架构](docs/architecture.md)、[设置](docs/settings.md)、[状态栏](docs/status-bar.md)、[输入法](docs/input-method.md)、[鼠标](docs/mouse.md)、[通知](docs/notifications.md)、[Shell 集成](docs/shell.md)。
+
+未完成范围包括 Yazi 文件管理/左面板、跨所有窗格搜索、全局 Agent 工具与权限桥、持久磁盘缓存、EPUB/Markdown 阅读和自包含分发。规划保留在 [design 当前状态](design/当前实施状态.md)，不将接口或外部程序启动等同于完整模块交付。
+
+## 验证与构建
+
+```bash
+.venv/bin/python -m unittest discover -s dev -p 'test_*.py'
 COSMOS_TEST_TMUX=1 cargo test --locked --offline
-python3 dev/smoke_workspace.py
-python3 dev/smoke_framework.py
-python3 dev/smoke_surface.py
-python3 dev/smoke_foundation.py
 ./packaging/build.sh
 ```
 
-Socket、PTY 和 Tmux 测试需正常本机权限；测试使用隔离状态与独立服务。构建包包含程序、示例、SDK、接口说明、许可证、运行库清单与校验值，仍需系统 Tmux 及相应运行库。
-
-## 当前边界
-
-默认客户端自行绘制终端 grid、光标、窗格、状态栏、面板、通知和 Mod。Tmux 作为持续会话与终端解析后端，通过持久控制连接提供已解析画面；普通工作区不使用 Tmux popup。`cosmos native` 保留旧界面回退。
-
-完整说明与兼容边界见 [自有工作区](docs/workspace.md)。图片/PDF 查看器已接入，见 [查看器](docs/viewer.md)。Rime 输入法已接入，见 [输入法与键盘预览](docs/input-method.md)；Yazi 和全局 Agent 工具层仍待完成。没有将后台模型或静态编译当成最终视觉验收。
-
-设计与进展见 [实施方案](design/实施方案-v0.1.md) 和 [实施进度](design/实施进度.md)。现有 terminal_agent 实现暂保持不变。
-
-
-panel 启动会先检查协调服务版本与能力。旧服务即使“健康”也可能缺少新 UI 接口；popup 模式会保留错误直到按 Enter，并在运行目录保存 panel-error.log。doctor 现在同时显示后端与运行服务的协议能力。架构边界见 [修订说明](design/架构边界修订.md)。
-
-
-## 体验自有 Mod 视图
-
-```bash
-./target/release/cosmos mod add examples/surface.mod.toml
-./target/release/cosmos panel
-```
-
-在面板进入 Mods，筛选 `interactive` 后 Enter。示例视图由 Cosmos 字符合成器绘制，输入会更新计数，Esc 恢复原菜单。该示例不需要 Tmux；它以面板为当前呈现表面，尚不代表已能覆盖任意 Shell 程序。新服务会提供 `surface-input` 能力。
-
-
-若正在旧 Tmux 客户端里，先 Ctrl-B d 回到外层 Shell，再运行新版 Cosmos；会话中的程序继续保留。不能在同一会话的窗格里启动捕获自身的工作区，代码会提前拒绝递归显示。
-
-
-## 图片与 PDF
-
-在 Cosmos 的 Shell 内运行 `cosmos open FILE`，临时替换当前窗格；外层终端独立运行用 `cosmos view FILE`。支持 PNG/JPEG/WebP 和 PDF 翻页、搜索与高亮。PDF 需要 Poppler，`cosmos doctor` 可检查。
-
-默认静默，不常驻显示操作说明；统一 `Leader ?` 查看当前上下文的快捷键。已打开的查看器可用 `?`，`q` / Esc 关闭。Kitty 终端使用内联图片数据，其他终端半块字符降级。详见 [查看器与验收边界](docs/viewer.md)。
-
-
-## Python + Textual 迁移入口
-
-已新增独立的统一渲染验证入口：
-
-```bash
-/home/amadeus/Program/cosmos/dev/cosmos-textual
-```
-
-Textual 接管终端画面、面板、帮助、通知、Mod 表面与 Kitty 图片的实际输出，Tmux 保留终端解析与会话。当前使用项目 `.venv` 中固定的 Textual 8.2.8；新环境需创建虚拟环境并安装 `python/requirements.txt`，协调服务仍使用现有 release 二进制。
-
-默认入口尚未切换。Python 端仍需补齐完整 PDF 搜索/缓存、鼠标与所有兼容回归，不能把本轮统一渲染验证说成迁移完成。详见 [迁移方案与验收](design/Python-Textual迁移.md)。
-
-Command-line usage and Bash completion: [docs/cli.md](docs/cli.md).
+按变更范围执行检查；真实 PTY、图形与 SSH 验收不能由静态测试代替。构建产物为 `dist/cosmos-0.1.0-arche-linux-x86_64.tar.gz`，附校验值、许可证与依赖说明。开发流程见 [Git 管理](docs/development.md)。

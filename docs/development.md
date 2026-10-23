@@ -36,3 +36,7 @@ COSMOS_TEST_TMUX=1 cargo test --locked --offline
 纳入 Rust/Python/C 源码、设计文档、测试、构建脚本、依赖锁及样例配置。排除 target、dist、虚拟环境、Python/工具缓存、原生编译产物、日志、环境密钥和运行报告。
 
 vendor 下保留 README、sources.json 和 sync.py，按固定 commit 记录参考源码；clone 出来的工作目录不纳入主仓库，也不创建无内容的 gitlink。恢复参考项目使用 `python3 vendor/sync.py`，需要网络，且会拒绝覆盖与清单版本不一致的本地 checkout。
+
+## Arche 开发版标识
+
+首个开发版为 Arche · 0.1.0，发布范围见根目录 RELEASE.md。Python 展示元数据位于 core/metadata.py，Rust Cargo 版本为 0.1.0；CLI --version 与 About 同时展示代号、版本和 development 渠道。构建脚本从 Python 元数据生成 cosmos-0.1.0-arche-linux-x86_64 目录名，并包含发布说明。应用版本不改变协议 1.4 或配置格式 1。正式 docs 描述已实现接口，待办与历史实现保持在 design。

@@ -10,7 +10,7 @@ STYLES = {
 
 
 def compose(context, area, cursor, palette, style="normal"):
-    preedit = context["preedit"]
+    preedit = context["preedit"].replace(" ", "'")
     caret = max(0, min(len(preedit), context.get("cursor", len(preedit))))
     labels = [f" {i + 1} {text} " for i, text in enumerate(context["candidates"])]
     width = min(
@@ -56,7 +56,7 @@ def compose(context, area, cursor, palette, style="normal"):
                 palette["accl"],
                 palette["base"],
                 bold=selection[0] <= index < selection[1],
-                underline=not character.isspace(),
+                underline=not character.isspace() and character != "'",
             )
         )
         offset += size

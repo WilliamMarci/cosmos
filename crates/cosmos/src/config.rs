@@ -12,6 +12,7 @@ pub struct Config {
     pub viewer_cache_mb: usize,
     pub viewer_image_max_mb: usize,
     pub viewer_prefetch: bool,
+    pub mouse_passthrough: bool,
     pub status_visible: bool,
     pub status_path_depth: usize,
     pub status_path_max_length: usize,
@@ -37,6 +38,7 @@ impl Default for Config {
             viewer_cache_mb: 128,
             viewer_image_max_mb: 32,
             viewer_prefetch: true,
+            mouse_passthrough: true,
             status_visible: true,
             status_path_depth: 3,
             status_path_max_length: 40,
@@ -181,5 +183,20 @@ impl Config {
             let _ = fs::remove_file(tmp);
         }
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Config;
+
+    #[test]
+    fn mouse_passthrough_defaults_on_for_old_configs() {
+        let parsed: Config = toml::from_str("version = 1").unwrap();
+        assert!(parsed.mouse_passthrough);
+        assert!(Config::default().mouse_passthrough);
+        assert!(toml::to_string(&Config::default())
+            .unwrap()
+            .contains("mouse_passthrough = true"));
     }
 }

@@ -17,12 +17,27 @@ from cosmos_tui.ui.styles import DARK, LIGHT
 from cosmos_tui.features.theme.controller import apply_interface
 
 
+async def notify_session_created(app, created):
+    if not created:
+        return
+    try:
+        await app.notification_events.publish(
+            f"Session '{app.backend.session}' not found; created",
+            source="workspace",
+            level="info",
+        )
+    except (OSError, RuntimeError):
+        logging.getLogger(__name__).warning(
+            "could not publish session creation notification"
+        )
+
+
 class RuntimeController(Controller):
     async def on_mount(self):
         app = self.app
         app._workspace_screen = app.screen
         await app.assistant_ui.start()
-        await app.backend.connect()
+        created = await app.backend.connect()
         await rpc.call(
             "ui.attach",
             {
@@ -33,6 +48,7 @@ class RuntimeController(Controller):
         )
         app.query_one("#agent-powerline").display = False
         app.query_one(TerminalSurface).focus()
+        await notify_session_created(app, created)
         app.set_interval(0.1, app.tick)
         await self.tick()
 

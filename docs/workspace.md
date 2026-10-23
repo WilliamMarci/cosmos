@@ -20,7 +20,7 @@ Cosmos 操作统一注册于 keymap.COMMANDS，由设置、分发和上下文帮
 
 普通终端窗格中的 Ctrl+Space 按 NUL（Tmux C-Space）转发，兼容传统 Ctrl+@ 和 Kitty 扩展键盘事件。因此 Bash 中绑定到 `\C-@` 的 menu-complete 等操作仍由 Bash 处理。
 
-点击普通窗格可切换焦点。查看器区域支持缩略图、滚轮、缩放和平移。普通终端应用的鼠标事件透传不属于当前鼠标接口。
+点击普通窗格可切换焦点。查看器区域支持缩略图、滚轮、缩放和平移。Settings → Input → Mouse passthrough 开启时，应用自己启用了鼠标跟踪的普通窗格会收到点击、按住拖动和滚轮；未启用鼠标跟踪的应用仍由 Cosmos 处理焦点和历史。Ctrl+P 的 Toggle mouse passthrough 可切换共享设置，并可在键位设置中绑定。默认不转发无按键的悬停移动。
 
 ## 区域与组件
 
@@ -48,7 +48,7 @@ Leader p 打开设置 Panel，只包含显示、键位、通知、Mod 管理与 
 
 普通终端窗格默认 Leader [ 进入 Tmux copy mode，Leader / 打开当前窗格历史搜索，Leader ] 粘贴 Tmux buffer。历史模式中：方向键或 h/j/k/l 移动，PageUp/PageDown 翻页，Home/g 到最早保留内容，End/G 到最新内容，0/$ 到行首/行末，Space/v/Ctrl+Space 开始选区，Enter/y/Alt+w 复制选区并返回，Esc/q 返回；/ 或 Ctrl+s 向前搜索，? 或 Ctrl+r 向后搜索，n/N 前后匹配。Leader ? 查看此模式的实际键位；键位均在统一设置中可改，Leader 本身优先于模式快捷键。
 
-普通窗格上滚进入历史并按三行滚动，下滚在历史模式中继续滚动。Tmux 保留历史、选区、搜索位置和 buffer；Cosmos 按 copy-mode 的 scroll_position 捕获对应视口，并显示选区及当前匹配。当前实现依赖 Tmux 的 capture-pane -M 支持，已在 Tmux 3.6 验证。
+在 Mouse passthrough 关闭、或窗格内应用没有启用鼠标跟踪时，普通窗格上滚进入历史并按三行滚动，下滚在历史模式中继续滚动。Tmux 保留历史、选区、搜索位置和 buffer；Cosmos 按 copy-mode 的 scroll_position 捕获对应视口，并显示选区及当前匹配。当前实现依赖 Tmux 的 capture-pane -M 支持，已在 Tmux 3.6 验证。
 
 复制目标为服务器端 Tmux buffer；不承诺本地系统剪贴板同步。当前提供键盘选区，尚不提供终端内容鼠标拖选。这是单窗格保留历史搜索，不是跨窗格搜索。
 

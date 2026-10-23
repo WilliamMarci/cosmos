@@ -74,13 +74,13 @@ CellSurface 将 frame 接到唯一 compositor；它自己不写 stdout。按下�
 {"method":"notifications.publish","params":{"source":"my-mod","text":"Continue?","actions":[{"id":"yes","label":"yes"},{"id":"no","label":"no"}]}}
 ```
 
-返回 `{id}`。actions 最多 3 项，id 唯一且长度 1..64 字节，label 非空、最多 64 字节，均禁止控制字符。显示标签按三个字符格裁切；使用短标签。带动作的通知自动 actionable；缺省常驻，也可显式设正 ttl_ms 到期。
+返回 `{id,count}`。actions 最多 3 项，id 唯一且长度 1..64 字节，label 非空、最多 64 字节，均禁止控制字符。显示标签按三个字符格裁切；使用短标签。带动作的通知自动 actionable；缺省常驻，也可显式设正 ttl_ms 到期。
 
 `notifications.act {id,action,client}` 选择已声明的动作。已处理、已被 claim 或动作不存在时拒绝。成功返回 `{resolved:true,action,source}`，服务持久保存 selected_action 并广播 `notifications.action {id,action,source,client}` 和 notifications.changed。其他客户端同步移除已处理通知；普通关闭只调用 notifications.dismiss，影响当前客户端。
 
 发布者通过 events.poll 订阅 notifications.action，根据 source/id/action 执行业务；服务不 eval action、不运行 Shell，不保证外部业务恰好执行一次。需要恢复处理时查询 notifications.list 中的 selected_action，而非只依赖内存事件。原有 claim/complete 接口仍保留，不能同时 act 一个已 claim 的通知。
 
-SDK `api.notify(text, actionable=False, actions=None)` 返回通知 ID 对象。右下角固定宽度堆栈，默认 1 行、长文最多 2 行，三个字符格动作按钮；空间不足时仅保留关闭按钮，可用配置中的 Notification actions（默认 Leader N）打开紧凑动作菜单。
+SDK `api.notify(text, actionable=False, actions=None, *, level="info", ttl_ms=None, persistent=False, session_id=None)` 返回含 id/count 的对象。右上角固定宽度堆栈，新消息在上，宽度按当前窗格原值的 70% 计算（最多 42 列），默认 1 行、长文最多 2 行，三个字符格动作按钮；空间不足时仅保留关闭按钮，可用配置中的 Notification actions（默认 Leader N）打开紧凑动作菜单。
 
 ## 按键注册与设置
 
@@ -95,7 +95,7 @@ reduced_motion = false
 "assistant.actions" = ["leader+full_stop"]
 ```
 
-普通 Bash/OpenCode/Yazi 应用自己的内部键位不归 Cosmos 接管。文本编辑器的标准编辑/选择行为由 CellEditor 或宿主 Input 实现，不作为终端应用全局快捷键截获。此设置只修改 Python UI 的注册动作，不改变旧 Rust 兼容前端按键表。
+普通 Bash/OpenCode/Yazi 应用自己的内部键位不归 Cosmos 接管。文本编辑器的标准编辑/选择行为由 CellEditor 或宿主 Input 实现，不作为终端应用全局快捷键截获。此设置修改当前 Python UI 的注册动作；旧 Rust UI 已停用。
 
 ## 生命周期和依赖
 
@@ -166,6 +166,8 @@ settings.get / settings.replace 的根配置增加 viewer_cache_mb（整数 16�
 ### Client-only input settings
 
 Settings → Input → Mouse mode is local to one UI connection; it is not part of settings.get/settings.replace or the Mod RPC contract. Auto/Cell/Pixel selection does not modify Kitty image rendering. See mouse.md for mode negotiation, startup arguments and lifecycle.
+
+Settings → Input → Mouse passthrough is the separate shared root field `mouse_passthrough` (boolean, default true). It only controls whether pointer events are delivered to pane applications that enabled mouse tracking; it does not change the client-local Mouse mode or the Mod RPC surface. The `workspace.mouse_passthrough` action toggles the same field through settings.get/settings.replace and is available in Ctrl+P Actions and Settings → Keybindings.
 
 设置列表的轮询值与分阶段编辑器、导航及内部 SettingRow 消息见 settings.md；配置字段与 RPC 形态不变。
 

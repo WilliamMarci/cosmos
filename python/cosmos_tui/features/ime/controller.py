@@ -7,6 +7,7 @@ from cosmos_tui.core.controller import Controller
 from cosmos_tui.features.ime.rime import Rime
 from cosmos_tui.features.ime.layout import compose
 from cosmos_tui.ui.cell_surface import CellSurface
+from cosmos_tui.ui.editor import CellEditor
 from cosmos_tui.ui.cells import Rect
 from cosmos_tui.ui.zones import Zone
 
@@ -62,6 +63,9 @@ class IMEController(Controller):
     def target(self):
         app = self.app
         focus = app.screen.focused
+        if isinstance(focus, CellEditor) and not focus.disabled and not focus.read_only:
+            pane = app.screen.source() if hasattr(app.screen, "source") else None
+            return ("input", focus), focus.cursor_screen_offset, pane
         if isinstance(focus, Input) and not focus.disabled and not focus.password:
             return ("input", focus), focus.cursor_screen_offset, None
         pane = app.active()

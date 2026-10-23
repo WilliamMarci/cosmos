@@ -30,6 +30,8 @@ class IMELayoutTests(unittest.TestCase):
         caret = next(r for r in frame.runs if r.reverse)
         self.assertEqual(caret.rect.x, frame.bounds.x + 2)
         self.assertTrue(any(r.underline for r in frame.runs))
+        separator = next(r for r in frame.runs if r.text == "'")
+        self.assertFalse(separator.underline)
         self.assertTrue(
             any("¹" in r.text and r.foreground == "yellow" for r in frame.runs)
         )

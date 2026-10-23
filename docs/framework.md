@@ -1,6 +1,6 @@
-# Cosmos 框架接口 v1.3
+# Cosmos 框架接口 v1.4 — Arche 0.1.0
 
-当前代码提供协调服务、事件、可信 Mod 加载、UI 状态模型和终端面板适配。Python 工作区在统一 compositor 中合成终端、dock/replacement/content 和辅助 UI；Rust 兼容入口单独保留。
+当前代码提供协调服务、事件、可信 Mod 加载、UI 状态模型和终端面板适配。Python 工作区在统一 compositor 中合成终端、dock/replacement/content 和辅助 UI；Rust 只保留协调服务和管理 CLI；旧 Rust UI 已停用。
 
 ## 1. 模块边界
 
@@ -9,22 +9,20 @@
 - `events.rs`：序号、有界回放、过滤、长轮询、epoch 和缺口检测。
 - `mods.rs`：持久 manifest、启动、就绪、停止、退出检测、限次退避和日志。
 - `ui.rs`：操作目录、角色调色板、客户端状态、焦点栈、视图租约、布局和内容版本。
-- `panel.rs`：面板控制器与可注入 Transport；筛选、子菜单、操作与帮助不依赖 tty 或 Tmux。
-- `input.rs`：分包按键、UTF-8、方向键、Escape 超时与 bracketed paste 解码。
-- `compositor.rs`：字符帧、图层裁切、宽字符单元、角色样式及按脏行差异输出。
-- `terminal_ui.rs`：真实 tty 模式、尺寸/字节读取、控制器调用与恢复守卫。
 - `notifications.rs`：通知历史、显示期限、客户端关闭、服务级认领与完成。
 - `storage.rs`：持久状态读写。
 - `backend.rs`：可替换会话后端边界。
-- `backends/tmux.rs`：当前稳定会话适配器、窗格查询及临时 popup 宿主。
-- `client.rs`：UI 启动前的协议与能力预检。
+- `backends/tmux.rs`：协调服务侧会话适配与兼容 RPC；当前 Python 客户端的控制连接和窗格快照在 `python/cosmos_tui/terminal/`。
+- `client.rs`：Rust 管理客户端的协议适配；当前 UI 启动预检在 `python/cosmos_tui/runtime/bootstrap.py`。
 - `signals.rs`：SIGTERM/SIGINT 关闭信号。
+
+`panel.rs`、`input.rs`、`compositor.rs` 和 `terminal_ui.rs` 保留旧实现参考，不是当前 UI 运行路径；当前 UI 分层见 [architecture.md](architecture.md)。
 
 外层终端模式由当前客户端宿主持有，Readline 继续持有源 Shell 编辑缓冲区。辅助 UI 不另起输出循环，不与宿主竞争写屏。
 
 ## 2. RPC 与版本
 
-私有 Unix socket，Linux 同 UID 验证，目录 0700/socket 0600，最多 32 个活动连接。JSON-RPC 2.0 换行分帧，最大 1 MiB；连接空闲 5 秒关闭。先发 `initialize {protocol_major:1}`，响应 minor=3 与能力列表。大版本不兼容拒绝，小版本能力按协商判断。
+私有 Unix socket，Linux 同 UID 验证，目录 0700/socket 0600，最多 32 个活动连接。JSON-RPC 2.0 换行分帧，最大 1 MiB；连接空闲 5 秒关闭。先发 `initialize {protocol_major:1}`，响应 minor=4 与能力列表。大版本不兼容拒绝，小版本能力按协商判断。
 
 事件使用 `events.poll` 长轮询，而非无界推送。最长等待 2 秒，等待期间不占全局状态锁。Python SDK 每次请求重新连接和协商，避免空闲连接失效。
 
@@ -85,15 +83,15 @@ stdout/stderr 各有独立日志，单次启动各保留前 1 MiB，超过后继
 
 `input.route {client}` 返回 application 或当前 modal view 的 owner/ID，仅解析路由，不向应用发送按键。UI 快照通过 `ui.snapshot` 获取；Mod 停止、失败、退出或卸载时自动释放其视图。
 
-布局矩形按客户端尺寸裁切。notification 右下角至多 60 列、2 行；dock 默认左侧至多 40 列。Python 工作区按这些矩形合成 Mod 文本角色与终端 grid。共享 PTY 尺寸由 Tmux 后端协调。
+布局矩形按客户端尺寸裁切。服务侧旧 notification 视图矩形和 dock 矩形不等于当前通知栈布局；当前通知栈固定在右上、宽度按 pane 的 70% 规则计算，单条最多两行，见 [notifications.md](notifications.md)。dock 模型默认左侧至多 40 列。Python 工作区按这些矩形合成 Mod 文本角色与终端 grid。共享 PTY 尺寸由 Tmux 后端协调。
 
 ## 6. 操作、设置与实际面板
 
 `actions.list` 返回内置和 Mod 操作。`actions.invoke {id,params?}` 使用同一处理逻辑。菜单返回 menu ID，设置操作验证并保存。Python 的 Leader p 只显示设置管理项；Ctrl+P 显示当前上下文动作，状态栏 cosmos 按钮打开开始菜单。Mod 的菜单位置、上下文与分组由其 action 元数据声明，详见 ui-api.md。
 
-`cosmos panel` 是 Rust 兼容面板入口；Python 工作区的 Leader p 在自己的 UI 层打开紧凑操作面板。箭头/Ctrl-N/P 选择，文字过滤，Enter 执行，Esc 返回，? 调出帮助；无常驻快捷键提示。深浅主题共用角色表，中文宽度按显示列裁切。
+`cosmos panel` 已停用；Python 工作区的 Leader p 在自己的 UI 层打开紧凑设置面板，动作使用 Ctrl+P。箭头/Ctrl-N/P 选择，文字过滤，Enter 执行，Esc 返回，? 调出帮助；无常驻快捷键提示。深浅主题共用角色表，中文宽度按显示列裁切。
 
-`settings.get/replace` 读写完整 TOML 配置。新增 notifications_enabled、notification_timeout_ms；通知页面提供显示开关。主题改变立即作用于面板。设置控件写入并读回确认；Python 客户端动态读取配置，快捷键编辑器支持三组 Leader 预设与动作绑定。`settings.apply` 仍可更新已有 Tmux 服务的基础设置。
+`settings.get/replace` 读写完整 TOML 配置。新增 notifications_enabled、notification_timeout_ms、mouse_passthrough；通知页面提供显示开关，鼠标透传由 Settings → Input 与 workspace.mouse_passthrough 动作共享。主题改变立即作用于面板。设置控件写入并读回确认；Python 客户端动态读取配置，快捷键编辑器支持三组 Leader 预设与动作绑定。`settings.apply` 仍可更新已有 Tmux 服务的基础设置。
 
 Guard 在正常退出、错误返回和 SIGTERM/SIGINT 时恢复终端模式与光标，并释放客户端。无法捕获的 SIGKILL 不在终端模式恢复保证内。
 
@@ -105,7 +103,7 @@ Guard 在正常退出、错误返回和 SIGTERM/SIGINT 时恢复终端模式与�
 
 通知和认领状态持久保存；崩溃后遗留认领需持 token 恢复处理或释放，不会擅自重试外部动作。高层动作回调与超时策略待具体 Mod 设计。
 
-Python 工作区通过 Cosmos 合成器在右下角显示紧凑通知，不抢焦点。动作按钮与服务级同步参见 ui-api.md；普通关闭只影响当前客户端。
+Python 工作区通过 Cosmos 合成器在右上角显示紧凑通知，不抢焦点。动作按钮与服务级同步参见 ui-api.md；普通关闭只影响当前客户端。
 
 ## 8. 区域接口与 Shell 接入
 

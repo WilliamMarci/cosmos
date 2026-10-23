@@ -1,2 +1,5 @@
 VERSION = "0.1.0"
+CODENAME = "Arche"
+CHANNEL = "development"
+DISPLAY_VERSION = f"Cosmos {CODENAME} {VERSION} ({CHANNEL})"
 AUTHOR = "William Marci"

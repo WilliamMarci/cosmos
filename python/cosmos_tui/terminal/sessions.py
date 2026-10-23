@@ -48,17 +48,42 @@ async def create(name, cwd=None):
     await backend.cli(
         "set-option", "-t", session_id, "default-command", backend.shell_command()
     )
+    return session_id
+
+
+async def exists(name):
+    return await Tmux(name).resolve_session_id() is not None
+
+
+async def kill(name):
+    backend = Tmux(name)
+    session_id = await backend.resolve_session_id()
+    if session_id is None:
+        raise ValueError(f"session not found: {name}")
+    await backend.cli("kill-session", "-t", session_id)
+
+
+async def rename(name, new_name):
+    Tmux.validate_name(new_name)
+    backend = Tmux(name)
+    session_id = await backend.resolve_session_id()
+    if session_id is None:
+        raise ValueError(f"session not found: {name}")
+    await backend.cli("rename-session", "-t", session_id, new_name)
 
 
 async def history(name, pane=None, lines=None, ansi=False):
     backend = Tmux(name)
-    # Resolve the exact session, then enumerate stable pane IDs; --pane cannot
+    # Resolve the exact session ID, then enumerate stable pane IDs; --pane cannot
     # accidentally export a pane belonging to another session.
+    session_id = await backend.resolve_session_id()
+    if session_id is None:
+        raise ValueError(f"session not found: {name}")
     output = await backend.cli(
         "list-panes",
         "-s",
         "-t",
-        "=" + name,
+        session_id,
         "-F",
         "#{pane_id}\t#{window_index}\t#{pane_index}",
     )

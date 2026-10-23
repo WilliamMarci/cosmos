@@ -11,7 +11,8 @@ sys.path[:0] = [
 ]
 from cosmos_tui.app import Cosmos  # noqa: E402
 from cosmos_tui.app import Palette  # noqa: E402
-from cosmos_tui.features.navigation.about import About, VERSION, AUTHOR  # noqa: E402
+from cosmos_tui.features.navigation.about import About  # noqa: E402
+from cosmos_tui.core.metadata import DISPLAY_VERSION, AUTHOR  # noqa: E402
 
 
 class Probe(Cosmos):
@@ -39,7 +40,7 @@ class AboutTests(unittest.IsolatedAsyncioTestCase):
                 text = "".join(
                     n.text or "" for n in root.iter() if n.tag.endswith("}text")
                 ).replace("\xa0", " ")
-                self.assertIn("Cosmos " + VERSION, text)
+                self.assertIn(DISPLAY_VERSION, text)
                 self.assertIn("Author  " + AUTHOR, text)
                 self.assertIn("░", text)
                 self.assertLessEqual(

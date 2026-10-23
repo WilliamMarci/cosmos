@@ -56,6 +56,7 @@ class NavigationController(Controller):
                     "next_pane",
                     "zoom",
                     "agent",
+                    "mouse_passthrough",
                 }
                 available.update("focus_" + d for d in ("left", "down", "up", "right"))
                 available.update("resize_" + d for d in ("left", "down", "up", "right"))
@@ -78,10 +79,14 @@ class NavigationController(Controller):
                     for c in selected
                     if c.target in ("cancel", "actions", "cycle(-1)", "cycle(1)")
                 ]
+            passthrough = (
+                "On" if app.settings.get("mouse_passthrough", True) else "Off"
+            )
             rows = [
                 dict(
                     id=c.id,
-                    label=c.label,
+                    label=c.label
+                    + (" · " + passthrough if c.target == "mouse_passthrough" else ""),
                     kind="command",
                     command=c,
                     group="Cosmos / " + c.context,

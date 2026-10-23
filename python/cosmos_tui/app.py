@@ -59,7 +59,12 @@ class Cosmos(App, inherit_bindings=False):
         self.prefix = False
         self.message = ""
         self.client = f"textual-{os.getpid()}"
-        self.settings = {"theme": "dark", "leader": "C-b", "status_visible": True}
+        self.settings = {
+            "theme": "dark",
+            "leader": "C-b",
+            "status_visible": True,
+            "mouse_passthrough": True,
+        }
         self.role_colors = DARK
         self.busy = False
         self.search = None
@@ -204,8 +209,8 @@ class Cosmos(App, inherit_bindings=False):
     async def on_mouse_move(self, event):
         return await self.pointer.on_mouse_move(event)
 
-    def on_mouse_up(self, event):
-        return self.pointer.on_mouse_up(event)
+    async def on_mouse_up(self, event):
+        return await self.pointer.on_mouse_up(event)
 
     async def scroll_viewer(self, event, direction):
         return await self.reader_ui.scroll_viewer(event, direction)

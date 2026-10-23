@@ -5,6 +5,10 @@ use std::env;
 fn run() -> Result<i32, String> {
     let args: Vec<String> = env::args().skip(1).collect();
     match args.first().map(String::as_str).unwrap_or("attach") {
+        "--version" | "-V" => {
+            println!("Cosmos Arche {} (development)", env!("CARGO_PKG_VERSION"));
+            Ok(0)
+        }
         "daemon" => {
             server::run()?;
             Ok(0)
@@ -28,7 +32,7 @@ fn run() -> Result<i32, String> {
         }
         "native" => Err("legacy frontend disabled; launch ./cosmos [SESSION]".into()),
         "doctor" => {
-            let value = json!({"version":env!("CARGO_PKG_VERSION"),"backend":cosmos::backend::current().describe(),"protocol":server::rpc("initialize",json!({"protocol_major":1})),"config":Config::path(),"config_valid":Config::load().is_ok(),"runtime":cosmos::runtime_dir().map_err(|e|e.to_string()),"coordinator":server::rpc("health",json!({})),"custom_rendering":true,"viewer":{"bitmap_formats":["PNG","JPEG","WebP"],"graphics":if cosmos::viewer::kitty_enabled(){"kitty"}else{"text"},"pdf_tools": (["pdfinfo","pdftoppm","pdftotext"].map(|name|json!({"name":name,"available":std::process::Command::new(name).arg("-v").output().is_ok()})))}});
+            let value = json!({"version":env!("CARGO_PKG_VERSION"),"codename":"Arche","channel":"development","backend":cosmos::backend::current().describe(),"protocol":server::rpc("initialize",json!({"protocol_major":1})),"config":Config::path(),"config_valid":Config::load().is_ok(),"runtime":cosmos::runtime_dir().map_err(|e|e.to_string()),"coordinator":server::rpc("health",json!({})),"custom_rendering":true,"viewer":{"bitmap_formats":["PNG","JPEG","WebP"],"graphics":if cosmos::viewer::kitty_enabled(){"kitty"}else{"text"},"pdf_tools": (["pdfinfo","pdftoppm","pdftotext"].map(|name|json!({"name":name,"available":std::process::Command::new(name).arg("-v").output().is_ok()})))}});
             println!("{}", serde_json::to_string_pretty(&value).unwrap());
             Ok(0)
         }

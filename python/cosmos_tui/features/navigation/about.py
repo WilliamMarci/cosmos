@@ -9,7 +9,7 @@ from cosmos_tui.input.shortcuts import CosmosModal
 from cosmos_tui.ui.chrome import Frame
 from cosmos_tui.ui.zones import Zone
 
-from cosmos_tui.core.metadata import AUTHOR, VERSION
+from cosmos_tui.core.metadata import AUTHOR, DISPLAY_VERSION
 
 
 class About(CosmosModal):
@@ -24,7 +24,7 @@ class About(CosmosModal):
     def compose(self):
         logo = (ASSET_DIR / "cosmos-logo.ansi").read_text()
         content = Text.from_ansi(logo.rstrip())
-        content.append(f"\n\nCosmos {VERSION}\nAuthor  {AUTHOR}")
+        content.append(f"\n\n{DISPLAY_VERSION}\nAuthor  {AUTHOR}")
         with Frame(id="about-frame") as frame:
             frame.border_title = "About"
             yield Static(content, id="about-content", markup=False)

@@ -29,6 +29,21 @@ class FarewellTests(unittest.TestCase):
         self.assertIn("cosmos study", stream.getvalue())
         self.assertNotIn("\x1b", stream.getvalue())
 
+    def test_retained_check_uses_the_stable_session_id(self):
+        stream = io.StringIO()
+        backend = SimpleNamespace(
+            argv=["tmux", "-L", "isolated"], session="study", session_id="$7"
+        )
+        with patch(
+            "cosmos_tui.ui.farewell.subprocess.run",
+            return_value=SimpleNamespace(returncode=0),
+        ) as run:
+            show_farewell({"reason": "detach"}, backend, stream)
+        self.assertEqual(
+            run.call_args.args[0],
+            ["tmux", "-L", "isolated", "has-session", "-t", "$7"],
+        )
+
     def test_ended_session_does_not_promise_reconnect(self):
         stream = io.StringIO()
         backend = SimpleNamespace(argv=["tmux"], session="main")

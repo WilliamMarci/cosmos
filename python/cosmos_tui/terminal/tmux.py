@@ -31,14 +31,20 @@ class Pane:
     selection_inclusive: bool = False
     selection_rectangle: bool = False
     copy_match: str = ""
+    mouse_any: bool = False
+    mouse_standard: bool = False
+    mouse_button: bool = False
+    mouse_all: bool = False
+    mouse_utf8: bool = False
+    mouse_sgr: bool = False
 
 
 class Tmux:
     def __init__(self, session="main"):
-        if not re.fullmatch(r"[A-Za-z0-9_-]+", session):
-            raise ValueError("invalid session name")
+        self.validate_name(session)
         self.session = session
         self.session_id = None
+        self.created = False
         self.argv = [
             os.getenv("COSMOS_TMUX", "tmux"),
             "-L",
@@ -63,6 +69,11 @@ class Tmux:
         return out.decode(errors="replace")
 
     @staticmethod
+    def validate_name(session):
+        if not re.fullmatch(r"[A-Za-z0-9_-]+", session):
+            raise ValueError("invalid session name")
+
+    @staticmethod
     def shell_command():
         return shlex.join(
             [
@@ -73,21 +84,63 @@ class Tmux:
             ]
         )
 
-    async def connect(self):
+    async def resolve_session_id(self, name=None):
+        """Resolve an exact name to its stable `$N` ID.
+
+        Tmux target-session parsing accepts an exact name, then a name prefix,
+        then a glob. Cosmos session names are exact identities, so operations
+        must never use an ambiguous name target.
+        """
+        name = self.session if name is None else name
         try:
-            await self.cli("has-session", "-t", self.session)
-        except RuntimeError:
-            await self.cli(
-                "-f",
-                "/dev/null",
-                "new-session",
-                "-d",
-                "-s",
-                self.session,
-                self.shell_command(),
+            output = await self.cli(
+                "list-sessions", "-F", "#{session_id}\t#{session_name}"
             )
+        except RuntimeError as error:
+            message = str(error)
+            if "no server running" in message or "No such file or directory" in message:
+                return None
+            raise
+        for row in output.splitlines():
+            session_id, _, session_name = row.partition("\t")
+            if session_name == name:
+                return session_id
+        return None
+
+    async def connect(self):
+        self.created = False
+        self.session_id = await self.resolve_session_id()
+        if self.session_id is None:
+            try:
+                self.session_id = (
+                    await self.cli(
+                        "-f",
+                        "/dev/null",
+                        "new-session",
+                        "-d",
+                        "-P",
+                        "-F",
+                        "#{session_id}",
+                        "-s",
+                        self.session,
+                        self.shell_command(),
+                    )
+                ).strip()
+            except RuntimeError:
+                # Another client may have created the exact session in between.
+                self.session_id = await self.resolve_session_id()
+                if self.session_id is None:
+                    raise
+            else:
+                self.created = True
+        if not re.fullmatch(r"\$\d+", self.session_id or ""):
+            raise RuntimeError("invalid session ID")
         await self.cli(
-            "set-option", "-t", self.session, "default-command", self.shell_command()
+            "set-option",
+            "-t",
+            self.session_id,
+            "default-command",
+            self.shell_command(),
         )
         # Refuse capturing our own physical client from its backend pane.
         if os.getenv("TMUX_PANE"):
@@ -96,7 +149,12 @@ class Tmux:
             if os.path.realpath(current) == os.path.realpath(socket):
                 panes = (
                     await self.cli(
-                        "list-panes", "-s", "-t", self.session, "-F", "#{pane_id}"
+                        "list-panes",
+                        "-s",
+                        "-t",
+                        self.session_id,
+                        "-F",
+                        "#{pane_id}",
                     )
                 ).splitlines()
                 if os.environ["TMUX_PANE"] in panes:
@@ -111,7 +169,7 @@ class Tmux:
             "-f",
             "no-output",
             "-t",
-            self.session,
+            self.session_id,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
@@ -119,10 +177,8 @@ class Tmux:
             limit=1024 * 1024,
         )
         await self._response()
-        self.session_id = (
-            await self.cli("display-message", "-p", "-t", self.session, "#{session_id}")
-        ).strip()
         await self.install_bell_hook()
+        return self.created
 
     async def install_bell_hook(self):
         # One stable hook slot per Cosmos tmux server, not one publisher/client.
@@ -263,13 +319,13 @@ class Tmux:
         rows = await self.request(
             "list-panes "
             + target
-            + " -F '#{pane_id}|#{pane_left}|#{pane_top}|#{pane_width}|#{pane_height}|#{pane_active}|#{window_zoomed_flag}|#{cursor_x}|#{cursor_y}|#{cursor_flag}|#{cursor_shape}|#{cursor_blinking}|#{@cosmos_viewer}|#{pane_in_mode}'"
+            + " -F '#{pane_id}|#{pane_left}|#{pane_top}|#{pane_width}|#{pane_height}|#{pane_active}|#{window_zoomed_flag}|#{cursor_x}|#{cursor_y}|#{cursor_flag}|#{cursor_shape}|#{cursor_blinking}|#{@cosmos_viewer}|#{pane_in_mode}|#{mouse_any_flag}#{mouse_standard_flag}#{mouse_button_flag}#{mouse_all_flag}#{mouse_utf8_flag}#{mouse_sgr_flag}'"
         )
         panes = []
         zoomed = False
         for row in rows:
-            fields = row.split("|", 13)
-            if len(fields) != 14:
+            fields = row.split("|", 14)
+            if len(fields) != 15:
                 continue
             (
                 pane,
@@ -286,7 +342,9 @@ class Tmux:
                 blink,
                 wire,
                 mode,
+                mouse_flags,
             ) = fields
+            mouse = [digit == "1" for digit in f"{mouse_flags:0<6}"[:6]]
             copy_mode = mode not in ("", "0")
             if not re.fullmatch(r"%\d+", pane):
                 raise RuntimeError("invalid pane ID")
@@ -343,6 +401,12 @@ class Tmux:
                     inclusive,
                     rectangle,
                     copy_match,
+                    mouse_any=mouse[0],
+                    mouse_standard=mouse[1],
+                    mouse_button=mouse[2],
+                    mouse_all=mouse[3],
+                    mouse_utf8=mouse[4],
+                    mouse_sgr=mouse[5],
                 )
             )
             zoomed = zoom == "1"
@@ -383,6 +447,15 @@ class Tmux:
                 name = key.upper()
             if name:
                 await self.request("send-keys -- " + self.quote(name))
+
+    async def send_bytes(self, target, data):
+        """Write raw bytes to a pane PTY without Tmux key-name translation."""
+        if not re.fullmatch(r"%\d+", target):
+            raise ValueError("invalid pane ID")
+        if not isinstance(data, (bytes, bytearray)) or not data:
+            raise ValueError("mouse report must be non-empty bytes")
+        payload = " ".join(f"{byte:02x}" for byte in data)
+        await self.request(f"send-keys -H -t {target} {payload}")
 
     async def paste(self, text, target=None):
         if target is not None and not re.fullmatch(r"%\d+", target):

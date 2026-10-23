@@ -8,7 +8,7 @@ The engine is real librime with the discovered Rime schema (`rime_ice` by defaul
 
 While composing, the two-row overlay shows preedit and numbered candidates near the input cursor. Space or candidate digits commit text without adding Return; arrows and PageUp/PageDown are passed to Rime for candidate navigation, Backspace edits, and Escape cancels. Candidate cells can be clicked. The overlay is clamped inside the pane or UI viewport and moves above the cursor when needed. It uses `UIFrame` / `CellSurface` on the insert/cover layer and never writes terminal escape sequences independently or resizes the pane. Very small viewports may clip candidates; paging remains available.
 
-Committed text goes to the captured pane using the existing paste adapter, or directly into the focused Cosmos Input. Viewer navigation, copy-mode, password fields and non-editable views bypass composition. Leader and global shortcuts are resolved before IME input. Ctrl+Space remains available to applications. Pasted text bypasses phonetic conversion. English full-width mode converts printable ASCII to full-width characters; control shortcuts pass through.
+Committed text goes to the captured pane using the existing paste adapter, or directly into the focused editable Cosmos Input/CellEditor (including the command assistant). Custom CellEditor commits use insert_text_at_cursor, emit its normal Changed message and preserve the assistant controller buffer. Its cursor_screen_offset accounts for horizontal scroll. Viewer navigation, copy-mode, password fields and non-editable views bypass composition. Leader and global shortcuts are resolved before IME input. Ctrl+Space remains available to applications. Pasted text bypasses phonetic conversion. English full-width mode converts printable ASCII to full-width characters; control shortcuts pass through.
 
 ## Engine and data discovery
 
@@ -29,13 +29,13 @@ The preview expands Leader to the configured Ctrl+B/Ctrl+A stroke and maps shift
 
 ## Distribution boundary
 
-The launcher supports package-local shared libraries through `lib/`. The current foundation archive does **not** yet bundle the full Rime runtime and dictionary data. It therefore requires the system dependencies or explicit paths above for IME. A self-contained Rime bundle, dependency/license inventory and clean-machine verification remain distribution work; copying only `librime.so` is insufficient. No claim of portability to machines without Rime is made for the current archive.
+The launcher supports package-local shared libraries through `lib/`. The Arche development archive does **not** yet bundle the full Rime runtime and dictionary data. It therefore requires the system dependencies or explicit paths above for IME. A self-contained Rime bundle, dependency/license inventory and clean-machine verification remain distribution work; copying only `librime.so` is insufficient. No claim of portability to machines without Rime is made for the current archive.
 
 ## Candidate presentation settings
 
 Settings → Input → Input method selects candidate number glyphs: normal `1 2 3`, superscript `¹ ² ³`, or subscript `₁ ₂ ₃`. These are glyph variants, not changes to the terminal font size. The service persists this as `ime_number_style = "normal" | "superscript" | "subscript"` in Cosmos configuration. A coordinator built before this field was introduced must be stopped and restarted before it can save the new setting; tmux applications are retained.
 
-Numbers use terminal ANSI yellow (the theme's amber). The right edge has one-cell pagination triangles: `◂ ▸` when available, `◃ ▹` when unavailable. Click enabled triangles or use PageUp/PageDown. Numbers continue to select their candidates regardless of glyph style. Preedit uses the engine's UTF-8 byte cursor/selection offsets converted to character positions; arrow keys edit at the visible caret, and separate word segments are underlined with gaps at spaces.
+Numbers use terminal ANSI yellow (the theme's amber). The right edge has one-cell pagination triangles: `◂ ▸` when available, `◃ ▹` when unavailable. Click enabled triangles or use PageUp/PageDown. Numbers continue to select their candidates regardless of glyph style. Preedit uses the engine's UTF-8 byte cursor/selection offsets converted to character positions; arrow keys edit at the visible caret, and separate word segments are underlined and their separators are displayed as ASCII apostrophes (`ni'hao`). Engine spaces are replaced one-for-one for display only, preserving cursor/selection offsets and the engine composition.
 
 The default language toggle is **Leader i** (Ctrl+B, then i unless Leader was changed). Ctrl+P also exposes explicit **Enable IME** and **Disable IME** actions; repeating either does not toggle it back. The existing language indicator remains clickable.
 

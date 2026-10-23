@@ -123,6 +123,7 @@ class NavigationTests(unittest.IsolatedAsyncioTestCase):
                 self.assertLessEqual(frame.region.height, 23 // 2)
                 labels = {row["label"] for row in app.screen.entries}
                 self.assertIn("Terminal action", labels)
+                self.assertIn("Toggle mouse passthrough · On", labels)
                 self.assertNotIn("Reader action", labels)
                 self.assertNotIn("Settings", labels)
                 await pilot.press(*"split left", "enter")
@@ -142,7 +143,8 @@ class NavigationTests(unittest.IsolatedAsyncioTestCase):
         with (
             patch("cosmos_tui.core.rpc.call", AsyncMock(return_value=snapshot())),
             patch(
-                "cosmos_tui.features.navigation.session_prompt.create", AsyncMock()
+                "cosmos_tui.features.navigation.session_prompt.create",
+                AsyncMock(return_value="$1"),
             ) as create,
         ):
             app = Probe()

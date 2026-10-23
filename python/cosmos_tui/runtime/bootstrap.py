@@ -24,6 +24,7 @@ REQUIRED_SETTINGS = {
     "viewer_image_max_mb",
     "viewer_cache_mb",
     "viewer_prefetch",
+    "mouse_passthrough",
     "terminal_theme",
     "leader2",
     "leader3",

@@ -5,7 +5,7 @@ import re
 from rich.segment import Segment
 from rich.style import Style
 from textual import events
-from textual.geometry import Region
+from textual.geometry import Region, Offset
 from textual.message import Message
 from textual.strip import Strip
 from textual.widget import Widget
@@ -147,6 +147,14 @@ class CellEditor(Widget, can_focus=True):
             self.anchor = self.cursor_position
         self.visible_cursor = True
         self.refresh()
+
+    @property
+    def cursor_screen_offset(self):
+        self.viewport()
+        return Offset(self.region.x + self.cursor_cell, self.region.y)
+
+    def insert_text_at_cursor(self, text):
+        self.insert(text)
 
     def insert(self, text):
         if self.read_only:

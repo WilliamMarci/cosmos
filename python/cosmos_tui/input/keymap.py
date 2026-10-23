@@ -72,6 +72,13 @@ register("global.ime_enable", "global", "Enable IME", [], "ime_enable")
 register("global.ime_disable", "global", "Disable IME", [], "ime_disable")
 register("workspace.quit", "workspace", "Quit / Exit Cosmos", [], "quit")
 register("workspace.new_session", "workspace", "New session", [], "new_session")
+register(
+    "workspace.mouse_passthrough",
+    "workspace",
+    "Toggle mouse passthrough",
+    [],
+    "mouse_passthrough",
+)
 register("global.start", "global", "Start menu", ["leader+m"], "start")
 for name, label, keys, target in [
     ("generate", "Generate command", ["enter"], "submit"),

@@ -54,6 +54,43 @@ class KeyboardTests(unittest.IsolatedAsyncioTestCase):
 
 @unittest.skipUnless(REAL_RIME, "requires librime and compiled rime_ice data")
 class IMETests(unittest.IsolatedAsyncioTestCase):
+    async def test_real_rime_in_command_assistant_custom_editor(self):
+        from test_assistant import LayerProbe
+        from cosmos_tui.ui.editor import CellEditor
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(
+                os.environ, XDG_STATE_HOME=directory, COSMOS_RIME_DATA=str(DATA)
+            ),
+        ):
+            app = LayerProbe()
+            app.backend.paste = AsyncMock()
+            try:
+                async with app.run_test(size=(80, 24)) as pilot:
+                    await pilot.pause()
+                    editor = app.screen.query_one(CellEditor)
+                    editor.assign("", 0)
+                    app.screen.capture()
+                    await pilot.press("ctrl+b", "i", *"nihao")
+                    target = app.ime.target()[0]
+                    self.assertEqual(target, ("input", editor))
+                    self.assertIn("你好", app.ime.engine.context(target)["candidates"])
+                    self.assertTrue(app.ime.surface.display)
+                    self.assertIs(app.ime.surface.screen, app.screen)
+                    await pilot.press("space")
+                    await pilot.pause()
+                    self.assertEqual(editor.value, "你好")
+                    self.assertEqual(app.screen.controller.input.text, "你好")
+                    app.backend.paste.assert_not_awaited()
+                    self.assertFalse(app.ime.engine.context(target)["preedit"])
+                    await app.ime.toggle()
+                    await app.ime.toggle_width()
+                    await pilot.press("a")
+                    self.assertEqual(editor.value, "你好ａ")
+            finally:
+                app.ime.close()
+
     async def test_real_candidates_targets_commit_and_width(self):
         with (
             tempfile.TemporaryDirectory() as directory,

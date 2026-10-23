@@ -52,13 +52,17 @@ class NewSession(CosmosModal):
         self.busy = True
         name = event.value.strip()
         try:
-            await create(name)
+            session_id = await create(name)
             windows = await self.app.backend.inventory()
-            window = next(row for row in windows if row["session"] == name)
+            window = next(
+                (row for row in windows if row["session_id"] == session_id), None
+            )
+            if window is None:
+                raise RuntimeError(f"session {name} is not ready")
             await self.app.backend.select_window(window)
             self.app.panes = await self.app.backend.snapshot()
             self.dismiss(None)
-        except (OSError, RuntimeError, ValueError, StopIteration) as error:
+        except (OSError, RuntimeError, ValueError) as error:
             self.query_one("#new-session-error", Static).update(str(error))
         finally:
             self.busy = False

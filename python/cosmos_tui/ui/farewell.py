@@ -11,10 +11,11 @@ from cosmos_tui.core.paths import ASSET_DIR, PROJECT_ROOT
 
 def show_farewell(result, backend, stream=None):
     stream = stream or sys.stdout
+    target = getattr(backend, "session_id", None) or backend.session
     try:
         retained = (
             subprocess.run(
-                [*backend.argv, "has-session", "-t", backend.session],
+                [*backend.argv, "has-session", "-t", target],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=2,

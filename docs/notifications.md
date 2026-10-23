@@ -40,6 +40,10 @@ The resulting Notice includes id, text, count, source, level, session_id, create
 
 `notifications.active {client}` returns unresolved, unexpired, locally visible entries; `notifications.list {client}` includes retained history. Both preserve publication order. `notifications.dismiss {id,client}` hides only for that client. `notifications.act {id,action,client}` resolves the declared action service-wide; other clients remove it. Expired/already resolved/claimed actions cannot be selected. Publishers consume notifications.action events to perform their own operation. No action is evaluated as a shell command by the notification service. Existing claim/complete/release/resolve operations remain available.
 
+## Session creation
+
+When `attach` finds no exact session and creates it, the UI publishes a session-scoped `info` notification after attaching, for example `Session 'research' not found; created`. The notice uses source `workspace` and the new stable `$N` session ID. Reconnecting to an existing session does not publish a notice. A publication failure is logged and does not block the workspace.
+
 ## Terminal bell
 
 The dedicated Cosmos Tmux server installs one stable `alert-bell[900]` hook, with monitor-bell on and bell-action any. Reconnecting clients replace the same slot; they do not add one publisher per client. A BEL in any monitored session publishes an info notification with its hook_session and window ID. The hook uses the current coordinator path and environment, including private XDG paths, and does not start a coordinator if it is stopped. Hook subprocess output is suppressed. The hook persists with retained Tmux applications; reconnect installs the current package's hook.
