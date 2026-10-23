@@ -247,6 +247,120 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
                     )
             await app.reader_ui.close()
 
+    async def test_zero_spacing_and_slow_inline_image_keep_text_and_footer(self):
+        import asyncio
+        from threading import Event
+        from cosmos_tui.features.reader.inline_placeholder import SPINNER
+        from PIL import ImageColor
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, XDG_CACHE_HOME=directory),
+        ):
+            root = Path(directory)
+            path = root / "slow.md"
+            path.write_text(
+                "# Chapter\n\nBefore image\n\n![Picture](slow.png)\n\nAfter image"
+            )
+            Image.new("RGB", (400, 200), "blue").save(root / "slow.png")
+            app = Probe()
+            gate = Event()
+            try:
+                async with app.run_test(size=(100, 30)) as pilot:
+                    pane = app.active()
+                    pane.viewer = base64.b64encode(
+                        json.dumps(
+                            dict(path=str(path), columns=1, thumbnails=False)
+                        ).encode()
+                    ).decode()
+                    doc = app.reader_ui.documents
+                    original = doc.asset
+
+                    def delayed(*args):
+                        if not gate.wait(4):
+                            raise RuntimeError("Test decoder gate timed out")
+                        return original(*args)
+
+                    compact = doc.layout(path, 76, dict(line_space=0))
+                    normal = doc.layout(path, 76, dict(line_space=1))
+                    self.assertLess(len(compact), len(normal))
+                    self.assertFalse(
+                        any(not r.text.plain and r.block < 0 for r in compact)
+                    )
+                    with patch.object(doc, "asset", side_effect=delayed):
+                        frame = await asyncio.wait_for(app.reader_ui.prepare(pane), 1)
+                        text = "\n".join(t.plain for t in frame.lines)
+                        self.assertIn("Before image", text)
+                        self.assertIn("After image", text)
+                        self.assertNotIn("[Image]", text)
+                        self.assertIn("slow.md", frame.lines[-1].plain)
+                        spinners = [
+                            (y, t)
+                            for y, t in enumerate(frame.lines)
+                            if any(c in t.plain for c in SPINNER)
+                        ]
+                        self.assertEqual(len(spinners), 1)
+                        self.assertLess(spinners[0][0], pane.height - 1)
+                        self.assertEqual(
+                            frame.image.getpixel((0, 0)),
+                            ImageColor.getrgb(app.role_colors["bg"]),
+                        )
+                        self.assertTrue(doc.assets.pending)
+                        gate.set()
+                        for _ in range(60):
+                            if not doc.assets.pending:
+                                break
+                            await asyncio.sleep(0.02)
+                        ready = await app.reader_ui.prepare(pane)
+                        self.assertFalse(
+                            any(c in t.plain for t in ready.lines for c in SPINNER)
+                        )
+                        self.assertTrue(
+                            any(
+                                b > 200 and r < 20
+                                for r, g, b in ready.image.get_flattened_data()
+                            )
+                        )
+                    await pilot.press("r", "down", "down", "left")
+                    self.assertEqual(app.reader_ui.state(pane)["line_space"], 0)
+            finally:
+                gate.set()
+                await app.reader_ui.close()
+
+    def test_clear_discards_running_inline_image_completion(self):
+        from threading import Event
+
+        started, release = Event(), Event()
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, XDG_CACHE_HOME=directory),
+        ):
+            root = Path(directory)
+            path = root / "book.md"
+            path.write_text("![Image](image.png)")
+            Image.new("RGB", (200, 100), "blue").save(root / "image.png")
+            doc = Documents(Media())
+            original = doc.asset
+
+            def delayed(*args):
+                started.set()
+                if not release.wait(3):
+                    raise RuntimeError("Test decoder gate timed out")
+                return original(*args)
+
+            try:
+                with patch.object(doc, "asset", side_effect=delayed):
+                    doc.assets.request(path, (str(path), "image.png"), (100, 50))
+                    self.assertTrue(started.wait(1))
+                    future = next(iter(doc.assets.pending.values()))
+                    doc.assets.clear()
+                    release.set()
+                    future.result(timeout=2)
+                    self.assertEqual(len(doc.assets.cache), 0)
+                    self.assertFalse(doc.assets.pending)
+            finally:
+                release.set()
+
     def test_disk_restored_documents_render_plain_and_styled_text(self):
         from test_next_readers_mods import book
         from cosmos_tui.features.reader.documents import decoded

@@ -61,7 +61,47 @@ class LoadingFrames:
             and (ready[0] == key or self.missing.get(pane.id) != key)
         ):
             return ready[2]
+        if not error and Path(self.controller.state(pane)["path"]).suffix.lower() in {
+            ".epub",
+            ".md",
+            ".markdown",
+            ".html",
+            ".htm",
+        }:
+            # Text parsing has no image footprint: do not show a fictitious
+            # viewport-sized image/spinner while preparing the first text frame.
+            return self.text_startup(pane)
         return self.placeholder(pane, error[1] if error and error[0] == key else None)
+
+    def text_startup(self, pane):
+        app = self.controller.app
+        palette = app.role_colors
+        cw, ch = self.controller.cell_pixels()
+        canvas = Image.new("RGB", (pane.width * cw, pane.height * ch), palette["bg"])
+        lines = [
+            Text(" " * pane.width, style=f"on {palette['bg']}")
+            for _ in range(pane.height)
+        ]
+        if lines:
+            title = Text(
+                " " + Path(self.controller.state(pane)["path"]).name,
+                style=f"{palette['fg']} on {palette['base']}",
+            )
+            title.truncate(pane.width)
+            lines[-1] = title
+        return ReadingFrame(
+            canvas,
+            lines,
+            range(1, 2),
+            0,
+            [],
+            max(1, pane.height - 1),
+            0,
+            pane.width,
+            1,
+            canvas.size,
+            (0, 0),
+        )
 
     async def load(self, pane, key):
         identity = None

@@ -79,6 +79,12 @@ def reflow(doc, path, width, state, cell):
                 rows.extend(Row(t, block=source.block) for t in parts)
                 rows.append(Row(Text(""), block=source.block, table=True))
         else:
+            if (
+                state.get("line_space", 1) == 0
+                and source.block < 0
+                and not source.text.plain.strip()
+            ):
+                continue
             wrapped = source.text.wrap(doc.console, width, overflow="fold")
             for i, text in enumerate(wrapped):
                 rows.append(
@@ -207,12 +213,39 @@ def render(doc, pane, state, palette, cell):
                     )
                 )
             if row.image and row.block not in state.get("collapsed_images", []):
+                if y >= 0:
+                    put(lines, x, y, Text(" " * width, style=style), width)
                 try:
-                    image = doc.asset(state["path"], *row.image)
-                    icon = max(image.size) <= state.get("icon_edge", ICON_EDGE)
-                    image.thumbnail(
-                        (width * cw, image_rows * ch), Image.Resampling.LANCZOS
-                    )
+                    bounds = (width * cw, image_rows * ch)
+                    iw, ih = doc.asset_size(state["path"], *row.image)
+                    icon = max(iw, ih) <= state.get("icon_edge", ICON_EDGE)
+                    if state.get("_progressive"):
+                        image, failure = doc.assets.request(
+                            state["path"], row.image, bounds
+                        )
+                        if image is None:
+                            from cosmos_tui.features.reader.inline_placeholder import (
+                                placeholder,
+                            )
+
+                            placeholder(
+                                canvas,
+                                lines,
+                                x,
+                                y,
+                                width,
+                                height,
+                                (iw, ih),
+                                image_rows,
+                                palette,
+                                cell,
+                                put,
+                                failure,
+                            )
+                            continue
+                    else:
+                        image = doc.asset(state["path"], *row.image)
+                        image.thumbnail(bounds, Image.Resampling.LANCZOS)
                     # Crop to this column: an image may straddle a logical page.
                     top = max(0, -y * ch)
                     bottom = min(image.height, (height - y) * ch)

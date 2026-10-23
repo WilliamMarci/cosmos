@@ -113,6 +113,9 @@ class Row:
 class Documents:
     def __init__(self, media, reader=None):
         self.media = media
+        from cosmos_tui.features.reader.inline_assets import InlineAssets
+
+        self.assets = InlineAssets(self)
         from cosmos_tui.features.reader.layout import Reader
 
         self.image_reader = reader if reader is not None else Reader(media)
@@ -128,6 +131,7 @@ class Documents:
 
     def clear(self):
         self.epoch += 1
+        self.assets.clear()
         self.cache.clear()
         self.layouts.clear()
         self.dimensions.clear()

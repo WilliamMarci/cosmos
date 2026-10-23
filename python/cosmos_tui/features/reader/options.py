@@ -8,7 +8,7 @@ from cosmos_tui.features.reader.controls import draw_buttons
 OPTIONS = (
     ("columns", "Col", ("auto", 1, 2, 3)),
     ("reading_mode", "Scroll", ("pages", "scroll")),
-    ("line_space", "Ln space", (1, 2, 3)),
+    ("line_space", "Ln space", (0, 1, 2, 3)),
     ("inline_rows", "Image size", (4, 6, 8, 12, 16, 18, 24, 32)),
 )
 

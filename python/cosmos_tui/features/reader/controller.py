@@ -5,6 +5,7 @@ import json
 import struct
 import sys
 import termios
+import time
 from pathlib import Path
 
 from cosmos_tui.core.controller import Controller
@@ -743,9 +744,12 @@ class ReaderController(Controller):
         app = self.app
         state = self.state(pane)
         state["_cell"] = self.cell_pixels()
+        if Path(state["path"]).suffix.lower() in DOCUMENTS:
+            state["_progressive"] = True
         revision = self.revisions.get(pane.id, 0)
         budget = app.settings.get("viewer_cache_mb", 128)
         self.media.configure(budget)
+        self.documents.assets.cache.resize(int(budget * 1024**2 * 0.1))
         await asyncio.to_thread(
             self.media.disk.configure, app.settings.get("viewer_disk_cache_mb", 512)
         )
@@ -779,6 +783,8 @@ class ReaderController(Controller):
                 app.graphics.enabled,
                 self.media.revision,
                 self.media.image_max_mb,
+                self.documents.assets.revision,
+                int(time.monotonic() * 4) if self.documents.assets.pending else 0,
             )
 
         if (
@@ -788,13 +794,14 @@ class ReaderController(Controller):
             self.schedule_prefetch(pane, state, self.pages[pane.id])
             return self.frames[pane.id]
         if Path(state["path"]).suffix.lower() in DOCUMENTS:
+            render_key = signature()
             frame, pages = await asyncio.to_thread(
                 self.documents.render, pane, state, app.role_colors, self.cell_pixels()
             )
             if revision != self.revisions.get(pane.id, 0):
                 return
             self.frames[pane.id], self.pages[pane.id] = frame, pages
-            self.frame_keys[pane.id] = signature()
+            self.frame_keys[pane.id] = render_key
             return frame
         page = max(1, int(state.get("page", 1)))
         if self.media.cache.get(identity + (page,)) is None:
