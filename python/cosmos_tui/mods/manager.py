@@ -1,0 +1,175 @@
+"""Discover UI packages and apply shared enablement/permission policies."""
+
+import hashlib
+import importlib.util
+import inspect
+import logging
+from pathlib import Path
+import re
+import sys
+import tomllib
+from cosmos_tui.core.paths import PROJECT_ROOT
+from cosmos_tui.mods.api import ModAPI
+
+
+class UIMods:
+    def __init__(self, app):
+        self.app = app
+        self.entries, self.loaded, self.actions, self.failures = {}, {}, {}, {}
+        self.signature = None
+
+    def policy(self, ident):
+        settings = self.app.settings.get("ui_mods", {}).get(ident, {})
+        return dict(
+            enabled=settings.get(
+                "enabled", self.entries[ident].get("enabled_by_default", False)
+            ),
+            notifications=settings.get("notifications", False),
+        )
+
+    def refresh(self):
+        signature = repr(
+            (
+                self.app.settings.get("ui_mod_paths", []),
+                self.app.settings.get("ui_mods", {}),
+            )
+        )
+        if signature == self.signature:
+            return
+        self.signature = signature
+        candidates = [PROJECT_ROOT / "mods"] + [
+            Path(p) for p in self.app.settings.get("ui_mod_paths", [])
+        ]
+        discovered = {}
+        for root in candidates:
+            manifests = (
+                [root / "mod.toml"]
+                if (root / "mod.toml").is_file()
+                else sorted(root.glob("*/mod.toml"))
+            )
+            for path in manifests:
+                try:
+                    if path.stat().st_size > 8192:
+                        raise ValueError("UI Mod manifest exceeds 8 KiB")
+                    item = tomllib.loads(path.read_text())
+                    ident = item["id"]
+                    if (
+                        not re.fullmatch(r"[a-zA-Z0-9_-]{1,96}", ident)
+                        or item.get("api_version") != 1
+                    ):
+                        raise ValueError("Invalid UI Mod id/API version")
+                    entry = (path.parent / item.get("entry", "__init__.py")).resolve()
+                    if (
+                        not entry.is_relative_to(path.parent.resolve())
+                        or not entry.is_file()
+                    ):
+                        raise ValueError(
+                            "UI Mod entry must be a file inside its package"
+                        )
+                    if not set(item.get("permissions", [])) <= {"notifications"}:
+                        raise ValueError("Unsupported UI Mod permission")
+                    discovered[ident] = dict(
+                        item, entry_path=entry, permissions=item.get("permissions", [])
+                    )
+                except (OSError, ValueError, KeyError) as error:
+                    logging.getLogger(__name__).warning("UI Mod %s: %s", path, error)
+        for ident in list(self.loaded):
+            if (
+                ident not in discovered
+                or self.entries[ident]["entry_path"] != discovered[ident]["entry_path"]
+            ):
+                self.unload(ident)
+        self.entries = discovered
+        for ident, item in self.entries.items():
+            enabled = self.policy(ident)["enabled"]
+            if not enabled:
+                self.unload(ident)
+            elif ident not in self.loaded:
+                name = (
+                    "cosmos_uimod_"
+                    + ident
+                    + "_"
+                    + hashlib.sha256(str(item["entry_path"]).encode()).hexdigest()[:12]
+                )
+                from cosmos_tui.input import keymap
+
+                previous_commands = list(keymap.COMMANDS)
+                try:
+                    spec = importlib.util.spec_from_file_location(
+                        name,
+                        item["entry_path"],
+                        submodule_search_locations=[str(item["entry_path"].parent)],
+                    )
+                    module = importlib.util.module_from_spec(spec)
+                    sys.modules[name] = module
+                    self.loaded[ident] = (name, None)
+                    spec.loader.exec_module(module)
+                    cleanup = module.activate(ModAPI(self, ident))
+                    keymap.validate(
+                        self.app.settings.get("keybindings", {}), self.app.settings
+                    )
+                    self.loaded[ident] = (name, cleanup)
+                    self.failures.pop(ident, None)
+                except Exception as error:
+                    keymap.COMMANDS[:] = previous_commands
+                    self.unload(ident)
+                    self.failures[ident] = str(error)
+                    logging.getLogger(__name__).exception("UI Mod %s failed", ident)
+                    if getattr(self.app, "_running", False):
+                        self.app.run_worker(
+                            self.app.action_error("mod." + ident, error)
+                        )
+
+    def register(self, ident, slot, callback):
+        existing = self.actions.get(slot)
+        if existing and existing[0] != ident:
+            raise RuntimeError(f"Status slot {slot} is already registered")
+        self.actions[slot] = (ident, callback)
+
+    def activate_status(self, slot):
+        entry = self.actions.get(slot)
+        if not entry:
+            return False
+        ident, callback = entry
+        try:
+            result = callback()
+            if inspect.isawaitable(result):
+
+                async def guarded():
+                    try:
+                        await result
+                    except Exception as error:
+                        await self.app.action_error("mod." + ident, error)
+
+                self.app.run_worker(guarded())
+        except Exception as error:
+            self.app.run_worker(self.app.action_error("mod." + ident, error))
+        return True
+
+    def unload(self, ident):
+        for slot, entry in list(self.actions.items()):
+            if entry[0] == ident:
+                self.actions.pop(slot, None)
+        loaded = self.loaded.pop(ident, None)
+        if loaded:
+            name, cleanup = loaded
+            if callable(cleanup):
+                try:
+                    cleanup()
+                except Exception:
+                    logging.getLogger(__name__).exception(
+                        "UI Mod cleanup failed: %s", ident
+                    )
+            for key in list(sys.modules):
+                if key == name or key.startswith(name + "."):
+                    sys.modules.pop(key, None)
+        for screen in list(getattr(self.app, "_screen_stack", [])):
+            if getattr(screen, "mod_owner", None) == ident:
+                if self.app.screen is screen:
+                    screen.dismiss()
+                else:
+                    self.app.run_worker(screen.remove())
+
+    def close(self):
+        for ident in list(self.loaded):
+            self.unload(ident)

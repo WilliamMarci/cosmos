@@ -67,21 +67,22 @@ class NotificationEvents:
         ttl_ms=None,
         persistent=False,
         session_id=None,
+        ui_mod=None,
     ):
-        return await rpc.call(
-            "notifications.publish",
-            dict(
-                text=text,
-                source=source,
-                actions=list(actions),
-                level=level,
-                ttl_ms=ttl_ms,
-                persistent=persistent,
-                session_id=session_id
-                if session_id is not None
-                else getattr(getattr(self.app, "backend", None), "session_id", None),
-            ),
+        params = dict(
+            text=text,
+            source=source,
+            actions=list(actions),
+            level=level,
+            ttl_ms=ttl_ms,
+            persistent=persistent,
+            session_id=session_id
+            if session_id is not None
+            else getattr(getattr(self.app, "backend", None), "session_id", None),
         )
+        if ui_mod is not None:
+            params["ui_mod"] = ui_mod
+        return await rpc.call("notifications.publish", params)
 
 
 @dataclass(frozen=True)

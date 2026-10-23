@@ -12,6 +12,11 @@ pub struct Config {
     pub viewer_cache_mb: usize,
     pub viewer_image_max_mb: usize,
     pub viewer_prefetch: bool,
+    pub viewer_disk_cache_mb: usize,
+    pub viewer_pdf_edge: usize,
+    pub viewer_pdf_page_mb: usize,
+    pub ui_mod_paths: Vec<String>,
+    pub ui_mods: BTreeMap<String, BTreeMap<String, bool>>,
     pub mouse_passthrough: bool,
     pub status_visible: bool,
     pub status_path_depth: usize,
@@ -38,6 +43,11 @@ impl Default for Config {
             viewer_cache_mb: 128,
             viewer_image_max_mb: 32,
             viewer_prefetch: true,
+            viewer_disk_cache_mb: 512,
+            viewer_pdf_edge: 2400,
+            viewer_pdf_page_mb: 32,
+            ui_mod_paths: Vec::new(),
+            ui_mods: BTreeMap::new(),
             mouse_passthrough: true,
             status_visible: true,
             status_path_depth: 3,
@@ -59,6 +69,31 @@ impl Default for Config {
 }
 impl Config {
     pub fn validate(&self) -> Result<(), String> {
+        if self.viewer_disk_cache_mb > 8192
+            || !(600..=4000).contains(&self.viewer_pdf_edge)
+            || !(4..=128).contains(&self.viewer_pdf_page_mb)
+        {
+            return Err("invalid reader disk cache or PDF raster budget".into());
+        }
+        if self.ui_mod_paths.len() > 64
+            || self
+                .ui_mod_paths
+                .iter()
+                .any(|p| !std::path::Path::new(p).is_absolute())
+            || self.ui_mods.len() > 128
+            || self.ui_mods.iter().any(|(id, values)| {
+                id.is_empty()
+                    || id.len() > 96
+                    || !id
+                        .bytes()
+                        .all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b))
+                    || values
+                        .keys()
+                        .any(|key| !["enabled", "notifications"].contains(&key.as_str()))
+            })
+        {
+            return Err("invalid UI Mod paths or permission policies".into());
+        }
         if self.status_path_depth > 32
             || !(8..=240).contains(&self.status_path_max_length)
             || !["left", "center", "right"].contains(&self.status_path_align.as_str())

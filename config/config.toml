@@ -15,6 +15,10 @@ notification_timeout_ms = 5000
 viewer_cache_mb = 128
 viewer_image_max_mb = 32
 viewer_prefetch = true
+viewer_disk_cache_mb = 512
+viewer_pdf_edge = 2400
+viewer_pdf_page_mb = 32
+ui_mod_paths = []
 # Pass clicks, drags and wheel events to applications in a pane when the
 # application enables mouse tracking. Off keeps Cosmos focus/history handling.
 mouse_passthrough = true

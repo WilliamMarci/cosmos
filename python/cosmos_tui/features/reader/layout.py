@@ -41,7 +41,14 @@ class Reader:
 
     def collection(self, state, pages):
         path = Path(state["path"])
-        if path.suffix.lower() == ".pdf":
+        if path.suffix.lower() in {
+            ".pdf",
+            ".epub",
+            ".md",
+            ".markdown",
+            ".html",
+            ".htm",
+        }:
             return range(1, pages + 1), max(
                 0, min(pages - 1, int(state.get("page", 1)) - 1)
             )
@@ -67,7 +74,14 @@ class Reader:
     def change(state, index, entries):
         index = max(0, min(len(entries) - 1, index))
         state = dict(state)
-        if Path(state["path"]).suffix.lower() == ".pdf":
+        if Path(state["path"]).suffix.lower() in {
+            ".pdf",
+            ".epub",
+            ".md",
+            ".markdown",
+            ".html",
+            ".htm",
+        }:
             state["page"] = entries[index]
         else:
             state.update(path=str(entries[index]), page=1, zoom=1, pan=[0, 0], query="")
@@ -118,6 +132,8 @@ class Reader:
                 f" {selected + 1}/{len(entries)}  {scale * 100:.0f}%  {source.width}×{source.height}px ",
                 style=f"{palette['fg']} on {palette['base']}",
             )
+            if document and max(source.size) < self.media.pdf_edge:
+                details.append(" reduced ", style=palette["mute"])
             details.truncate(available, overflow="ellipsis")
             info = Text(
                 " " + Path(state["path"]).name,

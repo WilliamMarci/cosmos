@@ -50,3 +50,5 @@ Settings → Status bar provides left/right choice controls for these shared fie
 - `status_separator`: powerline (default ``), capsule (`` / ``), slash (`╱` / `╲`), vertical (`│`), or none. Left-aligned blocks point right (``); right-aligned blocks point left (``). Center blocks use outward edges. Capsule blocks use rounded outer edges. Every seam uses the immediate left/right background colors; the COSMOS gradient contributes its nearest endpoint, including explicit solid mode colors. Select another style if the terminal font lacks Powerline glyphs.
 
 These fields are validated and persisted through settings.replace. Existing configuration files load the defaults. Upgrading a running coordinator requires a restart before the fields can be saved.
+
+The clock segment is a generic UI-Mod action slot. The bundled calendar package registers it and displays its own popup; the status bar contains no calendar logic. Disabling that package removes the click action. See ui-mods.md for relocation and notification permissions.

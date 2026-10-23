@@ -196,6 +196,7 @@ class StatusBar(Static):
                     + middle[offset + center_text.cell_len :]
                 )
         self.hits += [
+            (right_x + clock_offset, right_x + right.cell_len, "clock"),
             (right_x + language_offset, right_x + width_offset, "language"),
             (right_x + width_offset, right_x + clock_offset, "width"),
         ]
@@ -211,6 +212,8 @@ class StatusBar(Static):
         )
         if action is None and x < self.start_width:
             action = "start"
+        if action == "clock":
+            return self.app.ui_mods.activate_status("clock")
         if action:
             if action == "start":
                 self.app.action_start_menu()

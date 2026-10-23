@@ -15,6 +15,8 @@ from pathlib import Path
 from PIL import Image, ImageDraw
 from cosmos_tui.features.reader.cache import ByteCache, image_bytes
 from cosmos_tui.features.reader.pdf import metadata, parse_words, matches
+from cosmos_tui.features.reader.disk import DiskCache
+from cosmos_tui.features.reader.raster import render_pdf
 
 Image.MAX_IMAGE_PIXELS = 16_000_000
 
@@ -44,8 +46,8 @@ def tool(*args):
                 if not chunk:
                     break
                 output.extend(chunk)
-                if len(output) > 32 * 1024 * 1024:
-                    raise ValueError("decoder output exceeds 32 MiB")
+                if len(output) > 64 * 1024 * 1024:
+                    raise ValueError("decoder output exceeds 64 MiB")
             process.wait(timeout=max(0.01, deadline - time.monotonic()))
             if process.returncode:
                 errors.seek(0)
@@ -64,6 +66,10 @@ class Media:
     def __init__(self):
         self._lock = RLock()
         self.image_max_mb = 32
+        self.disk = DiskCache()
+        self.pdf_edge = 2400
+        self.pdf_page_mb = 32
+        self.resolutions = {}
         self.revision = 0
         self.epoch = 0
         self.versions = OrderedDict()
@@ -137,7 +143,17 @@ class Media:
         epoch = self.epoch
         result = self.documents.get(key)
         if result is None:
-            result = metadata(str(path))
+            disk_key = key + ("metadata-v2",)
+            result = self.disk.json(disk_key)
+            if not (
+                isinstance(result, list)
+                and len(result) == 2
+                and isinstance(result[0], int)
+                and isinstance(result[1], list)
+            ):
+                generation = self.disk.generation()
+                result = metadata(str(path))
+                self.disk.save_json(disk_key, result, generation)
             self.store(self.documents, key, result, epoch)
         return result
 
@@ -146,10 +162,19 @@ class Media:
         epoch = self.epoch
         result = self.documents.get(key)
         if result is None:
+            disk_key = key + ("words-v2",)
+            result = self.disk.json(disk_key)
+            if isinstance(result, list) and all(
+                isinstance(p, dict) and "words" in p and "extent" in p for p in result
+            ):
+                self.store(self.documents, key, result, epoch)
+                return result
+            generation = self.disk.generation()
             args = ["pdftotext"]
             if page is not None:
                 args += ["-f", str(page), "-l", str(page)]
             result = parse_words(tool(*args, "-bbox", str(path), "-"))
+            self.disk.save_json(disk_key, result, generation)
             self.store(self.documents, key, result, epoch)
         return result
 
@@ -173,33 +198,31 @@ class Media:
         key = identity + (page,)
         result = self.cache.get(key)
         if result is None:
+            disk_key = identity + ("bitmap-v3", page, self.pdf_edge, self.pdf_page_mb)
+            generation = self.disk.generation()
+            image = self.disk.image(disk_key)
             if path.suffix.lower() == ".pdf":
-                with Image.open(
-                    io.BytesIO(
-                        tool(
-                            "pdftoppm",
-                            "-f",
-                            str(page),
-                            "-l",
-                            str(page),
-                            "-singlefile",
-                            "-scale-to",
-                            "1800",
-                            "-png",
-                            str(path),
-                        )
+                if image is None:
+                    image, resolution = render_pdf(
+                        path, page, tool, self.pdf_edge, self.pdf_page_mb
                     )
-                ) as opened:
-                    image = opened.convert("RGB")
-                words = self.text(path, page)
-                has_text = bool(words and words[0]["words"])
-            else:
+                    self.resolutions[key] = resolution
+                    self.disk.save_image(disk_key, image, generation)
+                try:
+                    words = self.text(path, page) if epoch == self.epoch else []
+                    has_text = bool(words and words[0]["words"])
+                except (OSError, RuntimeError, ValueError):
+                    has_text = False
+            elif image is None:
                 with Image.open(path) as opened:
                     if opened.width * opened.height > 16_000_000:
                         raise ValueError("image exceeds pixel budget")
                     rgba = opened.convert("RGBA")
                     image = Image.new("RGB", rgba.size, "white")
                     image.paste(rgba, mask=rgba.getchannel("A"))
+                self.disk.save_image(disk_key, image, generation)
+                has_text = False
+            else:
                 has_text = False
             result = image, pages, has_text
             self.store(self.cache, key, result, epoch, changed=True)

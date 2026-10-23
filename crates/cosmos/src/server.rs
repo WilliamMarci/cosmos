@@ -188,6 +188,22 @@ impl State {
                 }
             }
             "notifications.publish" => {
+                if !p["ui_mod"].is_null() {
+                    let owner = required(p, "ui_mod")?;
+                    let policy = self.config.ui_mods.get(owner);
+                    if p["source"].as_str() != Some(format!("mod.{owner}").as_str())
+                        || !policy
+                            .and_then(|p| p.get("notifications"))
+                            .copied()
+                            .unwrap_or(false)
+                        || !policy
+                            .and_then(|p| p.get("enabled"))
+                            .copied()
+                            .unwrap_or(true)
+                    {
+                        return Err("UI Mod notification permission is not granted".into());
+                    }
+                }
                 let mut next = self.notices.clone();
                 let mut request = p.clone();
                 if request["ttl_ms"].is_null()

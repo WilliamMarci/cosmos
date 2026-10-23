@@ -172,3 +172,7 @@ Settings → Input → Mouse passthrough is the separate shared root field `mous
 设置列表的轮询值与分阶段编辑器、导航及内部 SettingRow 消息见 settings.md；配置字段与 RPC 形态不变。
 
 通知级别、逐条期限、固定宽度、上标 session_id、SDK 扩展参数和终端响铃桥的完整契约见 notifications.md。
+
+## 可移动 UI package Mods
+
+新增的客户端 UI 包接口、clock 状态栏动作、拥有者弹窗、统一按键注册及通知授权详见 [ui-mods.md](ui-mods.md)。calendar 的实现完全位于 mods/calendar；现有进程 Mod RPC 不变。

@@ -87,7 +87,9 @@ TOP_LEVEL_COMMANDS = SESSION_COMMANDS + (
         (),
         "stream coordinator events until interrupted",
     ),
-    CommandSpec("cache-clear", "[ca]che-clear", (), "clear the viewer disk cache"),
+    CommandSpec(
+        "cache-clear", "[ca]che-clear", (), "clear the persistent reader disk cache"
+    ),
     CommandSpec("mod", "[m]od", (), "manage trusted external Mods"),
     CommandSpec("action", "[ac]tion", (), "invoke a registered Mod action"),
     CommandSpec("rpc", "[rp]c", (), "call an existing coordinator RPC method"),
@@ -479,6 +481,14 @@ def main(argv=None):
             from cosmos_tui.runtime.bootstrap import run
 
             run(args)
+            return 0
+        if operation == "cache-clear":
+            from cosmos_tui.features.reader.disk import DiskCache
+
+            DiskCache().clear()
+            print(
+                "Reader disk cache cleared; active clients retain their memory caches"
+            )
             return 0
         binary = Path(
             os.environ.get("COSMOS_BINARY", PROJECT_ROOT / "target/release/cosmos")

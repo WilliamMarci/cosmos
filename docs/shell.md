@@ -21,3 +21,5 @@ cosmosrc 导出项目解释器/二进制路径、命令生成 prompt 路径，�
 `config/terminal-agent-prompt.md` 是给后端的 Linux Bash command generation 说明，包含输出 JSON、上下文、文件名与不执行命令的约束。COSMOS_AGENT_PROMPT 可指定替代文件。
 
 Cosmos 桥接请求将该文件路径作为 prompt_file 配置传给现有 OpenCode 后端，并在原上下文提示之前附加文件内容。仍保留原模型/权限/历史行为；模型输出只更新 Readline 缓冲区，运行需要用户显式操作。独立 terminal_agent 不会因 Cosmos UI 样式变动改变界面；只有显式配置 prompt_file 时才使用附加文件。
+
+Integrated open dispatch also recognizes .epub/.md/.markdown/.html/.htm; local rich-text viewing uses the same pane state and close behavior.

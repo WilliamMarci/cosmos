@@ -89,3 +89,9 @@ features/reader/loading.LoadingFrames owns non-blocking per-pane decode jobs and
 Notifications remain service-backed: Rust owns level/session metadata, independent expiry and synchronized actions; NoticeToast composes one/two-line fixed-width cards as a stack in UIFrame. Tmux installs one server hook for BEL publishing. Client prefix capture uses referenced Leader2/3 presets, and keyboard help/editor use the same configured chord mapping.
 
 Notification origin is a stable optional session_id ($N), independent of notification ID. UI publishers capture the source session for deferred reader/assistant errors; BEL obtains hook_session from Tmux. The stack tags the origin in superscript without filtering delivery, and fixes all card widths to the client's current pane-derived width.
+
+## 0.2 development: document/cache/UI package layers
+
+Reader owns separate Documents and Media adapters. Documents converts Markdown to HTML and reuses the vendored ZhihuViewer parser; EPUB packaging/resource resolution and terminal-cell pagination are in documents.py. Media handles bitmap/Poppler decoding; raster.py enforces adaptive page budgets. disk.py is the shared byte-bounded, atomic JSON/PNG persistence layer with inter-process locking and clear generations. Cache identity and decoder/parser versions are independent of UI frames.
+
+mods/manager.py discovers trusted relocatable UI packages, while mods/api.py exposes status callbacks, owned ModPopup surfaces, keybinding registration and notification grants. Settings persists policies through the coordinator. Calendar code only lives under the top-level mods/calendar package. StatusBar emits clock-slot activation without importing calendar. Existing process Mods and their Rust lifecycle remain independent; UI package permissions are supported API gates, not system sandboxing.

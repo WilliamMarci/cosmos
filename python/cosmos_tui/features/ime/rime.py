@@ -10,6 +10,7 @@ from pathlib import Path
 
 from cosmos_tui.core.paths import PROJECT_ROOT
 from cosmos_tui.features.ime.config import configuration
+from cosmos_tui.core.metadata import VERSION
 
 
 class Traits(C.Structure):
@@ -162,7 +163,7 @@ class Rime:
             user_data_dir=user,
             distribution_name="Cosmos",
             distribution_code_name="cosmos",
-            distribution_version="0.1.0",
+            distribution_version=VERSION,
             app_name="rime.cosmos",
             log_dir=state,
             prebuilt_data_dir=source / "build",

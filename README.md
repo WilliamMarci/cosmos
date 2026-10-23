@@ -1,8 +1,8 @@
-# Cosmos — Arche 0.1.0
+# Cosmos — Arche 0.2.0-dev.1
 
-**首个开发版 · 2026-10-23 · Author: William Marci**
+**下一版开发中 · 2026-10-23 · Author: William Marci**
 
-Cosmos 是运行在工作主机上的终端工作壳。通过普通 SSH 登录后运行 Cosmos，即可创建或重连持续会话；连接电脑无需安装配套 Cosmos。Arche 是开发版代号，不表示原定完整首版已经交付。版本范围与依赖见 [发布说明](RELEASE.md)。
+Cosmos 是运行在工作主机上的终端工作壳。通过普通 SSH 登录后运行 Cosmos，即可创建或重连持续会话；连接电脑无需安装配套 Cosmos。首个开发版 Arche 0.1.0 已保留为本地 v0.1.0 标签；当前为下一版开发分支，不表示原定完整首版已经交付。版本范围与依赖见 [发布说明](RELEASE.md)。
 
 ## 运行
 
@@ -34,7 +34,9 @@ source <(cosmos completion bash)
 
 - 持续会话、窗口/窗格切换、分屏、调整大小、焦点分割线、历史回滚与单窗格搜索。
 - Settings、Ctrl+P 上下文 Actions、COSMOS 开始菜单、分组键位编辑和可视键盘预览。
-- 图片/PDF 阅读、缩略图、缩放平移、PDF 搜索高亮、跳页、大纲、内存缓存与相邻页预读。
+- 图片/PDF 阅读、缩略图、缩放平移、搜索高亮、跳页、大纲、内存/磁盘缓存与相邻页预读；大 PDF 页自适应降低栅格分辨率。
+- EPUB/Markdown/HTML 富文本阅读，复用 ZhihuViewer 解析器，支持本地内嵌图片、逻辑页和大纲。
+- 可移动 UI Mod 包；calendar 注册日期点击弹窗，启用和通知权限在 Settings → Mods 分别管理。
 - terminal_agent 命令生成助手及 Cosmos 自绘输入；分屏启动 OpenCode。
 - librime 输入法、逐输入目标组字、候选与全半角；命令助手自绘编辑器也支持 IME。
 - 分级通知、来源会话标记、重复计数、终端响铃通知，以及可配置状态栏。
@@ -42,7 +44,7 @@ source <(cosmos completion bash)
 
 默认 Leader 为 Ctrl+B；`Leader p` 打开设置，`Leader m` 打开开始菜单，`Leader s` 切换窗口/会话，`Leader ?` 查看上下文快捷键。输入法通过 `Leader i` 切换。Leader2/3、具体动作及别名可在设置中调整。默认静默，不常驻显示全部按键。
 
-在 Cosmos Bash 中使用 `open FILE` 或 `cosmos open FILE` 打开 PNG/JPEG/WebP/PDF。Kitty 与 Ghostty 支持图形输出，其他终端可字符降级。阅读详情见 [Reader](docs/viewer.md)。
+在 Cosmos Bash 中使用 `open FILE` 或 `cosmos open FILE` 打开 PNG/JPEG/WebP/PDF/EPUB/Markdown/HTML。Kitty 与 Ghostty 支持图形输出，其他终端可字符降级。阅读详情见 [Reader](docs/viewer.md)。
 
 ## 配置与扩展
 
@@ -56,9 +58,9 @@ cosmos mod list
 
 Mod 注册持久保存，显式启动或配置 autostart；能力声明不构成系统沙箱。通过 UI 的 Settings → Mods 管理已注册程序，Mod 视图由当前 Python 宿主呈现，不使用旧 `cosmos panel` 入口。
 
-正式文档：[框架 RPC](docs/framework.md)、[UI 接口](docs/ui-api.md)、[架构](docs/architecture.md)、[设置](docs/settings.md)、[状态栏](docs/status-bar.md)、[输入法](docs/input-method.md)、[鼠标](docs/mouse.md)、[通知](docs/notifications.md)、[Shell 集成](docs/shell.md)。
+正式文档：[框架 RPC](docs/framework.md)、[UI 接口](docs/ui-api.md)、[架构](docs/architecture.md)、[设置](docs/settings.md)、[状态栏](docs/status-bar.md)、[输入法](docs/input-method.md)、[富文本阅读](docs/rich-reader.md)、[UI Mod 包](docs/ui-mods.md)、[鼠标](docs/mouse.md)、[通知](docs/notifications.md)、[Shell 集成](docs/shell.md)。
 
-未完成范围包括 Yazi 文件管理/左面板、跨所有窗格搜索、全局 Agent 工具与权限桥、持久磁盘缓存、EPUB/Markdown 阅读和自包含分发。规划保留在 [design 当前状态](design/当前实施状态.md)，不将接口或外部程序启动等同于完整模块交付。
+未完成范围包括 Yazi 文件管理/左面板、跨所有窗格搜索、全局 Agent 工具与权限桥和自包含分发。规划保留在 [design 当前状态](design/当前实施状态.md)，不将接口或外部程序启动等同于完整模块交付。
 
 ## 验证与构建
 
@@ -68,4 +70,4 @@ COSMOS_TEST_TMUX=1 cargo test --locked --offline
 ./packaging/build.sh
 ```
 
-按变更范围执行检查；真实 PTY、图形与 SSH 验收不能由静态测试代替。构建产物为 `dist/cosmos-0.1.0-arche-linux-x86_64.tar.gz`，附校验值、许可证与依赖说明。开发流程见 [Git 管理](docs/development.md)。
+按变更范围执行检查；真实 PTY、图形与 SSH 验收不能由静态测试代替。构建产物为 `dist/cosmos-0.2.0-dev.1-arche-linux-x86_64.tar.gz`，附校验值、许可证与依赖说明。开发流程见 [Git 管理](docs/development.md)。

@@ -7,6 +7,7 @@ GROUPS = [
     "History & selection",
     "Command assistant",
     "Reader",
+    "Mods",
     "Input method",
     "Dialogs & settings",
 ]
@@ -14,6 +15,8 @@ GROUPS = [
 
 def group(command):
     name, context = command.id, command.context
+    if context.startswith("mod."):
+        return "Mods"
     if ".ime_" in name:
         return "Input method"
     if context.startswith("assistant") or name in (

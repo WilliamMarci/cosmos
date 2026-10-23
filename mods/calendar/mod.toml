@@ -1,0 +1,6 @@
+id = "calendar"
+name = "Calendar"
+api_version = 1
+entry = "__init__.py"
+enabled_by_default = true
+permissions = ["notifications"]

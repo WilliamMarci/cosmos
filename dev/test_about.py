@@ -40,7 +40,8 @@ class AboutTests(unittest.IsolatedAsyncioTestCase):
                 text = "".join(
                     n.text or "" for n in root.iter() if n.tag.endswith("}text")
                 ).replace("\xa0", " ")
-                self.assertIn(DISPLAY_VERSION, text)
+                self.assertIn(DISPLAY_VERSION.split(" (")[0], text)
+                self.assertIn("(development)", text)
                 self.assertIn("Author  " + AUTHOR, text)
                 self.assertIn("░", text)
                 self.assertLessEqual(

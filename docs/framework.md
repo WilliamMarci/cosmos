@@ -1,4 +1,4 @@
-# Cosmos 框架接口 v1.4 — Arche 0.1.0
+# Cosmos 框架接口 v1.4 — 0.2.0 development
 
 当前代码提供协调服务、事件、可信 Mod 加载、UI 状态模型和终端面板适配。Python 工作区在统一 compositor 中合成终端、dock/replacement/content 和辅助 UI；Rust 只保留协调服务和管理 CLI；旧 Rust UI 已停用。
 
@@ -129,3 +129,5 @@ Python 工作区通过 Cosmos 合成器在右上角显示紧凑通知，不抢�
 actions.list 和 state.snapshot.actions 返回这些字段及 enabled。动作启动已声明的受管程序并附加 args，不执行任意 Shell 字符串；运行中 Mod 的启动动作暂不显示，竞态以 actions.invoke 的最终校验为准。注册及调用沿用 mods.register 和 actions.invoke；SDK 提供 register_manifest(manifest)、actions()。修改运行中 Mod 的 manifest 需先停止它。旧 action 不带新字段时使用默认值。
 
 完整通知字段、栈呈现与作用域见 notifications.md；设置控件与 Leader 预设见 settings.md。
+
+UI package Mod 的启用与通知许可由 ui_mods 配置映射保存；带 ui_mod 的通知请求在协调服务检查当前授权，接口与可信程序边界见 ui-mods.md。

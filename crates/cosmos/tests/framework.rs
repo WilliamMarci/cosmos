@@ -270,3 +270,30 @@ fn framework_lifecycle_events_ui_and_restart() {
     drop(s);
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn ui_mod_notification_grants_are_checked_by_the_coordinator() {
+    let root = std::env::temp_dir().join(format!("cosmos-ui-permissions-{}", std::process::id()));
+    let mut service = Service::start(root.clone());
+    let notice = json!({"text":"Calendar message","source":"mod.calendar","ui_mod":"calendar"});
+    assert!(service
+        .try_call("notifications.publish", notice.clone())
+        .is_err());
+    let mut settings = service.call("settings.get", json!({}));
+    settings["ui_mods"] = json!({"calendar":{"enabled":true,"notifications":true}});
+    service.call("settings.replace", settings.clone());
+    assert!(service
+        .try_call("notifications.publish", notice.clone())
+        .is_ok());
+    settings["ui_mods"]["calendar"]["notifications"] = json!(false);
+    service.call("settings.replace", settings.clone());
+    assert!(service
+        .try_call("notifications.publish", notice.clone())
+        .is_err());
+    settings["ui_mods"]["calendar"] = json!({"enabled":false,"notifications":true});
+    service.call("settings.replace", settings);
+    assert!(service.try_call("notifications.publish", notice).is_err());
+    service.stop();
+    drop(service);
+    std::fs::remove_dir_all(root).unwrap();
+}

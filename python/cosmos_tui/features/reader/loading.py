@@ -26,6 +26,8 @@ class LoadingFrames:
         return (
             pane.viewer,
             app.settings.get("viewer_image_max_mb", 32),
+            app.settings.get("viewer_pdf_edge", 2400),
+            app.settings.get("viewer_pdf_page_mb", 32),
             pane.width,
             pane.height,
             self.controller.cell_pixels(),

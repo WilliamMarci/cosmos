@@ -1,6 +1,7 @@
 """IME routing and cursor-anchored two-row presentation; pane drafts stay local."""
 
 import asyncio
+from textual.dom import NoScreen
 from textual.widgets import Input
 
 from cosmos_tui.core.controller import Controller
@@ -144,11 +145,13 @@ class IMEController(Controller):
             if self.surface:
                 self.surface.display = False
             return
-        if (
-            self.surface is None
-            or not self.surface.is_mounted
-            or self.surface.screen is not app.screen
-        ):
+        # Textual can retain is_mounted after a screen subtree was detached.
+        # Its screen property then raises instead of returning the old screen.
+        try:
+            attached = self.surface is not None and self.surface.screen is app.screen
+        except NoScreen:
+            attached = False
+        if not attached:
             if self.surface:
                 if self.surface.is_mounted:
                     await self.surface.remove()

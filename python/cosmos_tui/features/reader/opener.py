@@ -6,7 +6,18 @@ import subprocess
 import sys
 from pathlib import Path
 
-SUPPORTED = {".png", ".jpg", ".jpeg", ".webp", ".pdf"}
+SUPPORTED = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".webp",
+    ".pdf",
+    ".epub",
+    ".md",
+    ".markdown",
+    ".html",
+    ".htm",
+}
 
 
 def main(argv=None):

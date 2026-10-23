@@ -54,6 +54,7 @@ class RuntimeController(Controller):
 
     async def on_unmount(self):
         app = self.app
+        app.ui_mods.close()
         await app.reader_ui.close()
         app.ime.close()
         await app.assistant_ui.close()
@@ -71,6 +72,7 @@ class RuntimeController(Controller):
         try:
             await rpc.call("ui.heartbeat", {"client": app.client})
             app.settings = await rpc.call("settings.get")
+            app.ui_mods.refresh()
             app.role_colors = LIGHT if app.settings["theme"] == "light" else DARK
             apply_interface(app)
             for frame in app.screen.query(Frame):
@@ -124,9 +126,15 @@ class RuntimeController(Controller):
                         frame = app.reader_ui.loading.frame(pane)
                         lines[pane.id] = frame.lines
                         if reader_visible and not app.views:
-                            cover = getattr(app.screen, "cover_reader_image", None)
-                            image = cover(frame.image, pane) if cover else frame.image
-                            images.append((pane.id, image, pane.x, pane.y))
+                            tiled = getattr(app.screen, "reader_images", None)
+                            if tiled:
+                                images.extend(tiled(pane.id, frame.image, pane))
+                            else:
+                                cover = getattr(app.screen, "cover_reader_image", None)
+                                image = (
+                                    cover(frame.image, pane) if cover else frame.image
+                                )
+                                images.append((pane.id, image, pane.x, pane.y))
                     except Exception as error:
                         frame = app.reader_ui.loading.placeholder(pane, str(error))
                         lines[pane.id] = frame.lines

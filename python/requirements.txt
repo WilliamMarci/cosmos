@@ -6,3 +6,7 @@ regex>=2025.9,<2027
 wcwidth>=0.2.14,<1
 
 pypdf>=6.9.2,<7
+
+beautifulsoup4>=4.12,<5
+lxml>=5,<7
+markdown-it-py>=3,<5

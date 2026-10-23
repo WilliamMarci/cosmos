@@ -13,6 +13,7 @@ from cosmos_tui.core.services import (
     SessionWindows,
 )
 from cosmos_tui.features.assistant.launch import AssistantLauncher
+from cosmos_tui.mods.manager import UIMods
 from cosmos_tui.features.history.controller import HistoryController
 from cosmos_tui.features.status.controller import StatusController
 from cosmos_tui.features.ime.controller import IMEController
@@ -79,6 +80,7 @@ class Cosmos(App, inherit_bindings=False):
         self.pop_windows = PopWindows(self)
         self.notification_events = NotificationEvents(self)
         self.powerline = PowerlineSlot()
+        self.ui_mods = UIMods(self)
 
         self.runtime = RuntimeController(self)
         self.inputs = InputRouter(self)

@@ -7,7 +7,10 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, PropertyMock, patch
+from types import SimpleNamespace
+
+from textual.dom import NoScreen
 
 sys.path[:0] = [str(Path(__file__).resolve().parent)]
 from test_navigation import Probe, snapshot
@@ -25,6 +28,34 @@ REAL_RIME = (
 
 
 class KeyboardTests(unittest.IsolatedAsyncioTestCase):
+    async def test_detached_candidate_surface_is_replaced(self):
+        from cosmos_tui.features.ime.controller import IMEController
+        from cosmos_tui.ui.cells import Rect
+
+        screen = SimpleNamespace(mount=AsyncMock())
+        app = SimpleNamespace(screen=screen, ui_registry=Mock(), role_colors={}, settings={})
+        ime = IMEController(app)
+        ime.enabled = True
+        ime.engine = Mock()
+        ime.engine.context.return_value = {"preedit": "ni"}
+        old = Mock()
+        old.is_mounted = True
+        old.remove = AsyncMock()
+        type(old).screen = PropertyMock(side_effect=NoScreen("node has no screen"))
+        ime.surface = old
+        pane = SimpleNamespace(x=0, y=0, width=80, height=24)
+        replacement = Mock()
+        with (
+            patch.object(ime, "target", return_value=(("pane", "%0"), (0, 0), pane)),
+            patch("cosmos_tui.features.ime.controller.CellSurface", return_value=replacement),
+            patch("cosmos_tui.features.ime.controller.compose", return_value=Rect(0, 0, 1, 1)),
+        ):
+            await ime.refresh()
+        old.remove.assert_awaited_once()
+        screen.mount.assert_awaited_once_with(replacement)
+        self.assertIs(ime.surface, replacement)
+        replacement.present.assert_called_once()
+
     async def test_responsive_help_and_live_key_editor(self):
         app = Probe()
         async with app.run_test(size=(100, 50)) as pilot:

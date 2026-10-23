@@ -1,51 +1,53 @@
-# Notifications
+# UI package Mods — host API v1
 
-Notifications are explicit events. Normal rendering/state refresh does not create a notification. User-operation failures use error notifications; assistant integration warnings use warning; terminal BEL uses info.
+UI package Mods are trusted Python code loaded by each Cosmos client. Existing process Mods retain their Rust lifecycle/RPC SDK. Both are managed from Settings → Mods, with UI packages labelled “UI Mod”. This API adds host UI callbacks without hardcoding calendar or other business behavior in the application.
 
-## Presentation
+## Package discovery and relocation
 
-The global stack sits at the upper right. All cards have one fixed width based on the current client's active pane: 70% of min(pane width, 60 columns, viewport width), rounded down, with a two-column minimum (up to 42 columns). Short messages keep the same width. New messages enter at the top and push older messages down. Expiration or dismissal removes an entry; the remaining entries close the gap. If the stack exceeds the screen, only the newest entries that fit are drawn; Leader N can access every active entry.
+A package contains `mod.toml`, a Python entry and all its private files. The entry may use relative imports. Default discovery scans `mods/*/mod.toml` beside the Cosmos entry. Optional absolute `ui_mod_paths` accepts either a package directory or a directory containing packages. Later configured paths override a bundled package of the same ID.
 
-Repeated active, unresolved, unclaimed notices with identical text, source, level, session, actions, actionable flag and persistent/timed lifetime class merge under the same ID. The service increments `count` (initially 1), refreshes the deadline from the latest publication, clears client dismissals and moves the notice to the top. Expired/resolved notices start a new count. Different sessions never merge. A count above 1 appears after the content as an amber `×N`, reserved even when the message is truncated. Publication returns `{id,count}`; older persisted records without count load as 1.
+```toml
+# Cosmos config.toml root fields, before any table:
+ui_mod_paths = ["/absolute/path/to/calendar"]
 
-Each card is one row by default. Long text wraps to at most two rows and truncates the remainder with an ellipsis. The colored left marker is the right-half block `▐`; content follows, with compact three-column action buttons at the right of the last row. Notifications do not take focus. Colors are info blue, success green, warning amber, error red, progress cyan.
-
-Session-specific messages prefix their content with the stable Tmux session ID as superscript digits: `$1` displays `¹`, `$12` displays `¹²`. Global messages omit this tag. The tag identifies the origin; it does not filter delivery. All clients of the service receive the same notifications, subject to local dismissal and the service display setting.
-
-Settings → Notifications has an enable switch and the default timeout. Disabling display does not delete history or stop deadlines. The default is 5000 ms. Timers belong to individual notices and are computed by the coordinator; reopening/repainting does not restart them.
-
-## Public RPC and SDK
-
-`notifications.publish` accepts:
-
-- `text`: non-empty, at most 4096 bytes; control characters/newlines are rejected. The UI wraps text.
-- `source`: optional source string, default core, at most 128 bytes.
-- `level`: info (default), success, warning, error or progress.
-- `session_id`: optional stable Tmux `$N` ID; a non-negative integer or numeric string is also accepted and normalized to `$N`. Omit it for a global notification.
-- `ttl_ms`: omitted/null uses the configured default for ordinary notices. A positive value is clamped to 100 ms–24 hours. `0` keeps the notification indefinitely.
-- `persistent`: true also prevents expiration.
-- `actions`: up to three `{id,label}` objects. IDs are unique within the notice, at most 64 bytes. Labels are at most 64 bytes, drawn in three character cells.
-- `actionable`: compatibility flag. Actions automatically make a notice actionable. Actionable notices remain indefinitely unless a positive ttl_ms is explicitly supplied.
-
-```python
-api.notify("Build failed", level="error", session_id="$1")
-api.notify("Background task started", level="progress", ttl_ms=3000)
-api.notify("Continue?", level="warning", session_id="$1", ttl_ms=0,
-           actions=[{"id": "yes", "label": "yes"}, {"id": "no", "label": "no"}])
+[ui_mods.calendar]
+enabled = true
+notifications = false
 ```
 
-The SDK signature preserves positional `text, actionable=False, actions=None` and adds keyword-only `level="info", ttl_ms=None, persistent=False, session_id=None`. The in-process `app.notification_events.publish` accepts the same metadata with keyword source/actions and defaults its session ID to the client's current session.
+Updating root settings via settings.replace applies to all clients. Editing config.toml on disk requires coordinator reload/restart, as with other file edits. Settings → Mods → Rescan UI packages discovers newly copied packages in the current paths. Moving a package requires updating its path (or placing it in the default mods directory); there is no absolute-path dependency in calendar's source.
 
-The resulting Notice includes id, text, count, source, level, session_id, created_ms, expires_ms, actionable, resolved, actions, selected_action and client dismissal/claim state. `expires_ms=null` means no deadline. Older persisted notices without level/session metadata load as info/global.
+Manifest:
 
-`notifications.active {client}` returns unresolved, unexpired, locally visible entries; `notifications.list {client}` includes retained history. Both preserve publication order. `notifications.dismiss {id,client}` hides only for that client. `notifications.act {id,action,client}` resolves the declared action service-wide; other clients remove it. Expired/already resolved/claimed actions cannot be selected. Publishers consume notifications.action events to perform their own operation. No action is evaluated as a shell command by the notification service. Existing claim/complete/release/resolve operations remain available.
+```toml
+id = "calendar"
+name = "Calendar"
+api_version = 1
+entry = "__init__.py"
+enabled_by_default = true
+permissions = ["notifications"]
+```
 
-## Session creation
+Manifests are limited to 8 KiB. IDs contain ASCII letters/digits, `_` or `-`; entries must be files inside their package. The current permission vocabulary is `notifications`. Source is imported only when enabled. `activate(api)` registers components and may return a synchronous cleanup callable. Disabling invokes cleanup, removes status callbacks and closes the Mod's popup. Import/activation failures are logged and reported through the host operation-error notification path, not a separate error UI.
 
-When `attach` finds no exact session and creates it, the UI publishes a session-scoped `info` notification after attaching, for example `Session 'research' not found; created`. The notice uses source `workspace` and the new stable `$N` session ID. Reconnecting to an existing session does not publish a notice. A publication failure is logged and does not block the workspace.
+## Public Python API
 
-## Terminal bell
+Import host primitives from `cosmos_tui.mods.api`: ModPopup, Frame, Static, Text, Binding. API v1 deliberately exposes a small in-process UI interface:
 
-The dedicated Cosmos Tmux server installs one stable `alert-bell[900]` hook, with monitor-bell on and bell-action any. Reconnecting clients replace the same slot; they do not add one publisher per client. A BEL in any monitored session publishes an info notification with its hook_session and window ID. The hook uses the current coordinator path and environment, including private XDG paths, and does not start a coordinator if it is stopped. Hook subprocess output is suppressed. The hook persists with retained Tmux applications; reconnect installs the current package's hook.
+- `api.id`: package owner ID.
+- `api.palette`: a copy of the current Cosmos role palette.
+- `api.status_action("clock", callback)`: register a click callback on the date/time segment. Only one owner may occupy the slot. Currently clock is the supported slot.
+- `api.popup(screen)` / `api.toggle_popup(screen)`: show/toggle an owned popup. ModPopup is transparent outside its Frame, anchors above the right status area, retains the reader image and masks only the popup rectangle with alpha transparency. It does not resize a PTY.
+- `api.commands([(name,label,keys,target), ...])`: register normal keybinding entries under `mod.<id>.<name>` and context `mod.<id>`. They appear in Keybindings → Mods; overrides use the normal settings map. A ModPopup's target actions dispatch to its own action methods. Disabled/unavailable packages retain dormant configured bindings.
+- `ModPopup.action_help`: show shared shortcut help for the Mod context; packages may bind `?` to `help`.
+- `await api.notify(text, **metadata)`: publish through Cosmos's notification event API. Source is assigned as `mod.<id>`; level/actions/ttl/session metadata follows notifications.md.
 
-The coordinator must be restarted after upgrading from a version without severity/session/lifetime fields to use the full contract. `cosmos stop` retains Tmux applications and stops coordinator-managed Mods; reopen Cosmos afterward.
+Do not depend on private API fields or import business logic from the host. The supplied calendar package demonstrates only public APIs.
+
+## Enablement and notification permission
+
+Settings → Mods → package provides separate Enabled and Notification permission choices. Enablement is shared configuration; the actual UI module runs in each attached client. A package's enabled_by_default is used only when no saved enabled policy exists. The bundled calendar is enabled by default.
+
+Notification permission defaults to **Off**, independent of enablement. `api.notify` requires a loaded/enabled owner, a declaration in the manifest and the saved permission grant. The host sends a reserved ui_mod owner marker, and the coordinator independently checks the saved grant and enablement at publication time (including changes from another client). Revoking it affects existing API objects immediately; disabling the package also blocks sends. Normal host errors can still be reported by Cosmos itself. Calendar does not publish periodic notifications or reminders by default.
+
+These are supported host-API permissions, not an OS sandbox: packages are installed trusted Python programs in the client process. The older external-process SDK/RPC path is not turned into a sandbox or silently subjected to this UI-package policy. No filesystem/network isolation is promised.

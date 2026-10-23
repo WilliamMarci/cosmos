@@ -32,3 +32,5 @@ The saved configuration remains an array of normalized bindings, e.g. `['leader+
 ## Internal row interface
 
 `ui/settings.py` contains `SettingRow(row)`. A choice row contains label, key, value, choices (value/label pairs) and optional local scope. It posts `SettingRow.Cycle(row, direction)` for arrow clicks; the settings feature owns persistence and error handling. A binding row uses a separate hint field rendered with the muted role color. This is a host Python control, not an external Mod RPC extension.
+
+Reader 新增 viewer_disk_cache_mb（默认 512）、viewer_pdf_edge（默认 2400）和 viewer_pdf_page_mb（默认 32）。Settings → Mods 同时列出进程 Mod 和可移动 UI packages；UI 包子菜单分别管理启用与通知权限，缺省不授予通知。详见 ui-mods.md。

@@ -100,10 +100,10 @@ for name, label, keys, target in [
     ("thumbnails", "Toggle thumbnails", ["t"], "t"),
     ("previous", "Previous page / image", ["left_square_bracket", "comma"], "["),
     ("next", "Next page / image", ["right_square_bracket", "full_stop"], "]"),
-    ("search", "Search PDF", ["slash"], "/"),
+    ("search", "Search document", ["slash"], "/"),
     ("jump", "Go to page", ["g"], "g"),
-    ("find_next", "Next PDF match", ["n"], "n"),
-    ("find_previous", "Previous PDF match", ["N"], "N"),
+    ("find_next", "Next document match", ["n"], "n"),
+    ("find_previous", "Previous document match", ["N"], "N"),
     ("outline", "Switch thumbnails / outline", ["o"], "o"),
     ("navigation_focus", "Focus outline / page", ["tab"], "tab"),
     ("help", "Viewer help", ["question_mark"], "?"),
@@ -236,7 +236,11 @@ def default_reserved(context, key):
 
 def validate(overrides, settings=None):
     chords = leader_chords(settings or {})
-    unknown = set(overrides) - {c.id for c in COMMANDS}
+    unknown = {
+        name
+        for name in set(overrides) - {c.id for c in COMMANDS}
+        if not name.startswith("mod.")
+    }
     if unknown:
         raise ValueError("Unknown commands: " + ", ".join(sorted(unknown)))
     seen = {}

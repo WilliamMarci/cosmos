@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 from textual.binding import Binding
 from textual.widgets import Input, ListItem, ListView, Static
 
@@ -114,7 +116,27 @@ class Palette(CosmosModal):
                     [(False, "Off"), (True, "On")],
                     True,
                 ),
+                choice(
+                    "Disk cache size",
+                    "viewer_disk_cache_mb",
+                    [(0, "Off")]
+                    + [(n, f"{n} MiB") for n in (128, 256, 512, 1024, 2048)],
+                    512,
+                ),
+                choice(
+                    "PDF render longest edge",
+                    "viewer_pdf_edge",
+                    [(n, f"{n}px") for n in (1200, 1800, 2400, 3200, 4000)],
+                    2400,
+                ),
+                choice(
+                    "PDF page raster budget",
+                    "viewer_pdf_page_mb",
+                    [(n, f"{n} MiB") for n in (8, 16, 32, 64, 128)],
+                    32,
+                ),
                 dict(label="Clear this client's reader cache", kind="reader_clear"),
+                dict(label="Clear persistent reader cache", kind="reader_disk_clear"),
             ]
         if self.menu == "status_settings":
             rows = [
@@ -239,7 +261,19 @@ class Palette(CosmosModal):
                     5000,
                 )
             )
+        if self.menu == "mods" or self.menu.startswith("ui_mod:"):
+            self.app.settings.update(settings)
+            self.app.ui_mods.refresh()
         if self.menu == "mods":
+            rows.append(dict(label="Rescan UI packages", kind="ui_mod_rescan"))
+            rows += [
+                dict(
+                    label=item.get("name", ident) + " · UI Mod",
+                    kind="menu",
+                    menu="ui_mod:" + ident,
+                )
+                for ident, item in self.app.ui_mods.entries.items()
+            ]
             rows += [
                 dict(
                     label=f"{m['id']} · {m['status']['state']}",
@@ -252,6 +286,30 @@ class Palette(CosmosModal):
                 )
                 for m in snapshot["mods"]
             ]
+        if self.menu.startswith("ui_mod:"):
+            ident = self.menu.split(":", 1)[1]
+            if ident in self.app.ui_mods.entries:
+                policy = self.app.ui_mods.policy(ident)
+                rows = []
+                for key, label in (
+                    ("enabled", "Enabled"),
+                    ("notifications", "Notification permission"),
+                ):
+                    if (
+                        key == "notifications"
+                        and key not in self.app.ui_mods.entries[ident]["permissions"]
+                    ):
+                        continue
+                    row = choice(
+                        label, "ui_mods", [(False, "Off"), (True, "On")], False
+                    )
+                    row.update(
+                        value=policy[key],
+                        choices=[(False, "Off"), (True, "On")],
+                        ui_mod=ident,
+                        permission=key,
+                    )
+                    rows.append(row)
         if self.menu == "settings":
             rows.append(dict(label="Theme", kind="theme"))
             rows.append(dict(label="Reader", kind="menu", menu="reader_settings"))
@@ -301,11 +359,23 @@ class Palette(CosmosModal):
         if row["kind"] == "choice":
             await self.cycle_choice(row, 1)
             return
+        if row["kind"] == "ui_mod_rescan":
+            self.app.ui_mods.signature = None
+            self.app.ui_mods.refresh()
+            await self.populate()
+            return
         if row["kind"] == "reader_clear":
             self.app.reader_ui.clear_cache()
             return
         if row["kind"] == "theme":
             self.app.push_screen(ThemePanel())
+            return
+        if row["kind"] == "reader_disk_clear":
+            try:
+                await asyncio.to_thread(self.app.reader_ui.media.disk.clear)
+                self.app.reader_ui.clear_cache()
+            except OSError as error:
+                await self.app.action_error("reader.cache", error)
             return
         if row["kind"] == "keybinding":
             self.app.push_screen(
@@ -349,15 +419,29 @@ class Palette(CosmosModal):
                 self.app.set_mouse_mode(value)
             else:
                 settings = await rpc.call("settings.get")
-                settings[row["key"]] = value
+                if row.get("ui_mod"):
+                    values = settings.setdefault("ui_mods", {}).setdefault(
+                        row["ui_mod"], {}
+                    )
+                    values[row["permission"]] = value
+                else:
+                    settings[row["key"]] = value
                 keymap.validate(settings.get("keybindings", {}), settings)
                 await rpc.call("settings.replace", settings)
                 actual = await rpc.call("settings.get")
-                if actual.get(row["key"]) != value:
+                retained = (
+                    actual.get("ui_mods", {})
+                    .get(row["ui_mod"], {})
+                    .get(row["permission"])
+                    if row.get("ui_mod")
+                    else actual.get(row["key"])
+                )
+                if retained != value:
                     raise RuntimeError(
                         "Coordinator did not retain this setting; update/restart the coordinator and retry"
                     )
                 self.app.settings = actual
+                self.app.ui_mods.refresh()
             await self.populate()
         except (RuntimeError, OSError, ValueError) as failure:
             await self.app.action_error("settings." + row["key"], failure)

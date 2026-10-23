@@ -70,7 +70,7 @@ class StatusController(Controller):
             suffix = Path(state["path"]).suffix.lower()
             mode, label = (
                 ("doc", "DOC")
-                if suffix in (".pdf", ".epub", ".md", ".markdown")
+                if suffix in (".pdf", ".epub", ".md", ".markdown", ".html", ".htm")
                 else ("image", "IMAGE")
             )
             path = state["path"]
