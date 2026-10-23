@@ -54,6 +54,8 @@ async def action(controller, pane, state, name, value=0):
 async def key(controller, event, pane, state):
     char, key = event.character, event.key
     if state.get("inspector") is not None:
+        if char == "?":
+            return False
         if key in ("escape", "q"):
             state.pop("inspector", None)
         elif char == "y":

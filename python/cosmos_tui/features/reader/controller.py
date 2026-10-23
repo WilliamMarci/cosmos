@@ -38,10 +38,15 @@ class ReaderController(Controller):
         self.prepared_paths = {}
         self.frame_keys = {}
 
+    def state(self, pane):
+        from cosmos_tui.features.reader.preferences import defaults
+
+        return defaults(json.loads(base64.b64decode(pane.viewer)), self.app.settings)
+
     def pane_bounds(self, pid, path):
         for pane in self.app.panes:
             if pane.id == pid and pane.viewer:
-                state = json.loads(base64.b64decode(pane.viewer))
+                state = self.state(pane)
                 if state["path"] == path:
                     return pane.x, pane.y, pane.width, pane.height
         return None
@@ -380,7 +385,7 @@ class ReaderController(Controller):
         if not frame:
             return
         event.stop()
-        state = json.loads(base64.b64decode(pane.viewer))
+        state = self.state(pane)
         x, y = event.screen_x - pane.x, event.screen_y - pane.y
         for left, top, width, height, index in reversed(frame.hits):
             if left <= x < left + width and top <= y < top + height:
@@ -437,7 +442,7 @@ class ReaderController(Controller):
                 ).suffix.lower()
                 in DOCUMENTS
             ):
-                state = json.loads(base64.b64decode(pane.viewer))
+                state = self.state(pane)
                 frame = self.frames.get(pane.id)
                 hit = next(
                     (
@@ -457,7 +462,7 @@ class ReaderController(Controller):
         pane = next((p for p in app.panes if p.id == pid and p.viewer), None)
         if pane:
             frame = self.frames.get(pid)
-            state = json.loads(base64.b64decode(pane.viewer))
+            state = self.state(pane)
             cw, ch = self.cell_pixels()
             if Path(state["path"]).suffix.lower() in DOCUMENTS:
                 if state.get("inspector") is None:
@@ -511,7 +516,7 @@ class ReaderController(Controller):
         frame = self.frames.get(pane.id)
         if not frame:
             return
-        state = json.loads(base64.b64decode(pane.viewer))
+        state = self.state(pane)
         if (
             Path(state["path"]).suffix.lower() in DOCUMENTS
             and state.get("inspector") is not None
@@ -605,7 +610,7 @@ class ReaderController(Controller):
 
     async def on_key(self, event, pane):
         app = self.app
-        state = json.loads(base64.b64decode(pane.viewer))
+        state = self.state(pane)
         if Path(state["path"]).suffix.lower() in DOCUMENTS:
             from cosmos_tui.features.reader.rich_input import key
 
@@ -717,7 +722,7 @@ class ReaderController(Controller):
 
     async def prepare(self, pane):
         app = self.app
-        state = json.loads(base64.b64decode(pane.viewer))
+        state = self.state(pane)
         state["_cell"] = self.cell_pixels()
         revision = self.revisions.get(pane.id, 0)
         budget = app.settings.get("viewer_cache_mb", 128)

@@ -3,6 +3,7 @@
 from rich.text import Text
 from rich.style import Style
 from textual.widgets import Static
+from cosmos_tui.ui.blocks import transition
 
 
 def short_path(path, depth, maximum):
@@ -16,20 +17,6 @@ def short_path(path, depth, maximum):
             path = path[1:]
         path = "…" + path
     return path
-
-
-def transition(style, before, after, direction="right"):
-    """Join actual neighboring background colors, including gradient endpoints."""
-    if style == "none":
-        return Text()
-    if style == "capsule":
-        glyph = "" if direction == "left" else ""
-    elif style == "powerline":
-        glyph = "" if direction == "left" else ""
-    else:
-        glyph = "│" if style == "vertical" else "╲" if direction == "left" else "╱"
-    foreground, background = (after, before) if direction == "left" else (before, after)
-    return Text(glyph, style=Style(color=foreground, bgcolor=background))
 
 
 class StatusBar(Static):

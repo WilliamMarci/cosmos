@@ -5,7 +5,7 @@ import io
 import os
 import shutil
 
-from PIL import Image
+from PIL import Image, ImageDraw
 from rich.text import Text
 
 
@@ -36,7 +36,17 @@ def render_inspector(doc, pane, state, palette, cell):
         frame = doc.image_reader.render(
             image, image_state, 1, pane.width, pane.height, cell, palette, True
         )
-        canvas, lines = frame.image, frame.lines
+        canvas, lines = frame.image.copy(), [line.copy() for line in frame.lines]
+        # The document inspector has no image-directory thumbnail toggle.
+        from cosmos_tui.features.reader.flow import put
+
+        put(
+            lines,
+            max(0, pane.width - 3),
+            height,
+            Text(" " * min(3, pane.width), style=f"on {palette['base']}"),
+            3,
+        )
     else:
         for y, text in enumerate(
             row.text.split("\n")[max(0, dy) : max(0, dy) + height]
@@ -55,6 +65,20 @@ def render_inspector(doc, pane, state, palette, cell):
         lines[-1] = Text(
             " " * pane.width, style=f"{palette['fg']} on {palette['base']}"
         )
+    ImageDraw.Draw(canvas).rectangle(
+        (
+            max(0, pane.width - 3) * cw,
+            height * ch,
+            pane.width * cw - 1,
+            pane.height * ch - 1,
+        ),
+        fill=palette["base"],
+    )
+    if not row.image:
+        ImageDraw.Draw(canvas).rectangle(
+            (0, height * ch, pane.width * cw - 1, pane.height * ch - 1),
+            fill=palette["base"],
+        )
     hits = draw_buttons(
         lines,
         0,
@@ -65,6 +89,9 @@ def render_inspector(doc, pane, state, palette, cell):
         state.get("hover"),
         palette,
         put,
+        state.get("_separator", "powerline"),
+        canvas,
+        cell,
     )
     return canvas, lines, hits
 

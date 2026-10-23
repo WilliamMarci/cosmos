@@ -44,17 +44,23 @@ class SettingsTests(unittest.IsolatedAsyncioTestCase):
                 )
                 await pilot.press("full_stop")
                 self.assertEqual(menu.menu, "reader_settings")
+                cache_index = next(
+                    i
+                    for i, r in enumerate(menu.rows)
+                    if r.get("key") == "viewer_cache_mb"
+                )
+                menu.query_one(ListView).index = cache_index
                 await pilot.press("right")
                 self.assertEqual(state["settings"]["viewer_cache_mb"], 256)
                 from textual.color import Color
 
                 self.assertEqual(
-                    menu.query_one(ListItem).styles.background,
+                    menu.query(ListItem)[cache_index].styles.background,
                     Color.parse(app.role_colors["acc"]),
                 )
                 await pilot.press("left")
                 self.assertEqual(state["settings"]["viewer_cache_mb"], 128)
-                row = menu.query_one(SettingRow)
+                row = menu.query(SettingRow)[cache_index]
                 await pilot.click(row, offset=(row.size.width - 1, 0))
                 self.assertEqual(state["settings"]["viewer_cache_mb"], 256)
                 self.assertEqual(
@@ -95,9 +101,14 @@ class SettingsTests(unittest.IsolatedAsyncioTestCase):
                 app.push_screen(Palette("reader_settings"))
                 await pilot.pause()
                 menu = app.screen
-                menu.query_one(ListView).index = 0
+                cache_index = next(
+                    i
+                    for i, r in enumerate(menu.rows)
+                    if r.get("key") == "viewer_cache_mb"
+                )
+                menu.query_one(ListView).index = cache_index
                 await pilot.press("right")
-                self.assertEqual(menu.rows[0]["value"], 128)
+                self.assertEqual(menu.rows[cache_index]["value"], 128)
                 self.assertEqual(len(menu.query("#settings-error")), 0)
                 self.assertEqual(len(notices), 1)
                 self.assertEqual(notices[0]["level"], "error")
@@ -106,14 +117,18 @@ class SettingsTests(unittest.IsolatedAsyncioTestCase):
 
     def test_bootstrap_checks_running_settings_schema(self):
         from cosmos_tui.runtime.bootstrap import (
-            compatibility_gaps, REQUIRED_CAPABILITIES, REQUIRED_SETTINGS,
+            compatibility_gaps,
+            REQUIRED_CAPABILITIES,
+            REQUIRED_SETTINGS,
         )
 
         capabilities = {"capabilities": list(REQUIRED_CAPABILITIES)}
         settings = dict.fromkeys(REQUIRED_SETTINGS)
         self.assertEqual(compatibility_gaps(capabilities, settings), [])
         del settings["viewer_cache_mb"]
-        self.assertIn("setting:viewer_cache_mb", compatibility_gaps(capabilities, settings))
+        self.assertIn(
+            "setting:viewer_cache_mb", compatibility_gaps(capabilities, settings)
+        )
         self.assertIn("notification-stack-v1", compatibility_gaps({}, settings))
 
     async def test_binding_hints_and_explicit_stage_fields(self):
@@ -168,7 +183,9 @@ class SettingsTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
                 self.assertEqual(editor.values(), ["comma"])
                 await pilot.press("escape")
-                unbound = next(c for c in keymap.COMMANDS if c.id == "workspace.new_session")
+                unbound = next(
+                    c for c in keymap.COMMANDS if c.id == "workspace.new_session"
+                )
                 app.push_screen(KeyBindingEditor(unbound))
                 await pilot.pause()
                 self.assertEqual(app.screen.count, 1)

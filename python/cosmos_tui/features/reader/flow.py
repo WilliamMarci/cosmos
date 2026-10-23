@@ -4,8 +4,7 @@ from pathlib import Path
 import re
 import zipfile
 
-from PIL import Image
-from rich.cells import cell_len
+from PIL import Image, ImageDraw
 from rich.console import Console
 from rich.text import Text
 
@@ -38,21 +37,23 @@ def reflow(doc, path, width, state, cell):
     from cosmos_tui.features.reader.documents import Row
 
     rows = []
+    image_rows = state.get("image_rows", IMAGE_ROWS)
+    icon_edge = state.get("icon_edge", ICON_EDGE)
     collapsed = state.get("collapsed_images", [])
     for source in doc.rows(path):
         if source.image:
-            height = IMAGE_ROWS
+            height = image_rows
             icon = False
             if source.block in collapsed:
                 height = 0
             else:
                 try:
                     image_width, image_height = doc.asset_size(path, *source.image)
-                    icon = max(image_width, image_height) <= ICON_EDGE
+                    icon = max(image_width, image_height) <= icon_edge
                     scale = min(
                         1,
                         width * cell[0] / image_width,
-                        IMAGE_ROWS * cell[1] / image_height,
+                        image_rows * cell[1] / image_height,
                     )
                     height = max(
                         1, int((image_height * scale + cell[1] - 1) // cell[1])
@@ -74,12 +75,10 @@ def reflow(doc, path, width, state, cell):
         elif source.table:
             parts = source.text.split("\n")
             if max((t.cell_len for t in parts), default=0) > width:
-                rows.append(Row(Text("[Open table]"), block=source.block, table=True))
+                rows.append(Row(Text(""), block=source.block, table=True))
             else:
                 rows.extend(Row(t, block=source.block) for t in parts)
-                rows.append(
-                    Row(Text("[Open table] [copy]"), block=source.block, table=True)
-                )
+                rows.append(Row(Text(""), block=source.block, table=True))
         else:
             rows.extend(
                 Row(t, heading=source.heading and i == 0, block=source.block)
@@ -143,7 +142,15 @@ def render(doc, pane, state, palette, cell):
     pages = max(1, (len(rows) + stride - 1) // stride)
     page = start // stride + 1
     cw, ch = cell
+    image_rows = state.get("image_rows", IMAGE_ROWS)
     canvas = Image.new("RGB", (pane.width * cw, pane.height * ch), palette["bg"])
+    draw = ImageDraw.Draw(canvas)
+    draw.rectangle(
+        (0, height * ch, pane.width * cw - 1, pane.height * ch - 1),
+        fill=palette["base"],
+    )
+    if sidebar:
+        draw.rectangle((0, 0, sidebar * cw - 1, height * ch - 1), fill=palette["base"])
     style = f"{palette['fg']} on {palette['bg']}"
     lines = [Text(" " * pane.width, style=style) for _ in range(pane.height)]
     hits = []
@@ -152,7 +159,7 @@ def render(doc, pane, state, palette, cell):
     for column in range(count):
         x = sidebar + 1 + column * (width + 3)
         begin = start + column * height
-        for index in range(max(0, begin - IMAGE_ROWS), min(len(rows), begin + height)):
+        for index in range(max(0, begin - image_rows), min(len(rows), begin + height)):
             row = rows[index]
             y = index - begin
             if y < 0 and not row.image:
@@ -166,6 +173,11 @@ def render(doc, pane, state, palette, cell):
                 )
             if row.block == selected:
                 text.stylize(f"on {palette['base']}")
+                if y >= 0:
+                    draw.rectangle(
+                        (x * cw, y * ch, (x + width) * cw - 1, (y + 1) * ch - 1),
+                        fill=palette["base"],
+                    )
             if y >= 0:
                 put(lines, x, y, text, width)
                 hits.append((x, y, width, 1, ("paragraph", row.block)))
@@ -187,14 +199,17 @@ def render(doc, pane, state, palette, cell):
                         state.get("hover"),
                         palette,
                         put,
+                        state.get("_separator", "powerline"),
+                        canvas,
+                        cell,
                     )
                 )
             if row.image and row.block not in state.get("collapsed_images", []):
                 try:
                     image = doc.asset(state["path"], *row.image)
-                    icon = max(image.size) <= ICON_EDGE
+                    icon = max(image.size) <= state.get("icon_edge", ICON_EDGE)
                     image.thumbnail(
-                        (width * cw, IMAGE_ROWS * ch), Image.Resampling.LANCZOS
+                        (width * cw, image_rows * ch), Image.Resampling.LANCZOS
                     )
                     # Crop to this column: an image may straddle a logical page.
                     top = max(0, -y * ch)
@@ -266,34 +281,55 @@ def render(doc, pane, state, palette, cell):
 
         canvas, lines, hits = render_inspector(doc, pane, state, palette, cell)
     else:
-        footer = Text(
-            f" {Path(state['path']).name} ",
+        from cosmos_tui.features.reader.controls import draw_buttons
+
+        lines[-1] = Text(
+            " " * pane.width, style=f"{palette['fg']} on {palette['base']}"
+        )
+        columns_label = (
+            "Auto" if state.get("columns", "auto") == "auto" else str(state["columns"])
+        )
+        items = [
+            ("columns", "Cols " + columns_label),
+            ("mode", "Scroll" if state.get("reading_mode") == "scroll" else "Paged"),
+            ("sidebar", "Outline"),
+        ]
+        control_width = min(pane.width, sum(len(label) + 3 for _, label in items))
+        hits.extend(
+            draw_buttons(
+                lines,
+                0,
+                height,
+                control_width,
+                items,
+                0,
+                state.get("hover"),
+                palette,
+                put,
+                state.get("_separator", "powerline"),
+                canvas,
+                cell,
+            )
+        )
+        details = f" {page}/{pages} "
+        name = Text(
+            " " + Path(state["path"]).name,
             style=f"{palette['fg']} on {palette['base']}",
         )
-        suffix = f" [columns:{state.get('columns', 'auto')}] [mode:{state.get('reading_mode', 'pages')}] {page}/{pages} "
-        footer.truncate(max(0, pane.width - cell_len(suffix)))
-        footer.pad_right(max(0, pane.width - cell_len(suffix) - footer.cell_len))
-        begin = footer.cell_len
-        footer.append(suffix)
-        footer.truncate(pane.width)
-        lines[-1] = footer
-        hits.extend(
-            [
-                (
-                    begin,
-                    height,
-                    len(f" [columns:{state.get('columns', 'auto')}]"),
-                    1,
-                    ("columns", 0),
-                ),
-                (
-                    begin + len(f" [columns:{state.get('columns', 'auto')}]"),
-                    height,
-                    len(f" [mode:{state.get('reading_mode', 'pages')}]"),
-                    1,
-                    ("mode", 0),
-                ),
-            ]
+        name.truncate(max(0, pane.width - control_width - len(details)))
+        put(
+            lines,
+            control_width,
+            height,
+            name,
+            max(0, pane.width - control_width - len(details)),
+        )
+        put(
+            lines,
+            max(control_width, pane.width - len(details)),
+            height,
+            Text(details, style=f"{palette['fg']} on {palette['base']}"),
+            max(0, pane.width - control_width),
         )
     return ReadingFrame(
         canvas,

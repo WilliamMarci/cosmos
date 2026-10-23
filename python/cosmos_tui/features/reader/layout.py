@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw
 from rich.text import Text
 
 from cosmos_tui.render.graphics import halfblocks
+from cosmos_tui.ui.blocks import color_block
 from cosmos_tui.features.reader.cache import ByteCache, image_bytes
 
 FORMATS = {".png", ".jpg", ".jpeg", ".webp"}
@@ -142,7 +143,7 @@ class Reader:
             info.truncate(max(0, available - details.cell_len), overflow="ellipsis")
             info.pad_right(max(0, available - details.cell_len - info.cell_len))
             info += details
-            info.append(" − " if expanded else " + ", style=palette["accl"])
+            info += color_block("−" if expanded else "+", palette["fg"], palette["acc"])
             labels[main_rows] = (0, info)
             hits.append((cols - 3, main_rows, 3, 1, -1))
         if expanded and not outline_mode:
@@ -161,6 +162,16 @@ class Reader:
                 )
                 boxes.append((x, y, w, 4, index))
         draw = ImageDraw.Draw(canvas)
+        if footer:
+            draw.rectangle(
+                (
+                    max(0, cols - 3) * cw,
+                    main_rows * ch,
+                    cols * cw - 1,
+                    (main_rows + 1) * ch - 1,
+                ),
+                fill=palette["acc"],
+            )
         for x, y, w, h, index in boxes:
             tw, th = w * cw, h * ch
             thumb_state = self.change(state, index, entries)

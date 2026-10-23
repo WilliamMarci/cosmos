@@ -34,3 +34,12 @@ The saved configuration remains an array of normalized bindings, e.g. `['leader+
 `ui/settings.py` contains `SettingRow(row)`. A choice row contains label, key, value, choices (value/label pairs) and optional local scope. It posts `SettingRow.Cycle(row, direction)` for arrow clicks; the settings feature owns persistence and error handling. A binding row uses a separate hint field rendered with the muted role color. This is a host Python control, not an external Mod RPC extension.
 
 Reader 新增 viewer_disk_cache_mb（默认 512）、viewer_pdf_edge（默认 2400）和 viewer_pdf_page_mb（默认 32）。Settings → Mods 同时列出进程 Mod 和可移动 UI packages；UI 包子菜单分别管理启用与通知权限，缺省不授予通知。详见 ui-mods.md。
+
+
+## Rich Reader defaults
+
+Settings → Reader provides Default document columns (`viewer_rich_columns`: `auto`, `1`, `2`, `3`; default `auto`), Default reading mode (`viewer_rich_mode`: `pages` / `scroll`; default `pages`), Inline image maximum rows (`viewer_inline_image_rows`: 1–32; default 8), and Icon maximum edge (`viewer_icon_max_px`: 0–256 pixels; default 64, 0 disables icon classification). These use the standard left/right choice controls and are saved by the coordinator.
+
+New/unconfigured rich-document panes use the current column/mode defaults. Changing the pane footer or its Actions creates a pane override; subsequent changes to defaults do not overwrite that pane's selection. Image height and icon thresholds follow current settings for all rich-document panes. They invalidate the reflow cache. See rich-reader.md for keyboard controls and clipboard limitations.
+
+An already running coordinator from before these fields were added must be restarted after detaching clients; its Tmux applications are retained. Existing configuration files acquire the new defaults automatically.

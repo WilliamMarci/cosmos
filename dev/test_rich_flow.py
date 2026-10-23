@@ -10,7 +10,7 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_navigation import Probe
+from test_navigation import Probe, snapshot
 from cosmos_tui.features.reader.documents import Documents
 from cosmos_tui.features.reader.media import Media
 from cosmos_tui.features.reader.flow import geometry, ICON_EDGE
@@ -80,6 +80,110 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
 
             await app.reader_ui.close()
 
+    async def test_settings_actions_defaults_and_punctuation_page_turns(self):
+        from copy import deepcopy
+        from cosmos_tui.features.settings.panel import Palette
+        from cosmos_tui.features.navigation.menus import ActionDrawer
+        from cosmos_tui.core import rpc
+        from textual.widgets import ListView
+
+        settings = dict(
+            viewer_rich_columns="auto",
+            viewer_rich_mode="pages",
+            viewer_inline_image_rows=8,
+            viewer_icon_max_px=64,
+        )
+
+        async def call(method, params=None):
+            if method == "state.snapshot":
+                return dict(snapshot(), settings=deepcopy(settings))
+            if method == "settings.get":
+                return deepcopy(settings)
+            if method == "settings.replace":
+                settings.clear()
+                settings.update(deepcopy(params))
+                return deepcopy(settings)
+            return {}
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, XDG_CACHE_HOME=directory),
+            patch.object(rpc, "call", side_effect=call),
+        ):
+            path = Path(directory) / "reader.md"
+            path.write_text(
+                "# Reader\n\n" + "\n\n".join("Paragraph %s" % i for i in range(140))
+            )
+            app = Probe()
+            async with app.run_test(size=(90, 30)) as pilot:
+                app.push_screen(Palette("reader_settings"))
+                await pilot.pause()
+                menu = app.screen
+                row = next(
+                    r for r in menu.rows if r.get("key") == "viewer_rich_columns"
+                )
+                await menu.cycle_choice(row, 1)
+                self.assertEqual(settings["viewer_rich_columns"], "1")
+                await pilot.press("escape")
+                pane = app.active()
+                pane.viewer = base64.b64encode(
+                    json.dumps(dict(path=str(path))).encode()
+                ).decode()
+                state = app.reader_ui.state(pane)
+                self.assertEqual(state["columns"], 1)
+                state["columns"] = 2
+                await app.reader_ui.update_viewer(pane, state)
+                settings["viewer_rich_columns"] = "3"
+                app.settings = deepcopy(settings)
+                self.assertEqual(app.reader_ui.state(pane)["columns"], 2)
+                frame = await app.reader_ui.prepare(pane)
+                self.assertNotIn("[columns", frame.lines[-1].plain)
+                from PIL import ImageColor
+
+                button_hits = [h for h in frame.hits if h[-1][0] == "mode"]
+                bx, by = button_hits[-1][:2]
+                cw, ch = app.reader_ui.cell_pixels()
+                self.assertEqual(
+                    frame.image.getpixel((bx * cw, by * ch)),
+                    ImageColor.getrgb(app.role_colors["mute"]),
+                )
+                self.assertTrue(any(h[-1] == ("columns", 0) for h in frame.hits))
+                await pilot.press("full_stop")
+                after = app.reader_ui.state(pane)
+                self.assertEqual(after["page"], 2)
+                await pilot.press("comma")
+                self.assertEqual(app.reader_ui.state(pane)["page"], 1)
+                await pilot.press("v", "full_stop")
+                scroll = app.reader_ui.state(pane)
+                self.assertEqual(scroll["reading_mode"], "scroll")
+                self.assertEqual(scroll["row"], (pane.height - 1) * 2)
+                await pilot.press("comma")
+                self.assertEqual(app.reader_ui.state(pane)["row"], 0)
+                app.action_context_actions()
+                await pilot.pause()
+                self.assertIsInstance(app.screen, ActionDrawer)
+                ids = {r.get("id") for r in app.screen.entries}
+                self.assertTrue(
+                    {
+                        "viewer.columns",
+                        "viewer.reading_mode",
+                        "viewer.search",
+                        "viewer.outline",
+                    }
+                    <= ids
+                )
+                self.assertNotIn("viewer.zoom_in", ids)
+                index = next(
+                    i
+                    for i, r in enumerate(app.screen.rows)
+                    if r.get("id") == "viewer.columns"
+                )
+                app.screen.query_one(ListView).index = index
+                app.screen.choose()
+                await pilot.pause()
+                self.assertEqual(app.reader_ui.state(pane)["columns"], 3)
+            await app.reader_ui.close()
+
     def test_icons_natural_size_images_fold_and_wide_tables(self):
         with (
             tempfile.TemporaryDirectory() as directory,
@@ -119,7 +223,7 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
             folded = doc.layout(path, 86, dict(state, collapsed_images=[large]))
             self.assertLess(len(folded), len(rows))
             table = next(r for r in doc.rows(path) if r.table)
-            self.assertTrue(any(r.text.plain == "[Open table]" for r in rows))
+            self.assertTrue(any(r.table and r.block == table.block for r in rows))
             frame, _ = doc.render(
                 pane,
                 dict(state, inspector=table.block, inspect_pan=[8, 0]),

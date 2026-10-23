@@ -8,7 +8,7 @@ HTML parsing, semantic code coloring, tables and equation conversion are adapted
 
 Text is laid out in terminal cells, with an optional left outline generated from headings. Logical pages reflow with pane width and height. EPUB follows the OPF spine order, rather than ZIP/manifest file order; its chapter headings populate the same outline. This is a reflow reader, not fixed-layout EPUB rendering.
 
-- `c` cycles Auto / one / two / three columns; Auto uses the pane width and caps at three columns. Manual counts fall back when a column would be narrower than 24 cells. The reader footer exposes the same clickable selector.
+- `c` cycles Auto / one / two / three columns; Auto uses the pane width and caps at three columns. Manual counts fall back when a column would be narrower than 24 cells. The reader footer exposes the same clickable selector. Settings → Reader supplies its default; Ctrl+P offers the action for the current document.
 - `v` switches paged / continuous-row scrolling. In scroll mode Up/Down (and k/j) move one row; Left/Right (h/l), PageUp/PageDown, `,` / `.` and `[` / `]` move a viewport. Columns are read top-to-bottom, then left-to-right. The mouse wheel follows the active mode.
 - Tab / Shift+Tab select the next / previous paragraph or content block, bring it into view, and highlight it. Enter expands the selected image/table; `f` toggles a selected image's fold state and `y` copies a selected block.
 - `t` / `o` folds the outline sidebar. Click a heading to jump; headings have immediate hover feedback and the current section is highlighted. Navigation follows the current content position; the wheel over the outline scrolls its list independently.
@@ -17,7 +17,7 @@ Text is laid out in terminal cells, with an optional left outline generated from
 
 These defaults use the shared viewer keybinding registry and can be changed in Settings. Reader state (column policy, reading mode, position and folded images) is retained in the Tmux pane. Reflow on width changes recalculates logical pages.
 
-Inline images fit within **eight rows** without upscaling. Smaller images retain their natural pixel dimensions. Images whose original width and height are both at most **64px** are treated as icons and receive no operation buttons. Other images have compact borderless single-line controls (fold/show, expand, copy) inspired by ZhihuViewer, using Cosmos theme roles and immediate hover; they start expanded (folding is Off). Expanded images reuse the existing image Reader viewport, geometry and rendering cache, occupy the source reader pane, support +/- zoom, arrows/hjkl pan and Space fit, and return without losing the text position. Inline and expanded images use the same graphics output owner as the text.
+Inline images fit within **the configured row limit (eight by default)** without upscaling. Smaller images retain their natural pixel dimensions. Images whose original width and height are both at most **the configured icon edge (64px by default)** are treated as icons and receive no operation buttons. Other images have compact borderless single-line controls (fold/show, expand, copy) inspired by ZhihuViewer, using Cosmos theme roles and immediate hover; they start expanded (folding is Off). Expanded images reuse the existing image Reader viewport, geometry and rendering cache, occupy the source reader pane, support +/- zoom, arrows/hjkl pan and Space fit, and return without losing the text position. Inline and expanded images use the same graphics output owner as the text.
 
 Tables use ZhihuViewer's cell-width-aware box renderer. Tables wider than the column appear as an Open table entry, rather than wrapping away their column alignment; other tables render inline. The expanded table supports horizontal/vertical navigation and a copy button. Both image and table controls have immediate hover feedback. Table/image views stay inside the source reader pane.
 
@@ -32,3 +32,10 @@ HTML scripts, styles, frames, media and JavaScript are not executed. This is a c
 Text files and EPUB text members are limited to 16 MiB; reflow is capped at 200000 rows. Expanded books are limited to 128 MiB / 10000 entries. EPUB image members use the configured single-image byte limit and the existing 16-million-pixel limit. Archive references are normalized and cannot escape the book container. DRM/fixed-layout EPUBs are not supported.
 
 Parsed blocks and local decoded resources use the bounded persistent Reader cache described in viewer.md. Wrapped text/layout caches remain in memory. Cache keys include source identity and parser version; the disk entries contain JSON and PNG, never pickle or executable serialized objects.
+
+
+## Settings and contextual Actions
+
+Settings → Reader exposes column/mode defaults, inline image maximum rows and icon threshold. Footer selections override defaults for the current pane, while image sizing limits follow the current settings. Ctrl+P in a rich document includes columns, reading mode, outline, paragraph navigation, search and page jumps. Expand/fold/copy appear according to the selected block; an expanded asset instead offers its applicable controls. Rich-only actions are omitted for ordinary images/PDF, and rich-document search remains available.
+
+Footer and asset buttons are solid color blocks with plain Unicode/text labels and immediate hover. They share `ui/blocks.py` with the status bar, including neighboring-background separator colors and the configured status separator style. There are no emoji image buttons or square-bracket selectors. Comma/period continue to turn a full logical viewport in both paged and scroll reading.

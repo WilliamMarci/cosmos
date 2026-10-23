@@ -15,6 +15,10 @@ pub struct Config {
     pub viewer_disk_cache_mb: usize,
     pub viewer_pdf_edge: usize,
     pub viewer_pdf_page_mb: usize,
+    pub viewer_rich_columns: String,
+    pub viewer_rich_mode: String,
+    pub viewer_inline_image_rows: usize,
+    pub viewer_icon_max_px: usize,
     pub ui_mod_paths: Vec<String>,
     pub ui_mods: BTreeMap<String, BTreeMap<String, bool>>,
     pub mouse_passthrough: bool,
@@ -46,6 +50,10 @@ impl Default for Config {
             viewer_disk_cache_mb: 512,
             viewer_pdf_edge: 2400,
             viewer_pdf_page_mb: 32,
+            viewer_rich_columns: "auto".into(),
+            viewer_rich_mode: "pages".into(),
+            viewer_inline_image_rows: 8,
+            viewer_icon_max_px: 64,
             ui_mod_paths: Vec::new(),
             ui_mods: BTreeMap::new(),
             mouse_passthrough: true,
@@ -69,6 +77,13 @@ impl Default for Config {
 }
 impl Config {
     pub fn validate(&self) -> Result<(), String> {
+        if !["auto", "1", "2", "3"].contains(&self.viewer_rich_columns.as_str())
+            || !["pages", "scroll"].contains(&self.viewer_rich_mode.as_str())
+            || !(1..=32).contains(&self.viewer_inline_image_rows)
+            || self.viewer_icon_max_px > 256
+        {
+            return Err("invalid rich-reader defaults or inline image limits".into());
+        }
         if self.viewer_disk_cache_mb > 8192
             || !(600..=4000).contains(&self.viewer_pdf_edge)
             || !(4..=128).contains(&self.viewer_pdf_page_mb)

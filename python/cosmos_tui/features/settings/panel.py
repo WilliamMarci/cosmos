@@ -99,6 +99,31 @@ class Palette(CosmosModal):
         if self.menu == "reader_settings":
             rows = [
                 choice(
+                    "Default document columns",
+                    "viewer_rich_columns",
+                    [("auto", "Auto"), ("1", "One"), ("2", "Two"), ("3", "Three")],
+                    "auto",
+                ),
+                choice(
+                    "Default reading mode",
+                    "viewer_rich_mode",
+                    [("pages", "Paged"), ("scroll", "Scroll")],
+                    "pages",
+                ),
+                choice(
+                    "Inline image maximum rows",
+                    "viewer_inline_image_rows",
+                    [(n, str(n)) for n in (4, 6, 8, 12, 16, 18, 24, 32)],
+                    8,
+                ),
+                choice(
+                    "Icon maximum edge",
+                    "viewer_icon_max_px",
+                    [(0, "Off")]
+                    + [(n, f"{n}px") for n in (16, 32, 48, 64, 96, 128, 256)],
+                    64,
+                ),
+                choice(
                     "Cache size",
                     "viewer_cache_mb",
                     [(n, f"{n} MiB") for n in (64, 128, 256, 512)],

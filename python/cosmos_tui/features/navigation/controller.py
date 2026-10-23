@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+
 import base64
 import json
 from pathlib import Path
@@ -40,7 +42,7 @@ class NavigationController(Controller):
                 and Path(
                     json.loads(base64.b64decode(pane.viewer))["path"]
                 ).suffix.lower()
-                != ".pdf"
+                not in {".pdf", ".epub", ".md", ".markdown", ".html", ".htm"}
             ):
                 selected = [c for c in selected if c.id != "viewer.search"]
             if source is app._workspace_screen and pane:
@@ -79,9 +81,13 @@ class NavigationController(Controller):
                     for c in selected
                     if c.target in ("cancel", "actions", "cycle(-1)", "cycle(1)")
                 ]
-            passthrough = (
-                "On" if app.settings.get("mouse_passthrough", True) else "Off"
-            )
+            if pane and pane.viewer:
+                from cosmos_tui.features.reader.preferences import commands
+
+                selected = await asyncio.to_thread(
+                    commands, app.reader_ui, pane, selected
+                )
+            passthrough = "On" if app.settings.get("mouse_passthrough", True) else "Off"
             rows = [
                 dict(
                     id=c.id,
