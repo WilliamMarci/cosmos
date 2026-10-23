@@ -13,7 +13,6 @@ from PIL import Image
 from rich.console import Console
 from rich.text import Text
 from cosmos_tui.features.reader.richparse.htmlparse import parse_html, table_to_text
-from cosmos_tui.features.reader.layout import ReadingFrame
 from cosmos_tui.features.reader.cache import ByteCache
 
 FORMATS = {".epub", ".md", ".markdown", ".html", ".htm"}
@@ -105,17 +104,23 @@ class Row:
     text: Text
     image: tuple | None = None
     heading: bool = False
+    block: int = -1
+    table: bool = False
 
 
 class Documents:
-    def __init__(self, media):
+    def __init__(self, media, reader=None):
         self.media = media
+        from cosmos_tui.features.reader.layout import Reader
+
+        self.image_reader = reader if reader is not None else Reader(media)
         self.cache = ByteCache(
             24 * 1024**2, lambda rows: sum(len(r.text.plain) * 4 + 128 for r in rows)
         )
         self.layouts = ByteCache(
             16 * 1024**2, lambda rows: sum(len(r.text.plain) * 4 + 128 for r in rows)
         )
+        self.dimensions = ByteCache(1024**2, lambda _: 128)
         self.epoch = 0
         self.console = Console(width=100, color_system="truecolor")
 
@@ -123,11 +128,13 @@ class Documents:
         self.epoch += 1
         self.cache.clear()
         self.layouts.clear()
+        self.dimensions.clear()
+        self.image_reader.cache.clear()
 
     def rows(self, path):
         epoch = self.epoch
         identity = self.media.identity(path)
-        key = identity + ("rich-zhihu-v1",)
+        key = identity + ("rich-zhihu-v2",)
         cached = self.cache.get(key)
         if cached is not None:
             return cached
@@ -139,6 +146,8 @@ class Documents:
                         decoded(r["text"]),
                         tuple(r["image"]) if r.get("image") else None,
                         r.get("heading", False),
+                        r.get("block", -1),
+                        r.get("table", False),
                     )
                     for r in saved
                 ]
@@ -152,6 +161,7 @@ class Documents:
         for chapter, markup in chapters(Path(path)):
             blocks, _ = parse_html(markup)
             for block in blocks:
+                first = len(rows)
                 if block.kind == "img":
                     for source in block.urls:
                         rows.append(
@@ -163,12 +173,14 @@ class Documents:
                 elif block.kind == "list":
                     rows.extend(Row(t) for t in block.items)
                 elif block.kind == "table":
-                    rows.extend(Row(t) for t in table_to_text(block).split("\n"))
+                    rows.append(Row(table_to_text(block), table=True))
                 elif block.text is not None:
                     rows.extend(
                         Row(t, heading=block.kind == "h")
                         for t in block.text.split("\n")
                     )
+                for row in rows[first:]:
+                    row.block = first
                 rows.append(Row(Text("")))
         if len(rows) > 100000:
             raise ValueError("Rich-text document exceeds 100000 block rows")
@@ -179,37 +191,70 @@ class Documents:
         self.media.disk.save_json(
             key,
             [
-                {"text": encoded(r.text), "image": r.image, "heading": r.heading}
+                {
+                    "text": encoded(r.text),
+                    "image": r.image,
+                    "heading": r.heading,
+                    "block": r.block,
+                    "table": r.table,
+                }
                 for r in rows
             ],
             generation,
         )
         return rows
 
-    def layout(self, path, columns):
-        epoch = self.epoch
-        identity = self.media.identity(path)
-        key = identity + (columns, "wrapped-v1")
+    def layout(self, path, columns, state=None, cell=(10, 20)):
+        from cosmos_tui.features.reader.flow import reflow
+
+        state = state or {}
+        key = self.media.identity(path) + (
+            columns,
+            cell,
+            tuple(state.get("collapsed_images", [])),
+            "wrapped-v2",
+        )
         cached = self.layouts.get(key)
         if cached is not None:
             return cached
-        result = []
-        for row in self.rows(path):
-            if row.image:
-                result.append(row)
-                result.extend(Row(Text("")) for _ in range(7))
-            else:
-                result.extend(
-                    Row(t, heading=row.heading and i == 0)
-                    for i, t in enumerate(
-                        row.text.wrap(self.console, max(1, columns), overflow="fold")
-                    )
-                )
-            if len(result) > 200000:
-                raise ValueError("Reflowed document exceeds 200000 rows")
+        epoch = self.epoch
+        rows = reflow(self, path, columns, state, cell)
         if epoch == self.epoch:
-            self.layouts[key] = result
-        return result
+            self.layouts[key] = rows
+        return rows
+
+    def asset_size(self, path, chapter, source):
+        """Read image headers for reflow without decoding every book image."""
+        parsed = urlsplit(source)
+        if parsed.scheme or parsed.netloc:
+            raise ValueError("External image is not fetched")
+        key = self.media.identity(path) + (chapter, source, "size")
+        if Path(path).suffix.lower() != ".epub":
+            local = (Path(chapter).parent / unquote(parsed.path)).resolve()
+            if not local.is_relative_to(Path(path).resolve().parent):
+                raise ValueError("Image outside document directory")
+            stamp = self.media.identity(local)
+            self.media.check_image_size(local, stamp[1])
+            key += stamp
+        cached = self.dimensions.get(key)
+        if cached is not None:
+            return cached
+        if Path(path).suffix.lower() == ".epub":
+            name = member_path(posixpath.dirname(chapter), source)
+            with zipfile.ZipFile(path) as archive:
+                with archive.open(name) as stream:
+                    if (
+                        archive.getinfo(name).file_size
+                        > self.media.image_max_mb * 1024**2
+                    ):
+                        raise ValueError("Book image exceeds configured size limit")
+                    with Image.open(stream) as image:
+                        size = image.size
+        else:
+            with Image.open(local) as image:
+                size = image.size
+        self.dimensions[key] = size
+        return size
 
     def asset(self, path, chapter, source):
         parsed = urlsplit(source)
@@ -262,126 +307,37 @@ class Documents:
         return image.copy()
 
     def geometry(self, pane, state):
-        sidebar = (
-            min(26, pane.width // 3)
-            if state.get("thumbnails", True) and pane.width >= 45 and pane.height >= 12
-            else 0
-        )
-        return sidebar, max(1, pane.width - sidebar - 2), max(1, pane.height - 1)
+        from cosmos_tui.features.reader.flow import geometry
+
+        sidebar, width, height, count = geometry(pane, state)
+        return sidebar, width, height
 
     def info(self, pane, state):
-        _, columns, height = self.geometry(pane, state)
-        rows = self.layout(state["path"], columns)
+        from cosmos_tui.features.reader.flow import position
+
+        rows, sidebar, width, height, count, start = position(self, pane, state)
+        stride = height * count
         outline = [
-            dict(title=r.text.plain, page=i // height + 1, depth=0)
+            dict(title=r.text.plain, page=i // stride + 1, line=i, depth=0)
             for i, r in enumerate(rows)
             if r.heading
         ]
-        return max(1, (len(rows) + height - 1) // height), outline
+        return max(1, (len(rows) + stride - 1) // stride), outline
 
     def search(self, pane, state, query):
-        _, columns, height = self.geometry(pane, state)
-        rows = self.layout(state["path"], columns)
-        # Preserve every match; callers cycle within and across logical pages.
+        from cosmos_tui.features.reader.flow import position
+
+        rows, _, _, height, count, _ = position(self, pane, state)
         pattern = re.compile(re.escape(query), re.IGNORECASE)
         result = []
         for i, row in enumerate(rows):
             for _ in pattern.finditer(row.text.plain):
-                result.append(dict(page=i // height + 1, line=i))
+                result.append(dict(page=i // (height * count) + 1, line=i))
                 if len(result) >= 10000:
                     return result
         return result
 
     def render(self, pane, state, palette, cell):
-        epoch = self.epoch
-        sidebar, columns, height = self.geometry(pane, state)
-        rows = self.layout(state["path"], columns)
-        pages, outline = self.info(pane, state)
-        page = min(pages, max(1, int(state.get("page", 1))))
-        cw, ch = cell
-        canvas = Image.new("RGB", (pane.width * cw, pane.height * ch), palette["bg"])
-        lines = [
-            Text(" " * pane.width, style=f"{palette['fg']} on {palette['bg']}")
-            for _ in range(pane.height)
-        ]
-        start = (page - 1) * height
-        for index in range(max(0, start - 7), min(len(rows), start + height)):
-            if epoch != self.epoch:
-                break
-            row = rows[index]
-            y = index - start
-            if y < 0 and not row.image:
-                continue
-            text = row.text.copy()
-            if state.get("query"):
-                text.highlight_regex(
-                    re.escape(state["query"]),
-                    f"black on {palette['accl']}",
-                    re_flags=re.IGNORECASE,
-                )
-            text.truncate(columns)
-            x = sidebar + 1
-            if y >= 0:
-                lines[y] = lines[y][:x] + text + lines[y][x + text.cell_len :]
-            if row.image:
-                try:
-                    image = self.asset(state["path"], *row.image)
-                    bounds = (columns * cw, 8 * ch)
-                    image.thumbnail(bounds, Image.Resampling.LANCZOS)
-                    canvas.paste(image, (x * cw, y * ch))
-                    # Text stays blank over the image; the image and text share output ownership.
-                    if y >= 0:
-                        lines[y] = Text(" " * pane.width, style=f"on {palette['bg']}")
-                except (
-                    OSError,
-                    ValueError,
-                    Image.DecompressionBombError,
-                    zipfile.BadZipFile,
-                ) as error:
-                    if y < 0:
-                        continue
-                    label = Text(f"[Image: {error}]", style=palette["mute"])
-                    label.truncate(columns)
-                    lines[y] = lines[y][:x] + label + lines[y][x + label.cell_len :]
-        hits = []
-        if sidebar:
-            title = Text(
-                " Outline ".ljust(sidebar),
-                style=f"{palette['accl']} on {palette['base']}",
-            )
-            lines[0] = title + lines[0][sidebar:]
-            offset = max(0, int(state.get("outline_scroll", 0)))
-            for y, item in enumerate(outline[offset : offset + height - 1], 1):
-                text = Text(
-                    " " + item["title"], style=f"{palette['fg']} on {palette['base']}"
-                )
-                text.truncate(sidebar)
-                text.pad_right(max(0, sidebar - text.cell_len))
-                lines[y] = text + lines[y][sidebar:]
-                hits.append(
-                    (0, y, sidebar, 1, ("outline", item["page"], offset + y - 1))
-                )
-        footer = Text(
-            " " + Path(state["path"]).name,
-            style=f"{palette['fg']} on {palette['base']}",
-        )
-        footer.truncate(max(0, pane.width - 14))
-        footer.pad_right(max(0, pane.width - 14 - footer.cell_len))
-        footer.append(f" {page}/{pages} ".rjust(14))
-        footer.truncate(pane.width)
-        lines[-1] = footer
-        # Character fallback retains readable text and captions, never halfblocks over text.
-        frame = ReadingFrame(
-            canvas,
-            lines,
-            range(1, pages + 1),
-            page - 1,
-            hits,
-            height,
-            sidebar,
-            pane.width - sidebar,
-            1,
-            canvas.size,
-            (0, 0),
-        )
-        return frame, pages
+        from cosmos_tui.features.reader.flow import render
+
+        return render(self, pane, state, palette, cell)

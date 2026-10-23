@@ -25,7 +25,7 @@ class ReaderController(Controller):
         self.media = Media()
         self.loading = LoadingFrames(self)
         self.reader = Reader(self.media)
-        self.documents = Documents(self.media)
+        self.documents = Documents(self.media, self.reader)
         self.frames = {}
         self.pages = {}
         self.revisions = {}
@@ -147,7 +147,15 @@ class ReaderController(Controller):
             await self.update_viewer(pane, state)
             return "Search cleared"
         identity = await asyncio.to_thread(self.media.identity, state["path"])
-        cache_key = (identity, query, pane.width, pane.height)
+        cache_key = (
+            identity,
+            query,
+            pane.width,
+            pane.height,
+            state.get("columns", "auto"),
+            tuple(state.get("collapsed_images", [])),
+            self.cell_pixels(),
+        )
         cached = self.searches.get(pane.id)
         if not cached or cached["key"] != cache_key:
             results = await asyncio.to_thread(self.documents.search, pane, state, query)
@@ -176,6 +184,7 @@ class ReaderController(Controller):
             else 0
         )
         state["page"] = results[cached["index"]]["page"]
+        state["row"] = results[cached["index"]]["line"]
         await self.update_viewer(pane, state)
         return f"{cached['index'] + 1}/{len(results)} · page {state['page']}"
 
@@ -190,6 +199,11 @@ class ReaderController(Controller):
             if current["path"] != path:
                 raise RuntimeError("Source document changed")
             current.update(page=page, pan=[0, 0])
+            if Path(path).suffix.lower() in DOCUMENTS:
+                from cosmos_tui.features.reader.flow import geometry
+
+                _, _, height, columns = geometry(target, current)
+                current["row"] = (page - 1) * height * columns
             current.pop("outline_scroll", None)
             current.pop("outline_index", None)
             await self.update_viewer(target, current)
@@ -319,6 +333,8 @@ class ReaderController(Controller):
 
     async def update_viewer(self, pane, state):
         app = self.app
+        if Path(state["path"]).suffix.lower() in DOCUMENTS:
+            state["_cell"] = self.cell_pixels()
         frame = self.frames.get(pane.id)
         if frame and Path(state["path"]).suffix.lower() not in DOCUMENTS:
             # Clamp in source pixels after every input, not just while rasterizing.
@@ -366,8 +382,16 @@ class ReaderController(Controller):
         event.stop()
         state = json.loads(base64.b64decode(pane.viewer))
         x, y = event.screen_x - pane.x, event.screen_y - pane.y
-        for left, top, width, height, index in frame.hits:
+        for left, top, width, height, index in reversed(frame.hits):
             if left <= x < left + width and top <= y < top + height:
+                if (
+                    isinstance(index, tuple)
+                    and Path(state["path"]).suffix.lower() in DOCUMENTS
+                ):
+                    from cosmos_tui.features.reader.rich_input import action
+
+                    await action(self, pane, state, *index[:2])
+                    return
                 if isinstance(index, tuple):
                     state.update(
                         page=index[1],
@@ -388,6 +412,15 @@ class ReaderController(Controller):
                 await self.update_viewer(pane, state)
                 return
         if Path(state["path"]).suffix.lower() in DOCUMENTS:
+            if state.get("inspector") is not None:
+                from cosmos_tui.features.reader.inspector import source
+
+                if (
+                    source(self.documents, state, state["inspector"]).image
+                    and y < frame.main_rows
+                ):
+                    self.drag = pane.id, event.screen_x, event.screen_y
+                    app.query_one(TerminalSurface).capture_mouse()
             return
         if y < frame.main_rows and x >= frame.main_x:
             self.drag = pane.id, event.screen_x, event.screen_y
@@ -396,6 +429,29 @@ class ReaderController(Controller):
     async def on_mouse_move(self, event):
         app = self.app
         if not self.drag:
+            pane = self.viewer_at(event)
+            if (
+                pane
+                and Path(
+                    json.loads(base64.b64decode(pane.viewer))["path"]
+                ).suffix.lower()
+                in DOCUMENTS
+            ):
+                state = json.loads(base64.b64decode(pane.viewer))
+                frame = self.frames.get(pane.id)
+                hit = next(
+                    (
+                        list(item[:2])
+                        for x, y, w, h, item in reversed(frame.hits if frame else [])
+                        if isinstance(item, tuple)
+                        and x <= event.screen_x - pane.x < x + w
+                        and y <= event.screen_y - pane.y < y + h
+                    ),
+                    None,
+                )
+                if state.get("hover") != hit:
+                    state["hover"] = hit
+                    await self.update_viewer(pane, state)
             return
         pid, x, y = self.drag
         pane = next((p for p in app.panes if p.id == pid and p.viewer), None)
@@ -403,6 +459,34 @@ class ReaderController(Controller):
             frame = self.frames.get(pid)
             state = json.loads(base64.b64decode(pane.viewer))
             cw, ch = self.cell_pixels()
+            if Path(state["path"]).suffix.lower() in DOCUMENTS:
+                if state.get("inspector") is None:
+                    return
+                from cosmos_tui.features.reader.inspector import source
+
+                row = source(self.documents, state, state["inspector"])
+                if not row.image:
+                    return
+                image = await asyncio.to_thread(
+                    self.documents.asset, state["path"], *row.image
+                )
+                scale, pan = self.media.geometry(
+                    image,
+                    dict(
+                        zoom=state.get("inspect_zoom", 1),
+                        pan=state.get("inspect_pan", [0, 0]),
+                    ),
+                    pane.width * cw,
+                    max(1, pane.height - 1) * ch,
+                )
+                state["inspect_pan"] = [
+                    pan[0] - (event.screen_x - x) * cw / scale,
+                    pan[1] - (event.screen_y - y) * ch / scale,
+                ]
+                self.drag = pid, event.screen_x, event.screen_y
+                await self.update_viewer(pane, state)
+                event.stop()
+                return
             state["pan"] = [
                 state["pan"][0]
                 - (event.screen_x - x) * cw / self.view_scale(pane, state, frame),
@@ -428,11 +512,52 @@ class ReaderController(Controller):
         if not frame:
             return
         state = json.loads(base64.b64decode(pane.viewer))
-        if Path(state["path"]).suffix.lower() in DOCUMENTS and not event.ctrl:
-            state["page"] = max(
-                1, min(self.pages.get(pane.id, 1), state.get("page", 1) + direction)
+        if (
+            Path(state["path"]).suffix.lower() in DOCUMENTS
+            and state.get("inspector") is not None
+        ):
+            from cosmos_tui.features.reader.rich_input import key
+            from types import SimpleNamespace
+
+            await key(
+                self,
+                SimpleNamespace(
+                    key="plus" if direction < 0 else "minus",
+                    character="+" if direction < 0 else "-",
+                )
+                if event.ctrl
+                else SimpleNamespace(
+                    key="up" if direction < 0 else "down", character=None
+                ),
+                pane,
+                state,
             )
-            await self.update_viewer(pane, state)
+            event.stop()
+            return
+        if Path(state["path"]).suffix.lower() in DOCUMENTS and not event.ctrl:
+            if event.screen_x - pane.x < frame.main_x:
+                outline = await asyncio.to_thread(
+                    lambda: self.document_info(pane, state)[1]
+                )
+                state["outline_scroll"] = max(
+                    0,
+                    min(
+                        max(0, len(outline) - frame.main_rows + 1),
+                        state.get("outline_scroll", 0) + direction,
+                    ),
+                )
+                await self.update_viewer(pane, state)
+                event.stop()
+                return
+            from cosmos_tui.features.reader.rich_input import key
+            from types import SimpleNamespace
+
+            await key(
+                self,
+                SimpleNamespace(key="up" if direction < 0 else "down", character=None),
+                pane,
+                state,
+            )
             event.stop()
             return
         if (
@@ -482,27 +607,10 @@ class ReaderController(Controller):
         app = self.app
         state = json.loads(base64.b64decode(pane.viewer))
         if Path(state["path"]).suffix.lower() in DOCUMENTS:
-            state.setdefault("navigation", "outline")
-            if event.character == "o":
-                state["thumbnails"] = not state.get("thumbnails", True)
-                await self.update_viewer(pane, state)
+            from cosmos_tui.features.reader.rich_input import key
+
+            if await key(self, event, pane, state):
                 return
-        if (
-            Path(state["path"]).suffix.lower() in DOCUMENTS
-            and not state.get("nav_focus")
-            and event.key
-            in ("up", "down", "left", "right", "pageup", "pagedown", "home", "end")
-        ):
-            page = state.get("page", 1) + (
-                -1 if event.key in ("up", "left", "pageup") else 1
-            )
-            if event.key == "home":
-                page = 1
-            if event.key == "end":
-                page = self.pages.get(pane.id, 1)
-            state["page"] = max(1, min(self.pages.get(pane.id, 1), page))
-            await self.update_viewer(pane, state)
-            return
         if event.key in ("q", "escape"):
             self.revisions[pane.id] = self.revisions.get(pane.id, 0) + 1
             self.frames.pop(pane.id, None)
@@ -610,6 +718,7 @@ class ReaderController(Controller):
     async def prepare(self, pane):
         app = self.app
         state = json.loads(base64.b64decode(pane.viewer))
+        state["_cell"] = self.cell_pixels()
         revision = self.revisions.get(pane.id, 0)
         budget = app.settings.get("viewer_cache_mb", 128)
         self.media.configure(budget)

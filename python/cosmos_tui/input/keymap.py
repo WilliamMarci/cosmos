@@ -105,7 +105,13 @@ for name, label, keys, target in [
     ("find_next", "Next document match", ["n"], "n"),
     ("find_previous", "Previous document match", ["N"], "N"),
     ("outline", "Switch thumbnails / outline", ["o"], "o"),
-    ("navigation_focus", "Focus outline / page", ["tab"], "tab"),
+    ("navigation_focus", "Next paragraph / focus outline", ["tab"], "tab"),
+    ("paragraph_previous", "Previous paragraph", ["shift+tab"], "shift+tab"),
+    ("columns", "Cycle rich document columns", ["c"], "c"),
+    ("reading_mode", "Toggle paged / scroll reading", ["v"], "v"),
+    ("inspect", "Open selected image / table", ["enter"], "enter"),
+    ("copy_asset", "Copy selected image / table", ["y"], "y"),
+    ("fold_asset", "Fold selected inline image", ["f"], "f"),
     ("help", "Viewer help", ["question_mark"], "?"),
     *[
         (d, "Pan " + d, [d, k], d)
