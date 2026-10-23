@@ -20,6 +20,7 @@ viewer_pdf_edge = 2400
 viewer_pdf_page_mb = 32
 viewer_rich_columns = "auto"
 viewer_rich_mode = "pages"
+viewer_rich_line_space = 1
 viewer_inline_image_rows = 8
 viewer_icon_max_px = 64
 ui_mod_paths = []

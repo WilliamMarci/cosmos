@@ -43,3 +43,5 @@ Settings → Reader provides Default document columns (`viewer_rich_columns`: `a
 New/unconfigured rich-document panes use the current column/mode defaults. Changing the pane's upward Options menu or its Actions creates a pane override; subsequent changes to defaults do not overwrite that pane's selection. Icon thresholds follow current settings. Image height follows the global default unless the pane's Options menu supplies an override. The pane-local line spacing control offers 0–3 (0 removes generated spacer rows) without adding gaps inside tables or images. They invalidate the reflow cache. See rich-reader.md for keyboard controls and clipboard limitations.
 
 An already running coordinator from before these fields were added must be restarted after detaching clients; its Tmux applications are retained. Existing configuration files acquire the new defaults automatically.
+
+Reader choices changed through the upward menu or c/v Actions are also persisted to the shared configuration. `viewer_rich_line_space` stores the default line spacing (0–3, default 1) alongside columns, reading mode and inline image height, and is editable in Settings → Reader.

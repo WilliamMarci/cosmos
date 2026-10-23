@@ -26,6 +26,7 @@ REQUIRED_SETTINGS = {
     "viewer_pdf_page_mb",
     "viewer_rich_columns",
     "viewer_rich_mode",
+    "viewer_rich_line_space",
     "viewer_inline_image_rows",
     "viewer_icon_max_px",
     "ui_mod_paths",

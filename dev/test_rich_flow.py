@@ -7,7 +7,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_navigation import Probe, snapshot
@@ -22,6 +22,15 @@ from textual.events import Key
 
 
 class FlowTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self):
+        # Navigation-only fixtures must never write the user's real config.
+        self.config_saves = patch(
+            "cosmos_tui.features.reader.preferences.save_choice",
+            AsyncMock(return_value=True),
+        )
+        self.config_saves.start()
+        self.addCleanup(self.config_saves.stop)
+
     async def test_columns_scroll_paragraphs_outline_and_inspector(self):
         with (
             tempfile.TemporaryDirectory() as directory,
@@ -81,6 +90,7 @@ class FlowTests(unittest.IsolatedAsyncioTestCase):
             await app.reader_ui.close()
 
     async def test_settings_actions_defaults_and_punctuation_page_turns(self):
+        self.config_saves.stop()  # This test supplies its own isolated config RPC.
         from copy import deepcopy
         from cosmos_tui.features.settings.panel import Palette
         from cosmos_tui.features.navigation.menus import ActionDrawer

@@ -111,6 +111,12 @@ class Palette(CosmosModal):
                     "pages",
                 ),
                 choice(
+                    "Default line spacing",
+                    "viewer_rich_line_space",
+                    [(n, str(n)) for n in (0, 1, 2, 3)],
+                    1,
+                ),
+                choice(
                     "Inline image maximum rows",
                     "viewer_inline_image_rows",
                     [(n, str(n)) for n in (4, 6, 8, 12, 16, 18, 24, 32)],

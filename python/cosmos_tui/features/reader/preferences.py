@@ -14,7 +14,7 @@ def defaults(state, settings):
         state["image_rows"] = state.get(
             "inline_rows", settings.get("viewer_inline_image_rows", 8)
         )
-        state.setdefault("line_space", 1)
+        state.setdefault("line_space", settings.get("viewer_rich_line_space", 1))
         state["icon_edge"] = settings.get("viewer_icon_max_px", 64)
     return state
 
@@ -98,3 +98,28 @@ def commands(controller, pane, candidates):
         for c in candidates
         if c.context != "viewer" or c.id.split(".")[-1] in available
     ]
+
+
+async def save_choice(controller, state, field):
+    """Use the same coordinator-backed config as the main Settings panel."""
+    from cosmos_tui.core import rpc
+
+    keys = {
+        "columns": "viewer_rich_columns",
+        "reading_mode": "viewer_rich_mode",
+        "line_space": "viewer_rich_line_space",
+        "inline_rows": "viewer_inline_image_rows",
+    }
+    value = str(state[field]) if field == "columns" else state[field]
+    try:
+        settings = await rpc.call("settings.get")
+        settings[keys[field]] = value
+        await rpc.call("settings.replace", settings)
+        actual = await rpc.call("settings.get")
+        if actual.get(keys[field]) != value:
+            raise RuntimeError("Coordinator did not retain the reader setting")
+        controller.app.settings = actual
+    except (OSError, RuntimeError, ValueError) as error:
+        await controller.app.action_error("reader.settings", error)
+        return False
+    return True

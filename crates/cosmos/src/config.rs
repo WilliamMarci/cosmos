@@ -17,6 +17,7 @@ pub struct Config {
     pub viewer_pdf_page_mb: usize,
     pub viewer_rich_columns: String,
     pub viewer_rich_mode: String,
+    pub viewer_rich_line_space: usize,
     pub viewer_inline_image_rows: usize,
     pub viewer_icon_max_px: usize,
     pub ui_mod_paths: Vec<String>,
@@ -52,6 +53,7 @@ impl Default for Config {
             viewer_pdf_page_mb: 32,
             viewer_rich_columns: "auto".into(),
             viewer_rich_mode: "pages".into(),
+            viewer_rich_line_space: 1,
             viewer_inline_image_rows: 8,
             viewer_icon_max_px: 64,
             ui_mod_paths: Vec::new(),
@@ -79,6 +81,7 @@ impl Config {
     pub fn validate(&self) -> Result<(), String> {
         if !["auto", "1", "2", "3"].contains(&self.viewer_rich_columns.as_str())
             || !["pages", "scroll"].contains(&self.viewer_rich_mode.as_str())
+            || self.viewer_rich_line_space > 3
             || !(1..=32).contains(&self.viewer_inline_image_rows)
             || self.viewer_icon_max_px > 256
         {

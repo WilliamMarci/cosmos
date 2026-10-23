@@ -16,6 +16,7 @@ def seek(doc, pane, state, line):
 
 async def action(controller, pane, state, name, value=0):
     doc = controller.documents
+    saved_field = None
     if name not in ("options", "option_previous", "option_next"):
         if pane.id in controller.options:
             controller.options[pane.id]["open"] = False
@@ -30,6 +31,7 @@ async def action(controller, pane, state, name, value=0):
         menu = controller.options.setdefault(pane.id, {"open": True, "index": 0})
         menu["index"] = int(value)
         field, _, values, current = choices(state, int(value))
+        saved_field = field
         _, _, _, _, _, start = await asyncio.to_thread(position, doc, pane, state)
         values = list(values)
         if current not in values:
@@ -43,12 +45,14 @@ async def action(controller, pane, state, name, value=0):
         seek(doc, pane, state, start)
         state.update(_options_open=True, _option_index=menu["index"])
     elif name == "columns":
+        saved_field = "columns"
         _, _, _, _, _, old_start = await asyncio.to_thread(position, doc, pane, state)
         choices = ["auto", 1, 2, 3]
         current = state.get("columns", "auto")
         state["columns"] = choices[(choices.index(current) + 1) % len(choices)]
         seek(doc, pane, state, old_start)
     elif name == "mode":
+        saved_field = "reading_mode"
         _, _, _, _, _, start = await asyncio.to_thread(position, doc, pane, state)
         state["reading_mode"] = (
             "pages" if state.get("reading_mode") == "scroll" else "scroll"
@@ -74,6 +78,11 @@ async def action(controller, pane, state, name, value=0):
         except (RuntimeError, OSError) as error:
             await controller.app.action_error("reader.copy", error)
         return
+    if saved_field:
+        from cosmos_tui.features.reader.preferences import save_choice
+
+        if not await save_choice(controller, state, saved_field):
+            return
     await controller.update_viewer(pane, state)
 
 
