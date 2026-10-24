@@ -31,6 +31,20 @@ def main(argv=None):
         remote = "://" in value or value.startswith("mailto:")
         path = Path(value).expanduser().absolute() if not remote else None
         integrated = bool(os.getenv("TMUX_PANE") and os.getenv("TMUX"))
+        if path is not None and path.is_dir():
+            from cosmos_tui.features.files.opener import open_directory
+
+            try:
+                open_directory(path)
+            except (
+                OSError,
+                RuntimeError,
+                ValueError,
+                subprocess.CalledProcessError,
+            ) as error:
+                print(f"open: {error}", file=sys.stderr)
+                result = result or 1
+            continue
         supported = (
             path is not None and path.is_file() and path.suffix.lower() in SUPPORTED
         )

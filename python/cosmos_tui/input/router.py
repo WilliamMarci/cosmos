@@ -180,6 +180,12 @@ class InputRouter(Controller):
         if app.view_focus is not None:
             return "surface"
         pane = app.active()
+        if pane and pane.viewer:
+            import base64
+            import json
+
+            if json.loads(base64.b64decode(pane.viewer)).get("kind") == "files":
+                return "files"
         if pane and pane.copy_mode and not pane.viewer:
             return "copy"
         return (

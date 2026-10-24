@@ -120,6 +120,22 @@ for name, label, keys, target in [
     ],
 ]:
     register("viewer." + name, "viewer", label, keys, target)
+for name, label, keys, target in [
+    ("close", "Close files", ["q", "escape"], "q"),
+    ("open", "Open entry", ["enter", "right", "l"], "enter"),
+    ("parent", "Parent directory", ["left", "h"], "left"),
+    ("up", "Previous entry", ["up", "k"], "up"),
+    ("down", "Next entry", ["down", "j"], "down"),
+    ("first", "First entry", ["home"], "home"),
+    ("last", "Last entry", ["end"], "end"),
+    ("page_up", "Previous page", ["pageup"], "pageup"),
+    ("page_down", "Next page", ["pagedown"], "pagedown"),
+    ("filter", "Filter files", ["slash"], "/"),
+    ("hidden", "Toggle hidden files", ["full_stop"], "."),
+    ("sort", "Cycle sort order", ["s"], "s"),
+    ("help", "Files help", ["question_mark"], "?"),
+]:
+    register("files." + name, "files", label, keys, target)
 for context in (
     "palette",
     "switch",

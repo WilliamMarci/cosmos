@@ -61,19 +61,27 @@ class LoadingFrames:
             and (ready[0] == key or self.missing.get(pane.id) != key)
         ):
             return ready[2]
-        if not error and Path(self.controller.state(pane)["path"]).suffix.lower() in {
-            ".epub",
-            ".md",
-            ".markdown",
-            ".html",
-            ".htm",
-        }:
+        if self.controller.state(pane).get("kind") == "files":
+            return self.text_startup(
+                pane, error[1] if error and error[0] == key else None
+            )
+        if not error and (
+            self.controller.state(pane).get("kind") == "files"
+            or Path(self.controller.state(pane)["path"]).suffix.lower()
+            in {
+                ".epub",
+                ".md",
+                ".markdown",
+                ".html",
+                ".htm",
+            }
+        ):
             # Text parsing has no image footprint: do not show a fictitious
             # viewport-sized image/spinner while preparing the first text frame.
             return self.text_startup(pane)
         return self.placeholder(pane, error[1] if error and error[0] == key else None)
 
-    def text_startup(self, pane):
+    def text_startup(self, pane, error=None):
         app = self.controller.app
         palette = app.role_colors
         cw, ch = self.controller.cell_pixels()
@@ -89,6 +97,10 @@ class LoadingFrames:
             )
             title.truncate(pane.width)
             lines[-1] = title
+        if error and len(lines) > 1:
+            label = Text(str(error), style=palette["mute"])
+            label.truncate(pane.width)
+            lines[0] = label
         return ReadingFrame(
             canvas,
             lines,

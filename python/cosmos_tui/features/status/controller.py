@@ -73,6 +73,8 @@ class StatusController(Controller):
                 if suffix in (".pdf", ".epub", ".md", ".markdown", ".html", ".htm")
                 else ("image", "IMAGE")
             )
+            if state.get("kind") == "files":
+                mode, label = "files", "FILES"
             path = state["path"]
         elif Path(program).name in ("opencode", "claude", "codex"):
             mode, label = "agent", "AGENT"

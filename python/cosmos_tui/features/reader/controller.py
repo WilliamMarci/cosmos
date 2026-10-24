@@ -23,6 +23,9 @@ from cosmos_tui.ui.help import Help
 class ReaderController(Controller):
     def __init__(self, app):
         super().__init__(app)
+        from cosmos_tui.features.files.view import FileManager
+
+        self.files = FileManager(self)
         self.media = Media()
         self.loading = LoadingFrames(self)
         self.reader = Reader(self.media)
@@ -350,7 +353,11 @@ class ReaderController(Controller):
         if Path(state["path"]).suffix.lower() in DOCUMENTS:
             state["_cell"] = self.cell_pixels()
         frame = self.frames.get(pane.id)
-        if frame and Path(state["path"]).suffix.lower() not in DOCUMENTS:
+        if (
+            frame
+            and state.get("kind") != "files"
+            and Path(state["path"]).suffix.lower() not in DOCUMENTS
+        ):
             # Clamp in source pixels after every input, not just while rasterizing.
             cw, ch = self.cell_pixels()
             sw, sh = frame.source_size
@@ -401,6 +408,13 @@ class ReaderController(Controller):
         event.stop()
         state = self.state(pane)
         x, y = event.screen_x - pane.x, event.screen_y - pane.y
+        if state.get("kind") == "files":
+            for left, top, width, height, index in frame.hits:
+                if left <= x < left + width and top <= y < top + height:
+                    state["cursor"] = index[1]
+                    await self.update_viewer(pane, state)
+                    return
+            return
         for left, top, width, height, index in reversed(frame.hits):
             if left <= x < left + width and top <= y < top + height:
                 if (
@@ -536,6 +550,21 @@ class ReaderController(Controller):
         if not frame:
             return
         state = self.state(pane)
+        if state.get("kind") == "files":
+            from types import SimpleNamespace
+
+            try:
+                await self.files.key(
+                    SimpleNamespace(
+                        key="up" if direction < 0 else "down", character=None
+                    ),
+                    pane,
+                    state,
+                )
+            except (OSError, RuntimeError, ValueError) as error:
+                await self.app.action_error("files", error)
+            event.stop()
+            return
         if (
             Path(state["path"]).suffix.lower() in DOCUMENTS
             and state.get("inspector") is not None
@@ -630,12 +659,21 @@ class ReaderController(Controller):
     async def on_key(self, event, pane):
         app = self.app
         state = self.state(pane)
+        if state.get("kind") == "files":
+            try:
+                await self.files.key(event, pane, state)
+            except (OSError, RuntimeError, ValueError) as error:
+                await app.action_error("files", error)
+            return
         if Path(state["path"]).suffix.lower() in DOCUMENTS:
             from cosmos_tui.features.reader.rich_input import key
 
             if await key(self, event, pane, state):
                 return
         if event.key in ("q", "escape"):
+            if state.get("return_files"):
+                await self.update_viewer(pane, state["return_files"])
+                return
             self.revisions[pane.id] = self.revisions.get(pane.id, 0) + 1
             self.options.pop(pane.id, None)
             self.frames.pop(pane.id, None)
@@ -743,6 +781,12 @@ class ReaderController(Controller):
     async def prepare(self, pane):
         app = self.app
         state = self.state(pane)
+        if state.get("kind") == "files":
+            frame = await asyncio.to_thread(
+                self.files.render, pane, state, app.role_colors, self.cell_pixels()
+            )
+            self.frames[pane.id], self.pages[pane.id] = frame, 1
+            return frame
         state["_cell"] = self.cell_pixels()
         if Path(state["path"]).suffix.lower() in DOCUMENTS:
             state["_progressive"] = True

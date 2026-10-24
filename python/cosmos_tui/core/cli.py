@@ -93,7 +93,9 @@ TOP_LEVEL_COMMANDS = SESSION_COMMANDS + (
     CommandSpec("mod", "[m]od", (), "manage trusted external Mods"),
     CommandSpec("action", "[ac]tion", (), "invoke a registered Mod action"),
     CommandSpec("rpc", "[rp]c", (), "call an existing coordinator RPC method"),
-    CommandSpec("open", "[o]pen", (), "open a file in the current Cosmos pane"),
+    CommandSpec(
+        "open", "[o]pen", (), "open a file or directory in the current Cosmos pane"
+    ),
     CommandSpec("completion", "[com]pletion", (), "print shell completion code"),
     CommandSpec("help", "[he]lp", (), "show general or command help"),
 )
@@ -489,6 +491,11 @@ def main(argv=None):
             print(
                 "Reader disk cache cleared; active clients retain their memory caches"
             )
+            return 0
+        if operation == "open" and Path(args.file).expanduser().is_dir():
+            from cosmos_tui.features.files.opener import open_directory
+
+            open_directory(args.file)
             return 0
         binary = Path(
             os.environ.get("COSMOS_BINARY", PROJECT_ROOT / "target/release/cosmos")

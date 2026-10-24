@@ -5,6 +5,8 @@ from cosmos_tui.features.reader.documents import FORMATS
 
 
 def defaults(state, settings):
+    if state.get("kind") == "files":
+        return state
     if Path(state["path"]).suffix.lower() in FORMATS:
         state.setdefault("columns", settings.get("viewer_rich_columns", "auto"))
         if state["columns"] != "auto":

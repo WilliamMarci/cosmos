@@ -7,6 +7,7 @@ GROUPS = [
     "History & selection",
     "Command assistant",
     "Reader",
+    "Files",
     "Mods",
     "Input method",
     "Dialogs & settings",
@@ -24,6 +25,8 @@ def group(command):
         "workspace.agent",
     ):
         return "Command assistant"
+    if context == "files":
+        return "Files"
     if context.startswith("viewer"):
         return "Reader"
     if context == "copy" or any(
