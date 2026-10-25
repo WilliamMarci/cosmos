@@ -25,6 +25,9 @@ from cosmos_tui.ui.menus import CompactMenu
 class InputRouter(Controller):
     async def on_event(self, event):
         app = self.app
+        if isinstance(event, events.Key) and not event.is_forwarded:
+            if await app.workspace.identify_key(event):
+                return
         # Resolve Leader before forwarding to focused widgets. Keyboard protocols
         # may describe shifted punctuation by character rather than binding name.
         if isinstance(event, events.Key) and not event.is_forwarded:

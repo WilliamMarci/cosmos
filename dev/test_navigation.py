@@ -152,6 +152,7 @@ class NavigationTests(unittest.IsolatedAsyncioTestCase):
             app.backend.inventory = AsyncMock(return_value=[window])
             app.backend.select_window = AsyncMock()
             async with app.run_test(size=(80, 24)) as pilot:
+                app.backend.request.return_value = ["/tmp"]
                 await pilot.press("ctrl+p")
                 self.assertIn(
                     "New session", [row["label"] for row in app.screen.entries]
@@ -159,7 +160,7 @@ class NavigationTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.press(*"new session", "enter")
                 self.assertIsInstance(app.screen, NewSession)
                 await pilot.press(*"research", "enter")
-                create.assert_awaited_once_with("research")
+                create.assert_awaited_once_with("research", cwd="/tmp")
                 app.backend.select_window.assert_awaited_once_with(window)
                 self.assertIs(app.screen, app._workspace_screen)
                 self.assertEqual(app.active().id, "%0")

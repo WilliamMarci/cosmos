@@ -12,7 +12,7 @@ async def listing():
         output = await backend.cli(
             "list-sessions",
             "-F",
-            "#{session_name}\t#{session_windows}\t#{session_created}",
+            "#{session_name}\t#{session_windows}\t#{session_created}\t#{session_id}",
         )
     except RuntimeError as error:
         if "no server running" in str(error) or "No such file or directory" in str(
@@ -21,12 +21,15 @@ async def listing():
             return []
         raise
     return [
-        dict(name=name, windows=int(windows), created=int(created))
-        for name, windows, created in (row.split("\t") for row in output.splitlines())
+        dict(name=name, windows=int(windows), created=int(created), id=ident)
+        for name, windows, created, ident in (
+            row.split("\t") for row in output.splitlines()
+        )
     ]
 
 
 async def create(name, cwd=None):
+    Tmux.validate_name(name)
     backend = Tmux(name)
     arguments = [
         "-f",
@@ -103,6 +106,7 @@ async def history(name, pane=None, lines=None, ansi=False):
         result.append(
             dict(
                 session=name,
+                session_id=session_id,
                 window=int(window),
                 pane_index=int(index),
                 pane=pane_id,

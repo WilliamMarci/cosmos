@@ -57,6 +57,7 @@ class NavigationController(Controller):
                     "split_horizontal",
                     "split_vertical",
                     "next_pane",
+                    "identify_panes",
                     "zoom",
                     "agent",
                     "mouse_passthrough",

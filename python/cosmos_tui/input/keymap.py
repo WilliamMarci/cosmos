@@ -48,6 +48,7 @@ for name, label, keys, target in [
     ("next_window", "Next window", ["n"], "n"),
     ("previous_window", "Previous window", ["b"], "b"),
     ("next_pane", "Next pane", ["o"], "o"),
+    ("identify_panes", "Show pane numbers / select pane", ["q"], "identify_panes"),
     ("zoom", "Zoom pane", ["z"], "z"),
     ("notifications", "Notification actions", ["N"], "N"),
     *[(f"focus_{d}", f"Focus {d}", [d], d) for d in ("up", "down", "left", "right")],
@@ -182,6 +183,15 @@ for context in (
             else [key],
             key,
         )
+
+for name, label, key in [
+    ("expand", "Expand session / window", "right"),
+    ("collapse", "Collapse session / window", "left"),
+    ("new", "New session", "ctrl+n"),
+    ("rename", "Rename selected target", "ctrl+r"),
+    ("more", "More target actions", "ctrl+o"),
+]:
+    register("switch." + name, "switch", label, [key], key)
 
 for name, label, keys, target in [
     ("cancel", "Return to terminal", ["escape", "q"], "cancel"),

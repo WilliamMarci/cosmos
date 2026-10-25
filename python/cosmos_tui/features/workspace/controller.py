@@ -35,6 +35,32 @@ class WorkspaceController(Controller):
         except (RuntimeError, OSError, ValueError) as error:
             await app.action_error("mouse passthrough", error)
 
+    def show_pane_numbers(self):
+        self.identifying = True
+        if getattr(self, "identify_timer", None):
+            self.identify_timer.stop()
+        self.identify_timer = self.app.set_timer(3, self.hide_pane_numbers)
+        self.app.query_one("#terminal").refresh()
+
+    def hide_pane_numbers(self):
+        self.identifying = False
+        self.app.query_one("#terminal").refresh()
+
+    async def identify_key(self, event):
+        if not getattr(self, "identifying", False):
+            return False
+        self.hide_pane_numbers()
+        if self.app.screen is not self.app._workspace_screen:
+            return False
+        digit = event.character or event.key
+        if len(digit) == 1 and digit in "0123456789":
+            pane = next((p for p in self.app.panes if p.index == int(digit)), None)
+            if pane:
+                await self.app.backend.request("select-pane -t " + pane.id)
+                self.app.panes = await self.app.backend.snapshot()
+            return True
+        return event.key == "escape"
+
     async def action_leader_key(self, key):
         app = self.app
         logging.getLogger(__name__).debug("action_leader_key %s", key)
@@ -55,6 +81,9 @@ class WorkspaceController(Controller):
                     await app.copy_action("search")
             except RuntimeError as error:
                 await app.action_error(key, error)
+            return
+        if key == "identify_panes":
+            self.show_pane_numbers()
             return
         if key == "start":
             app.action_start_menu()

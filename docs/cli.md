@@ -95,3 +95,17 @@ The flat commands, their common aliases, nested session operations, uniform sess
 `cosmos --version` prints `Cosmos Arche 0.2.0-dev.1 (development)`. The codename/channel identify the development release; session command and protocol version semantics are unchanged.
 
 `cosmos cache-clear` now clears the persistent Python Reader cache with the same lock/generation protocol as Settings → Reader; running clients keep their in-memory frames. The older viewer.cache.clear RPC remains the legacy Rust cache operation.
+
+## Stable session and pane IDs
+
+Session targets accept exact names or the Tmux server's stable `$ID`. Quote dollar IDs so the shell does not expand them:
+
+```bash
+cosmos list
+cosmos attach '$3'
+cosmos exists '$3'
+cosmos rename '$3' research
+cosmos history '$3' --pane '%8' --json
+```
+
+IDs survive renaming for the lifetime of that Tmux server. A missing ID is an error, and `cosmos new` requires a name. List output begins with the session ID; JSON session listings expose it as `id`. History JSON additionally includes `session_id`. The existing `--pane '%ID'` option checks that the pane belongs to the requested session. Switch displays stable `$`/`@`/`%` IDs separately from the local window/pane indices; see [Switch](switch.md).

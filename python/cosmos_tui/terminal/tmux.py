@@ -37,11 +37,15 @@ class Pane:
     mouse_all: bool = False
     mouse_utf8: bool = False
     mouse_sgr: bool = False
+    index: int = 0
+    window_id: str = ""
+    session_id: str = ""
+    name: str = ""
 
 
 class Tmux:
     def __init__(self, session="main"):
-        self.validate_name(session)
+        self.validate_target(session)
         self.session = session
         self.session_id = None
         self.created = False
@@ -74,6 +78,11 @@ class Tmux:
             raise ValueError("invalid session name")
 
     @staticmethod
+    def validate_target(value):
+        if not re.fullmatch(r"\$\d+", value):
+            Tmux.validate_name(value)
+
+    @staticmethod
     def shell_command():
         return shlex.join(
             [
@@ -103,7 +112,7 @@ class Tmux:
             raise
         for row in output.splitlines():
             session_id, _, session_name = row.partition("\t")
-            if session_name == name:
+            if session_name == name or session_id == name:
                 return session_id
         return None
 
@@ -111,6 +120,8 @@ class Tmux:
         self.created = False
         self.session_id = await self.resolve_session_id()
         if self.session_id is None:
+            if self.session.startswith("$"):
+                raise ValueError(f"session not found: {self.session}")
             try:
                 self.session_id = (
                     await self.cli(
@@ -135,6 +146,11 @@ class Tmux:
                 self.created = True
         if not re.fullmatch(r"\$\d+", self.session_id or ""):
             raise RuntimeError("invalid session ID")
+        self.session = (
+            await self.cli(
+                "display-message", "-p", "-t", self.session_id, "#{session_name}"
+            )
+        ).strip()
         await self.cli(
             "set-option",
             "-t",
@@ -319,14 +335,16 @@ class Tmux:
         rows = await self.request(
             "list-panes "
             + target
-            + " -F '#{pane_id}|#{pane_left}|#{pane_top}|#{pane_width}|#{pane_height}|#{pane_active}|#{window_zoomed_flag}|#{cursor_x}|#{cursor_y}|#{cursor_flag}|#{cursor_shape}|#{cursor_blinking}|#{@cosmos_viewer}|#{pane_in_mode}|#{mouse_any_flag}#{mouse_standard_flag}#{mouse_button_flag}#{mouse_all_flag}#{mouse_utf8_flag}#{mouse_sgr_flag}'"
+            + " -F '#{pane_id}|#{pane_left}|#{pane_top}|#{pane_width}|#{pane_height}|#{pane_active}|#{window_zoomed_flag}|#{cursor_x}|#{cursor_y}|#{cursor_flag}|#{cursor_shape}|#{cursor_blinking}|#{@cosmos_viewer}|#{pane_in_mode}|#{mouse_any_flag}#{mouse_standard_flag}#{mouse_button_flag}#{mouse_all_flag}#{mouse_utf8_flag}#{mouse_sgr_flag}|#{pane_index}|#{window_id}|#{session_id}|#{@cosmos_name}'"
         )
         panes = []
         zoomed = False
         for row in rows:
-            fields = row.split("|", 14)
-            if len(fields) != 15:
+            fields = row.split("|", 18)
+            if len(fields) not in (15, 19):
                 continue
+            identities = fields[15:]
+            fields = fields[:15]
             (
                 pane,
                 x,
@@ -407,6 +425,10 @@ class Tmux:
                     mouse_all=mouse[3],
                     mouse_utf8=mouse[4],
                     mouse_sgr=mouse[5],
+                    index=int(identities[0]) if identities else len(panes),
+                    window_id=identities[1] if identities else (window or ""),
+                    session_id=identities[2] if identities else (self.session_id or ""),
+                    name=identities[3] if identities else "",
                 )
             )
             zoomed = zoom == "1"

@@ -95,6 +95,30 @@ class TerminalSurface(Widget):
                         strip.crop(right, pane.width),
                     ]
                 )
+            if (
+                getattr(getattr(self.app, "workspace", None), "identifying", False)
+                and row == pane.height // 2
+            ):
+                label = f" {pane.index} · {pane.id} "
+                label = label[: pane.width]
+                left = max(0, (pane.width - len(label)) // 2)
+                badge = Strip(
+                    [
+                        Segment(
+                            label,
+                            Style(
+                                color=palette["on"], bgcolor=palette["acc"], bold=True
+                            ),
+                        )
+                    ]
+                )
+                strip = Strip.join(
+                    [
+                        strip.crop(0, left),
+                        badge,
+                        strip.crop(left + len(label), pane.width),
+                    ]
+                )
             parts.append(strip)
             x = pane.x + pane.width
         if x < width:

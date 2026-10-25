@@ -450,7 +450,7 @@ def main(argv=None):
                 print(json.dumps(rows, indent=2))
             else:
                 for row in rows:
-                    print(f"{row['name']}\t{row['windows']} window(s)")
+                    print(f"{row['id']}\t{row['name']}\t{row['windows']} window(s)")
             return 0
         if operation == "exists":
             from cosmos_tui.terminal import sessions

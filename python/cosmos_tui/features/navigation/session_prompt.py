@@ -1,7 +1,6 @@
 """Create and select a retained session through the shared bottom overlay."""
 
 from textual.binding import Binding
-from textual.widgets import Static
 
 from cosmos_tui.input.shortcuts import CosmosInput, CosmosModal
 from cosmos_tui.terminal.sessions import create
@@ -11,16 +10,16 @@ from cosmos_tui.ui.chrome import BottomSheet, SheetShadow
 class NewSession(CosmosModal):
     BINDINGS = [Binding("escape", "cancel", show=False)]
     DEFAULT_CSS = """
-    #new-session-sheet { position: absolute; width: 100%; height: 3; padding: 0 1; }
+    #new-session-sheet { position: absolute; width: 100%; height: 2; padding: 0 1; }
     #new-session-name { height: 1; border: none; padding: 0; }
-    #new-session-error { height: 1; }
     """
 
-    def __init__(self):
+    def __init__(self, cwd=None):
         super().__init__()
         self.styles.background = "transparent"
         self.styles.background_tint = "transparent"
         self.busy = False
+        self.cwd = cwd
 
     def compose(self):
         yield SheetShadow(id="new-session-shadow")
@@ -30,7 +29,6 @@ class NewSession(CosmosModal):
                 placeholder="Session name · Enter to create · Esc to cancel",
                 id="new-session-name",
             )
-            yield Static("", id="new-session-error", markup=False)
 
     def on_mount(self):
         self.place()
@@ -39,7 +37,7 @@ class NewSession(CosmosModal):
     def place(self):
         bottom = self.app.size.height - int(self.app.query_one("#status").display)
         self.query_one(SheetShadow).place(
-            self.query_one(BottomSheet), 0, max(0, bottom - 3), self.app.size.width, 3
+            self.query_one(BottomSheet), 0, max(0, bottom - 2), self.app.size.width, 2
         )
 
     def on_resize(self):
@@ -52,7 +50,14 @@ class NewSession(CosmosModal):
         self.busy = True
         name = event.value.strip()
         try:
-            session_id = await create(name)
+            cwd = self.cwd
+            if cwd is None and self.app.active():
+                pane = self.app.active()
+                rows = await self.app.backend.request(
+                    f"display-message -p -t {pane.id} '#{{pane_current_path}}'"
+                )
+                cwd = "\n".join(rows) or None
+            session_id = await create(name, cwd=cwd)
             windows = await self.app.backend.inventory()
             window = next(
                 (row for row in windows if row["session_id"] == session_id), None
@@ -61,9 +66,9 @@ class NewSession(CosmosModal):
                 raise RuntimeError(f"session {name} is not ready")
             await self.app.backend.select_window(window)
             self.app.panes = await self.app.backend.snapshot()
-            self.dismiss(None)
+            self.dismiss(window)
         except (OSError, RuntimeError, ValueError) as error:
-            self.query_one("#new-session-error", Static).update(str(error))
+            await self.app.action_error("session.new", error)
         finally:
             self.busy = False
 
