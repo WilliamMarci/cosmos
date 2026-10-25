@@ -125,6 +125,12 @@ class SettingsTests(unittest.IsolatedAsyncioTestCase):
         capabilities = {"capabilities": list(REQUIRED_CAPABILITIES)}
         settings = dict.fromkeys(REQUIRED_SETTINGS)
         self.assertEqual(compatibility_gaps(capabilities, settings), [])
+        without_assistant = dict(settings)
+        without_assistant.pop("assistant_file_access")
+        self.assertIn(
+            "setting:assistant_file_access",
+            compatibility_gaps(capabilities, without_assistant),
+        )
         del settings["viewer_cache_mb"]
         self.assertIn(
             "setting:viewer_cache_mb", compatibility_gaps(capabilities, settings)

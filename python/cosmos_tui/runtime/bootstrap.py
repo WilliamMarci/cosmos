@@ -17,6 +17,7 @@ REQUIRED_CAPABILITIES = {
     "leader-presets-v1",
 }
 REQUIRED_SETTINGS = {
+    "assistant_file_access",
     "status_path_depth",
     "status_path_max_length",
     "status_path_align",
