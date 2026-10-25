@@ -195,17 +195,21 @@ class Rime:
                 )
             self.sessions[target] = sid
         sid = self.sessions[target]
-        self.call(
-            "set_option", None, [C.c_size_t, C.c_char_p, C.c_int], sid, b"ascii_mode", 0
-        )
-        self.call(
-            "set_option",
-            None,
-            [C.c_size_t, C.c_char_p, C.c_int],
-            sid,
-            b"full_shape",
-            full,
-        )
+        # Even setting an unchanged Rime option can reset the candidate menu.
+        # Compare the engine state before setting; paging must survive each key.
+        for option, value in ((b"ascii_mode", False), (b"full_shape", bool(full))):
+            current = bool(
+                self.call("get_option", C.c_int, [C.c_size_t, C.c_char_p], sid, option)
+            )
+            if current != value:
+                self.call(
+                    "set_option",
+                    None,
+                    [C.c_size_t, C.c_char_p, C.c_int],
+                    sid,
+                    option,
+                    int(value),
+                )
         return sid
 
     def process(self, target, key, full=False):

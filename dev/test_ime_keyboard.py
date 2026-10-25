@@ -85,6 +85,30 @@ class KeyboardTests(unittest.IsolatedAsyncioTestCase):
 
 @unittest.skipUnless(REAL_RIME, "requires librime and compiled rime_ice data")
 class IMETests(unittest.IsolatedAsyncioTestCase):
+    async def test_real_rime_repeated_candidate_paging(self):
+        from cosmos_tui.features.ime.rime import Rime
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(
+                os.environ, XDG_STATE_HOME=directory, COSMOS_RIME_DATA=str(DATA)
+            ),
+        ):
+            engine = Rime()
+            target = ("pane", "%paging-test")
+            try:
+                for char in "shi":
+                    engine.process(target, ord(char))
+                self.assertEqual(engine.context(target)["page"], 0)
+                for expected in range(1, 6):
+                    engine.process(target, 0xFF56)
+                    self.assertEqual(engine.context(target)["page"], expected)
+                for expected in range(4, -1, -1):
+                    engine.process(target, 0xFF55)
+                    self.assertEqual(engine.context(target)["page"], expected)
+            finally:
+                engine.close()
+
     async def test_real_rime_in_command_assistant_custom_editor(self):
         from test_assistant import LayerProbe
         from cosmos_tui.ui.editor import CellEditor

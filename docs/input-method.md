@@ -10,6 +10,8 @@ While composing, the two-row overlay shows preedit and numbered candidates near 
 
 Committed text goes to the captured pane using the existing paste adapter, or directly into the focused editable Cosmos Input/CellEditor (including the command assistant). Custom CellEditor commits use insert_text_at_cursor, emit its normal Changed message and preserve the assistant controller buffer. Its cursor_screen_offset accounts for horizontal scroll. Viewer navigation, copy-mode, password fields and non-editable views bypass composition. Leader and global shortcuts are resolved before IME input. Ctrl+Space remains available to applications. Pasted text bypasses phonetic conversion. English full-width mode converts printable ASCII to full-width characters; control shortcuts pass through.
 
+Candidate paging preserves the Rime menu across consecutive keys. Language and width options are only set when their engine values change; reapplying unchanged options would reset the candidate page.
+
 ## Engine and data discovery
 
 - Library: `COSMOS_RIME_LIBRARY`, then package `lib/librime.so.1`, then system librime.
