@@ -107,9 +107,9 @@ class SwitchTreeTests(unittest.IsolatedAsyncioTestCase):
                 await screen.inventory_ready.wait()
                 await pilot.pause()
                 self.assertIsInstance(screen, Switcher)
-                self.assertEqual(
-                    [r["kind"] for r in screen.rows], ["session", "window", "window"]
-                )
+                self.assertEqual([r["kind"] for r in screen.rows], ["session"])
+                await pilot.press("right")
+                screen.query_one(ListView).index = 1
                 await pilot.press("right")
                 self.assertEqual(
                     [r["kind"] for r in screen.rows],
@@ -118,9 +118,17 @@ class SwitchTreeTests(unittest.IsolatedAsyncioTestCase):
                 screen.query_one(ListView).index = 2
                 await pilot.pause()
                 widget = screen.query(SwitchRow)[2]
-                widget.render()
+                painted = widget.render()
+                row_bg = painted.get_style_at_offset(app.console, 4).bgcolor
+                self.assertNotEqual(row_bg.name, app.role_colors["acc"])
                 self.assertEqual(
-                    [name for _, _, name in widget.hits], ["switch", "rename", "more"]
+                    row_bg,
+                    painted.get_style_at_offset(
+                        app.console, widget.hits[-1][0]
+                    ).bgcolor,
+                )
+                self.assertEqual(
+                    [name for _, _, name in widget.hits], ["rename", "more"]
                 )
                 await pilot.press("ctrl+r")
                 await pilot.pause()
@@ -149,6 +157,13 @@ class SwitchTreeTests(unittest.IsolatedAsyncioTestCase):
                 await pilot.pause()
                 self.assertIn("select-pane -t %9", app.backend.calls)
                 self.assertIs(app.screen, app._workspace_screen)
+                await pilot.press("ctrl+b", "s")
+                await app.screen.inventory_ready.wait()
+                self.assertIn("$7:@3", app.screen.expanded)
+                app.screen.query_one(ListView).index = 0
+                await pilot.press("left", "escape", "ctrl+b", "s")
+                await app.screen.inventory_ready.wait()
+                self.assertEqual([r["kind"] for r in app.screen.rows], ["session"])
 
     async def test_identify_panes_selects_stable_id_without_typing_digit(self):
         app = BaseProbe()

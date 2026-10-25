@@ -66,6 +66,22 @@ class StatusController(Controller):
         path, program = self.metadata
         mode, label, details = "cosmos", "COSMOS", ""
         file_info = None
+        identity = None
+        history = ""
+        if pane:
+            sid = pane.session_id or app.backend.session_id
+            if sid:
+                identity = f"{sid}:{pane.id}"
+            if pane.copy_mode:
+                total = pane.history_size + pane.height
+                row = max(
+                    1,
+                    min(
+                        total,
+                        pane.history_size - pane.scroll_position + pane.cursor[1] + 1,
+                    ),
+                )
+                history = f"COPY {row}/{total}:{pane.cursor[0] + 1} {round(row / max(1, total) * 100)}%"
         if pane and pane.viewer:
             state = json.loads(base64.b64decode(pane.viewer))
             suffix = Path(state["path"]).suffix.lower()
@@ -113,4 +129,6 @@ class StatusController(Controller):
             clock=datetime.now().astimezone().strftime("%H:%M %b %d"),
             mode=mode,
             file_info=file_info,
+            identity=identity,
+            history=history,
         )

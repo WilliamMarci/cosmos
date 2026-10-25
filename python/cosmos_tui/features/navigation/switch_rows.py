@@ -4,6 +4,7 @@ from rich.text import Text
 from textual.widget import Widget
 from textual.message import Message
 from cosmos_tui.ui.primitives import CompactAction
+from cosmos_tui.ui.theme import blend
 
 
 class SwitchRow(Widget):
@@ -25,8 +26,12 @@ class SwitchRow(Widget):
     def render(self):
         palette = self.app.role_colors
         active = bool(getattr(self.parent, "highlighted", False))
-        bg = palette["acc"] if active else palette["base"]
-        fg = palette["on"] if active else palette["fg"]
+        bg = (
+            blend(palette["base"], palette["acc"], 0.18 if active else 0.1)
+            if active or self.hovered
+            else palette["base"]
+        )
+        fg = palette["fg"]
         controls = Text()
         self.hits = []
         show = active or self.hovered
@@ -45,18 +50,16 @@ class SwitchRow(Widget):
         if level < 2:
             self.hits.append((len(prefix), len(prefix) + 1, "fold"))
         if show:
-            for name, glyph in (("switch", "↵"), ("rename", "✎"), ("more", "⋯")):
+            for name, glyph in (("rename", "✎"), ("more", "⋯")):
                 paint = CompactAction(glyph).paint(palette)
-                controls.append(
-                    paint.text, style=f"{paint.foreground} on {paint.background}"
-                )
+                controls.append(paint.text, style=f"{paint.foreground} on {bg}")
         room = max(0, self.size.width - controls.cell_len)
         left.truncate(room, overflow="ellipsis")
         left.pad_right(max(0, room - left.cell_len))
         if show:
             self.hits.extend(
                 (room + i * 3, room + (i + 1) * 3, name)
-                for i, name in enumerate(("switch", "rename", "more"))
+                for i, name in enumerate(("rename", "more"))
             )
         return left + controls
 

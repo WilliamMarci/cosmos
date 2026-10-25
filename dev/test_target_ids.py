@@ -1,6 +1,7 @@
 """Stable IDs survive rename and pane indices remain local display coordinates."""
 
 import os
+import asyncio
 from pathlib import Path
 import tempfile
 import unittest
@@ -52,6 +53,32 @@ class TargetIDTests(unittest.IsolatedAsyncioTestCase):
                     self.assertTrue(await sessions.exists(sid))
                     self.assertEqual((await sessions.listing())[0]["id"], sid)
                     self.assertEqual((await sessions.listing())[0]["name"], "renamed")
+                    await backend.request(
+                        f"send-keys -t {selected.id} 'seq 1 200' Enter"
+                    )
+                    for _ in range(50):
+                        count = await backend.request(
+                            f"display-message -p -t {selected.id} '#{{history_size}}'"
+                        )
+                        if count and int(count[0]) > 0:
+                            break
+                        await asyncio.sleep(0.02)
+                    await backend.request("copy-mode -t " + selected.id)
+                    await backend.request(f"send-keys -X -t {selected.id} history-top")
+                    copied = next(
+                        p for p in await backend.snapshot() if p.id == selected.id
+                    )
+                    self.assertTrue(copied.copy_mode)
+                    self.assertGreater(copied.history_size, 0)
+                    self.assertGreater(copied.scroll_position, 0)
+                    self.assertLessEqual(
+                        copied.history_size
+                        - copied.scroll_position
+                        + copied.cursor[1]
+                        + 1,
+                        copied.height,
+                    )
+                    await backend.request(f"send-keys -X -t {selected.id} cancel")
                     history = await sessions.history(sid, pane=selected.id, lines=5)
                     self.assertEqual(history[0]["session_id"], sid)
                     self.assertEqual(history[0]["pane"], selected.id)

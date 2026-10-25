@@ -62,6 +62,8 @@ class Switcher(CosmosModal):
                 yield LayoutPreview()
 
     async def on_mount(self):
+        self.expanded = getattr(self.app, "_switch_expanded", set())
+        self.app._switch_expanded = self.expanded
         palette = self.app.role_colors
         for widget in self.query("#switch-list, #switch-new"):
             widget.styles.background = palette["base"]
@@ -100,8 +102,6 @@ class Switcher(CosmosModal):
                             pane_name=name,
                         )
                     )
-        if initial:
-            self.expanded.update(w["session_id"] for w in self.windows)
         await self.populate()
 
     def nodes(self, query):
@@ -174,8 +174,17 @@ class Switcher(CosmosModal):
             ListItem(SwitchRow(row, row["key"] in self.expanded)) for row in self.rows
         )
         if self.rows:
+            candidates = [previous] if previous else []
+            while candidates and ":" in candidates[-1]:
+                candidates.append(candidates[-1].rsplit(":", 1)[0])
             listing.index = next(
-                (i for i, row in enumerate(self.rows) if row["key"] == previous), 0
+                (
+                    i
+                    for key in candidates
+                    for i, row in enumerate(self.rows)
+                    if row["key"] == key
+                ),
+                0,
             )
             self.pending = self.rows[listing.index]["window_id"]
         else:
@@ -366,8 +375,6 @@ class Switcher(CosmosModal):
         self.query_one(ListView).index = index
         if event.action == "fold":
             await self.fold()
-        elif event.action == "switch":
-            await self.confirm(event.row)
         elif event.action == "rename":
             await self.action_rename()
         else:

@@ -41,6 +41,8 @@ class Pane:
     window_id: str = ""
     session_id: str = ""
     name: str = ""
+    history_size: int = 0
+    scroll_position: int = 0
 
 
 class Tmux:
@@ -368,6 +370,7 @@ class Tmux:
                 raise RuntimeError("invalid pane ID")
             selection = None
             offset = 0
+            history_size = 0
             inclusive = rectangle = False
             copy_match = ""
             if copy_mode:
@@ -429,6 +432,8 @@ class Tmux:
                     window_id=identities[1] if identities else (window or ""),
                     session_id=identities[2] if identities else (self.session_id or ""),
                     name=identities[3] if identities else "",
+                    history_size=history_size,
+                    scroll_position=offset,
                 )
             )
             zoomed = zoom == "1"
