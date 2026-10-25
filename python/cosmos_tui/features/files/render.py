@@ -80,7 +80,11 @@ def render(manager, pane, state, palette, cell):
         try:
             parent_items = manager.listing(
                 dict(
-                    state, path=str(Path(state["path"]).parent), filter="", selected=[]
+                    state,
+                    path=str(Path(state["path"]).parent),
+                    filter="",
+                    selected=[],
+                    category="all",
                 )
             )
             active = next(
@@ -108,7 +112,14 @@ def render(manager, pane, state, palette, cell):
         try:
             if item["directory"]:
                 children = manager.listing(
-                    dict(state, path=item["path"], filter="", cursor=0, selected=[])
+                    dict(
+                        state,
+                        path=item["path"],
+                        filter="",
+                        cursor=0,
+                        selected=[],
+                        category="all",
+                    )
                 )
                 column(children, x, max(1, size))
             else:

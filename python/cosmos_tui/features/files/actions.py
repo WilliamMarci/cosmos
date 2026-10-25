@@ -146,6 +146,29 @@ async def handle(manager, event, pane, state, items, cursor):
                 ),
                 confirm,
             )
+    elif key == "file_category":
+        choices = [
+            (name, label)
+            for name, label in (
+                ("all", "All files"),
+                ("directory", "Directories"),
+                ("image", "Images"),
+                ("document", "Documents"),
+                ("archive", "Archives"),
+                ("media", "Audio / video"),
+                ("code", "Source / config"),
+                ("executable", "Executables"),
+                ("link", "Symbolic links"),
+                ("file", "Other files"),
+            )
+        ]
+
+        def choose_category(value):
+            if value:
+                state.update(category=value, cursor=0)
+                app.run_worker(manager.controller.update_viewer(pane, state))
+
+        app.push_screen(CompactMenu("Filter by type", choices), choose_category)
     elif char == "S":
         choices = [
             (value, label)
@@ -185,3 +208,26 @@ async def handle(manager, event, pane, state, items, cursor):
     else:
         return False
     return True
+
+
+def command_group(command):
+    name = command.id.split(".")[-1]
+    if name in (
+        "copy",
+        "cut",
+        "paste",
+        "create",
+        "mkdir",
+        "rename",
+        "trash",
+        "select",
+        "select_all",
+    ):
+        return "Files / Operations"
+    if name in ("sort", "sort_menu", "reverse"):
+        return "Files / Sorting"
+    if name in ("filter", "hidden", "category"):
+        return "Files / Filters"
+    if name in ("terminal", "agent"):
+        return "Files / Open here"
+    return "Files / Navigation"

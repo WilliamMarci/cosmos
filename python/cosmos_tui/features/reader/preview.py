@@ -65,23 +65,34 @@ def book_cover(path):
     return None
 
 
+def fit_image(image, bounds):
+    scale = min(bounds[0] / image.width, bounds[1] / image.height)
+    size = (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
+    return image.resize(size, Image.Resampling.LANCZOS) if image.size != size else image
+
+
 def preview(path, bounds, *, media, documents, columns=40, rows=30):
     """Return first-page image, EPUB cover or rich text. Never open a UI/process app."""
+    bounds = tuple(max(1, min(4000, int(v))) for v in bounds)
     path = Path(path)
     if not path.is_file():
         return Preview(lines=[Text("Special file")])
     suffix = path.suffix.lower()
     if suffix in (".png", ".jpg", ".jpeg", ".webp", ".pdf"):
         return Preview(
-            image=media.thumbnail(dict(path=str(path), page=1), bounds).copy()
+            image=fit_image(
+                media.thumbnail(
+                    dict(path=str(path), page=1), bounds, max_edge=max(bounds)
+                ),
+                bounds,
+            )
         )
     if suffix in FORMATS:
         if suffix == ".epub":
             cover = book_cover(path)
             if cover:
                 image = documents.asset(path, *cover)
-                image.thumbnail(bounds, Image.Resampling.LANCZOS)
-                return Preview(image=image)
+                return Preview(image=fit_image(image, bounds))
         from rich.console import Console
 
         console = Console(width=max(1, columns))
@@ -89,8 +100,7 @@ def preview(path, bounds, *, media, documents, columns=40, rows=30):
         for row in documents.rows(path):
             if row.image and suffix == ".epub":
                 image = documents.asset(path, *row.image)
-                image.thumbnail(bounds, Image.Resampling.LANCZOS)
-                return Preview(image=image)
+                return Preview(image=fit_image(image, bounds))
             result.extend(row.text.wrap(console, max(1, columns)))
             if len(result) >= rows:
                 break

@@ -48,6 +48,7 @@ class NavigationController(Controller):
             if source is app._workspace_screen and pane:
                 available = {
                     "switch",
+                    "files",
                     "detach",
                     "quit",
                     "ime_toggle",
@@ -88,6 +89,8 @@ class NavigationController(Controller):
                     commands, app.reader_ui, pane, selected
                 )
             passthrough = "On" if app.settings.get("mouse_passthrough", True) else "Off"
+            from cosmos_tui.features.files.actions import command_group
+
             rows = [
                 dict(
                     id=c.id,
@@ -95,7 +98,9 @@ class NavigationController(Controller):
                     + (" · " + passthrough if c.target == "mouse_passthrough" else ""),
                     kind="command",
                     command=c,
-                    group="Cosmos / " + c.context,
+                    group=command_group(c)
+                    if c.context == "files"
+                    else "Cosmos / " + c.context,
                     shortcut=next(
                         (
                             keys
@@ -144,6 +149,7 @@ class NavigationController(Controller):
             for command in keymap.COMMANDS:
                 if command.id in (
                     "workspace.switch",
+                    "workspace.files",
                     "workspace.agent",
                     "workspace.new_session",
                     "workspace.quit",
@@ -151,7 +157,9 @@ class NavigationController(Controller):
                     rows.append(
                         dict(
                             id=command.id,
-                            label=command.label,
+                            label="Files"
+                            if command.id == "workspace.files"
+                            else command.label,
                             kind="command",
                             command=command,
                             group="Cosmos",
@@ -169,6 +177,25 @@ class NavigationController(Controller):
                 await self.invoke_entry(row, app.screen)
 
         app.push_screen(StartMenu(load), choose)
+
+    async def open_files(self):
+        app = self.app
+        pane = app.active()
+        if not pane:
+            raise RuntimeError("No active pane")
+        if pane.viewer:
+            state = app.reader_ui.state(pane)
+            if state.get("kind") == "files":
+                return
+            path = str(Path(state["path"]).parent)
+        else:
+            rows = await app.backend.request(
+                f"display-message -p -t {pane.id} '#{{pane_current_path}}'"
+            )
+            path = "\n".join(rows)
+        if not path or not Path(path).is_dir():
+            raise ValueError("Current directory is unavailable")
+        await app.reader_ui.update_viewer(pane, dict(kind="files", path=path, cursor=0))
 
     async def invoke_entry(self, row, source):
         app = self.app

@@ -24,6 +24,7 @@ class FileManager:
             state.get("show_hidden", False),
             state.get("sort", "natural"),
             state.get("reverse", False),
+            state.get("category", "all"),
         )
         result = self.snapshots.get(key)
         if result is None:
@@ -82,7 +83,11 @@ class FileManager:
         elif key == "left":
             origin = state["path"]
             state.update(
-                path=str(Path(origin).parent), cursor=0, filter="", selected=[]
+                path=str(Path(origin).parent),
+                cursor=0,
+                filter="",
+                selected=[],
+                category="all",
             )
             parents = await asyncio.to_thread(self.listing, state)
             state["cursor"] = next(
@@ -91,7 +96,9 @@ class FileManager:
         elif key in ("right", "enter") and items:
             item = items[cursor]
             if item["directory"]:
-                state.update(path=item["path"], cursor=0, filter="", selected=[])
+                state.update(
+                    path=item["path"], cursor=0, filter="", selected=[], category="all"
+                )
             else:
                 from cosmos_tui.features.reader.opener import SUPPORTED
 

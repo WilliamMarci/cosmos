@@ -102,6 +102,13 @@ class PreviewTests(unittest.TestCase):
                 result = preview(root / name, (80, 100), media=media, documents=docs)
                 self.assertLessEqual(result.image.width, 80)
                 self.assertLessEqual(result.image.height, 100)
+            # Both tiny images and PDF rasterization must fill the available box.
+            for name in ("image.png", "book.pdf"):
+                fitted = preview(
+                    root / name, (600, 800), media=media, documents=docs
+                ).image
+                self.assertEqual(fitted.height, 800)
+                self.assertLessEqual(fitted.width, 600)
             (root / "read.md").write_text("# Heading\n\nHello **Cosmos**.")
             result = preview(
                 root / "read.md",

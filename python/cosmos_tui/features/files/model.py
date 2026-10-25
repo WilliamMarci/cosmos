@@ -59,6 +59,12 @@ def entries(state):
             if len(result) >= 50000:
                 raise ValueError("Directory exceeds 50000 entries; narrow its scope")
 
+    kind = state.get("category", "all")
+    if kind != "all":
+        from cosmos_tui.features.files.style import category
+
+        result = [item for item in result if category(item) == kind]
+
     def order(a, b):
         if a["directory"] != b["directory"]:
             return -1 if a["directory"] else 1

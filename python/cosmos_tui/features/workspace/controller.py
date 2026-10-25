@@ -123,6 +123,9 @@ class WorkspaceController(Controller):
         if key == "new_session":
             app.push_screen(NewSession())
             return
+        if key == "files":
+            await app.navigation.open_files()
+            return
         if key == "s":
             app.push_screen(Switcher())
             return
@@ -172,13 +175,10 @@ class WorkspaceController(Controller):
                 return
             app.push_screen(
                 Help(
-                    "Viewer" if app.active() and app.active().viewer else "Workspace",
-                    keymap.help_rows(
-                        "viewer"
-                        if app.active() and app.active().viewer
-                        else "workspace",
-                        app.settings,
+                    {"files": "Files", "viewer": "Viewer"}.get(
+                        app.key_context(), "Workspace"
                     ),
+                    keymap.help_rows(app.key_context(), app.settings),
                 )
             )
             return

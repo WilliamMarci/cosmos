@@ -25,7 +25,7 @@ def group(command):
         "workspace.agent",
     ):
         return "Command assistant"
-    if context == "files":
+    if context == "files" or name == "workspace.files":
         return "Files"
     if context.startswith("viewer"):
         return "Reader"

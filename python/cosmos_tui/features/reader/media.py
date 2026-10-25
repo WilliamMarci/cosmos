@@ -273,11 +273,11 @@ class Media:
             max(-limit, min(limit, value)) for value, limit in zip(pan, limits)
         )
 
-    def thumbnail(self, state, bounds, wait=True):
+    def thumbnail(self, state, bounds, wait=True, *, max_edge=320):
         path = Path(state["path"])
         identity = self.identity(path)
         self.check_image_size(path, identity[1])
-        key = identity + (state.get("page", 1), bounds)
+        key = identity + (state.get("page", 1), bounds, max_edge)
         epoch = self.epoch
         cached = self.thumbnails.get(key)
         if cached is not None:
@@ -309,7 +309,7 @@ class Media:
                         str(state["page"]),
                         "-singlefile",
                         "-scale-to",
-                        str(min(320, max(bounds))),
+                        str(min(max_edge, max(bounds))),
                         "-png",
                         str(path),
                     )
