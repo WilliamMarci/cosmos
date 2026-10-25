@@ -48,6 +48,10 @@ def entries(state):
                         size=info.st_size,
                         mtime=info.st_mtime,
                         link=entry.is_symlink(),
+                        mode=info.st_mode,
+                        uid=info.st_uid,
+                        gid=info.st_gid,
+                        target=os.readlink(entry.path) if entry.is_symlink() else "",
                     )
                 )
             except FileNotFoundError:
@@ -59,12 +63,24 @@ def entries(state):
         if a["directory"] != b["directory"]:
             return -1 if a["directory"] else 1
         mode = state.get("sort", "natural")
+        if mode == "extension":
+            aa, bb = (
+                Path(a["name"]).suffix.casefold(),
+                Path(b["name"]).suffix.casefold(),
+            )
+            if aa != bb:
+                return (aa > bb) - (aa < bb)
         if mode in ("size", "mtime") and a[mode] != b[mode]:
             return -1 if a[mode] > b[mode] else 1
         aa, bb = os.fsencode(a["name"]), os.fsencode(b["name"])
         return compare(aa, len(aa), bb, len(bb)) or ((aa > bb) - (aa < bb))
 
-    return sorted(result, key=cmp_to_key(order))
+    ordered = sorted(result, key=cmp_to_key(order))
+    if state.get("reverse"):
+        return [x for x in reversed(ordered) if x["directory"]] + [
+            x for x in reversed(ordered) if not x["directory"]
+        ]
+    return ordered
 
 
 def preview(entry, limit=32768):

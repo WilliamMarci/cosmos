@@ -1,6 +1,8 @@
 version = 1
 theme = "dark"
 terminal_theme = "inherit"
+files_icons = false # Requires a Nerd Font when enabled
+files_border = "dividers" # none, dividers, frame
 status_visible = true
 status_path_depth = 3
 status_path_max_length = 40

@@ -341,9 +341,22 @@ class Palette(CosmosModal):
                         permission=key,
                     )
                     rows.append(row)
+        if self.menu == "files_settings":
+            rows = [
+                choice(
+                    "File icons", "files_icons", [(False, "Off"), (True, "On")], False
+                ),
+                choice(
+                    "Borders",
+                    "files_border",
+                    [("none", "None"), ("dividers", "Dividers"), ("frame", "Frame")],
+                    "dividers",
+                ),
+            ]
         if self.menu == "settings":
             rows.append(dict(label="Theme", kind="theme"))
             rows.append(dict(label="Reader", kind="menu", menu="reader_settings"))
+            rows.append(dict(label="Files", kind="menu", menu="files_settings"))
             rows.append(dict(label="Status bar", kind="menu", menu="status_settings"))
             rows.append(dict(label="Input", kind="menu", menu="input_settings"))
             rows.append(dict(label="About", kind="about"))

@@ -9,6 +9,8 @@ pub struct Config {
     pub version: u32,
     pub theme: String,
     pub terminal_theme: String,
+    pub files_icons: bool,
+    pub files_border: String,
     pub viewer_cache_mb: usize,
     pub viewer_image_max_mb: usize,
     pub viewer_prefetch: bool,
@@ -45,6 +47,8 @@ impl Default for Config {
             version: 1,
             theme: "dark".into(),
             terminal_theme: "inherit".into(),
+            files_icons: false,
+            files_border: "dividers".into(),
             viewer_cache_mb: 128,
             viewer_image_max_mb: 32,
             viewer_prefetch: true,
@@ -79,6 +83,9 @@ impl Default for Config {
 }
 impl Config {
     pub fn validate(&self) -> Result<(), String> {
+        if !["none", "dividers", "frame"].contains(&self.files_border.as_str()) {
+            return Err("invalid files_border".into());
+        }
         if !["auto", "1", "2", "3"].contains(&self.viewer_rich_columns.as_str())
             || !["pages", "scroll"].contains(&self.viewer_rich_mode.as_str())
             || self.viewer_rich_line_space > 3

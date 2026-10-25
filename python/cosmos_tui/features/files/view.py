@@ -3,11 +3,9 @@
 import asyncio
 from pathlib import Path
 
-from PIL import Image, ImageDraw
-from rich.text import Text
-from cosmos_tui.features.files.model import entries, preview, display
-from cosmos_tui.features.reader.layout import ReadingFrame
-from cosmos_tui.features.reader.flow import put
+from cosmos_tui.features.files.model import entries
+from cosmos_tui.features.files.render import render
+from cosmos_tui.features.files.style import metadata
 from cosmos_tui.features.search.bar import BottomSearch
 
 
@@ -15,6 +13,8 @@ class FileManager:
     def __init__(self, controller):
         self.controller = controller
         self.snapshots = {}
+        self.clipboard = None
+        self.busy = False
 
     def listing(self, state):
         key = (
@@ -23,110 +23,44 @@ class FileManager:
             state.get("filter", ""),
             state.get("show_hidden", False),
             state.get("sort", "natural"),
+            state.get("reverse", False),
         )
-        if key not in self.snapshots:
+        result = self.snapshots.get(key)
+        if result is None:
             result = entries(state)
             if len(self.snapshots) >= 8:
                 self.snapshots.clear()
             self.snapshots[key] = result
-        return self.snapshots[key]
+        return result
 
     def render(self, pane, state, palette, cell):
-        items = self.listing(state)
-        cw, ch = cell
-        canvas = Image.new("RGB", (pane.width * cw, pane.height * ch), palette["bg"])
-        lines = [
-            Text(" " * pane.width, style=f"{palette['fg']} on {palette['bg']}")
-            for _ in range(pane.height)
-        ]
-        rows = max(1, pane.height - 2)
-        cursor = max(0, min(len(items) - 1, state.get("cursor", 0)))
-        left = pane.width if pane.width < 65 else pane.width * 3 // 5
-        put(
-            lines,
-            0,
-            0,
-            Text(" " + display(state["path"]), style=palette["accl"]),
-            pane.width,
-        )
-        top = max(0, min(cursor - rows // 2, max(0, len(items) - rows)))
-        hits = []
-        draw = ImageDraw.Draw(canvas)
-        for y, index in enumerate(range(top, min(len(items), top + rows)), 1):
-            item = items[index]
-            selected = index == cursor
-            bg = palette["acc"] if selected else palette["bg"]
-            fg = (
-                palette["on"]
-                if selected
-                else palette["accl"]
-                if item["directory"]
-                else palette["fg"]
-            )
-            if selected:
-                draw.rectangle((0, y * ch, left * cw - 1, (y + 1) * ch - 1), fill=bg)
-            label = (
-                " "
-                + display(item["name"])
-                + ("/" if item["directory"] else "")
-                + (" ↗" if item["link"] else "")
-            )
-            text = Text(label, style=f"{fg} on {bg}")
-            text.truncate(max(1, left - 1), overflow="ellipsis")
-            put(lines, 0, y, text, left)
-            hits.append((0, y, left, 1, ("file_entry", index)))
-        if not items:
-            put(
-                lines,
-                1,
-                1,
-                Text("No matching files", style=palette["mute"]),
-                max(1, left - 2),
-            )
-        if left < pane.width:
-            draw.line(
-                (left * cw, ch, left * cw, (pane.height - 1) * ch), fill=palette["mute"]
-            )
-            if items:
-                try:
-                    content = preview(items[cursor])
-                except OSError as error:
-                    content = str(error)
-                for y, line in enumerate(content.splitlines()[:rows], 1):
-                    put(
-                        lines,
-                        left + 2,
-                        y,
-                        Text(display(line.expandtabs(4)), style=palette["mute"]),
-                        max(0, pane.width - left - 3),
-                    )
-        footer = f" {len(items)} entries · {state.get('sort', 'natural')}" + (
-            " · hidden" if state.get("show_hidden") else ""
-        )
-        lines[-1] = Text(footer, style=f"{palette['fg']} on {palette['base']}")
-        lines[-1].truncate(pane.width)
-        return ReadingFrame(
-            canvas, lines, items, cursor, hits, rows, 0, left, 1, canvas.size, (0, 0)
-        )
+        return render(self, pane, state, palette, cell)
+
+    def status(self, state):
+        return metadata(self.listing(state), state.get("cursor", 0))
 
     async def key(self, event, pane, state):
         controller = self.controller
-        items = await asyncio.to_thread(self.listing, state)
         key, char = event.key, event.character
+        if key in ("q", "escape"):
+            pane.viewer = ""
+            controller.frames.pop(pane.id, None)
+            await controller.app.backend.request(
+                f"set-option -pu -t {pane.id} @cosmos_viewer"
+            )
+            return
+        items = await asyncio.to_thread(self.listing, state)
         cursor = max(0, min(len(items) - 1, state.get("cursor", 0)))
+        from cosmos_tui.features.files.actions import handle
+
+        if await handle(self, event, pane, state, items, cursor):
+            return
         if char == "?":
             from cosmos_tui.ui.help import Help
             from cosmos_tui.input import keymap
 
             controller.app.push_screen(
                 Help("Files", keymap.help_rows("files", controller.app.settings))
-            )
-            return
-        if key in ("q", "escape"):
-            pane.viewer = ""
-            controller.frames.pop(pane.id, None)
-            await controller.app.backend.request(
-                f"set-option -pu -t {pane.id} @cosmos_viewer"
             )
             return
         if key in ("up", "down", "home", "end", "pageup", "pagedown"):
@@ -145,11 +79,13 @@ class FileManager:
                 )
             )
         elif key == "left":
-            state.update(path=str(Path(state["path"]).parent), cursor=0, filter="")
+            state.update(
+                path=str(Path(state["path"]).parent), cursor=0, filter="", selected=[]
+            )
         elif key in ("right", "enter") and items:
             item = items[cursor]
             if item["directory"]:
-                state.update(path=item["path"], cursor=0, filter="")
+                state.update(path=item["path"], cursor=0, filter="", selected=[])
             else:
                 from cosmos_tui.features.reader.opener import SUPPORTED
 
@@ -179,7 +115,7 @@ class FileManager:
         elif char == ".":
             state["show_hidden"] = not state.get("show_hidden", False)
         elif char == "s":
-            sorts = ["natural", "size", "mtime"]
+            sorts = ["natural", "size", "mtime", "extension"]
             state["sort"] = sorts[
                 (sorts.index(state.get("sort", "natural")) + 1) % len(sorts)
             ]

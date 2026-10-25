@@ -25,6 +25,8 @@ def commands(controller, pane, candidates):
     if not pane or not pane.viewer:
         return candidates
     state = controller.state(pane)
+    if state.get("kind") == "files":
+        return candidates
     rich = Path(state["path"]).suffix.lower() in FORMATS
     rich_only = {
         "reading_options",

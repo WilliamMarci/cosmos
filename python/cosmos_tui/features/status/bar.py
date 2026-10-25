@@ -38,6 +38,7 @@ class StatusBar(Static):
         center=(),
         clock="",
         mode="cosmos",
+        file_info=None,
     ):
         app = self.app
         palette = app.role_colors
@@ -100,6 +101,14 @@ class StatusBar(Static):
         left += Text(f" {index}", style=Style(color="#e8a662", bgcolor=session_bg))
         left += Text(f" {name} ", style=Style(color=palette["fg"], bgcolor=session_bg))
         left += divide(session_bg, palette["base"])
+        if file_info:
+            from cosmos_tui.features.files.model import display
+
+            left += Text(
+                " " + file_info.get("size", "") + " ",
+                style=Style(color=palette["accl"], bgcolor=session_bg),
+            )
+            left += Text(display(file_info.get("name", "")) + " ", style=base)
         language = "中" if app.ime.enabled else "En"
         right = Text(style=base)
         path = short_path(
@@ -148,6 +157,20 @@ class StatusBar(Static):
             left += path_text
         elif alignment == "right":
             right += path_text
+        if file_info:
+            from cosmos_tui.features.files.style import permission_text
+
+            if width >= 90:
+                right += permission_text(file_info.get("permissions", ""), palette)
+                right.append(" " + file_info.get("owner", "") + " ", style=base)
+            if width >= 65:
+                right.append(
+                    " " + file_info.get("percent", "") + " ", style=palette["accl"]
+                )
+            right.append(
+                " " + file_info.get("position", "") + " ",
+                style=Style(color=palette["on"], bgcolor=palette["acc"]),
+            )
         language_offset = right.cell_len
         right.append(
             " " + language + " ",

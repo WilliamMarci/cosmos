@@ -18,6 +18,8 @@ REQUIRED_CAPABILITIES = {
 }
 REQUIRED_SETTINGS = {
     "assistant_file_access",
+    "files_icons",
+    "files_border",
     "status_path_depth",
     "status_path_max_length",
     "status_path_align",

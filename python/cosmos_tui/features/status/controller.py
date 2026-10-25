@@ -65,6 +65,7 @@ class StatusController(Controller):
                     pass
         path, program = self.metadata
         mode, label, details = "cosmos", "COSMOS", ""
+        file_info = None
         if pane and pane.viewer:
             state = json.loads(base64.b64decode(pane.viewer))
             suffix = Path(state["path"]).suffix.lower()
@@ -75,7 +76,15 @@ class StatusController(Controller):
             )
             if state.get("kind") == "files":
                 mode, label = "files", "FILES"
-            path = state["path"]
+                try:
+                    file_info = await asyncio.to_thread(
+                        app.reader_ui.files.status, state
+                    )
+                except (OSError, ValueError, RuntimeError):
+                    file_info = dict(
+                        name="Unavailable", size="", permissions="", position=""
+                    )
+            path = "" if file_info is not None else state["path"]
         elif Path(program).name in ("opencode", "claude", "codex"):
             mode, label = "agent", "AGENT"
         elif Path(program).name == "yazi":
@@ -103,4 +112,5 @@ class StatusController(Controller):
             center=center,
             clock=datetime.now().astimezone().strftime("%H:%M %b %d"),
             mode=mode,
+            file_info=file_info,
         )

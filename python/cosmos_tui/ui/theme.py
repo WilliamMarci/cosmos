@@ -2,6 +2,11 @@
 
 from rich.color import Color
 
+# Shared Cosmos accent roles; individual themes may override them.
+SEMANTIC_COLORS = dict(
+    warning="#e8a662", error="#df6b82", success="#8dbf7a", media="#b69be4"
+)
+
 
 def blend(a, b, amount):
     aa, bb = Color.parse(a).get_truecolor(), Color.parse(b).get_truecolor()
