@@ -100,10 +100,18 @@ class StatusBar(Static):
             self.start_width = min(width, start.cell_len)
             self.hits[0] = (0, self.start_width, "start")
         left = start + divide(start_end, session_bg)
-        left += Text(
-            f" {identity if identity is not None else index}",
-            style=Style(color="#e8a662", bgcolor=session_bg),
-        )
+        if identity is not None and ":" in identity:
+            session, pane = identity.split(":", 1)
+            left += Text(
+                " " + session.lstrip("$"),
+                style=Style(color="#e8a662", bgcolor=session_bg),
+            )
+            left += Text(":", style=Style(color=palette["mute"], bgcolor=session_bg))
+            left += Text(
+                pane.lstrip("%"), style=Style(color=palette["accl"], bgcolor=session_bg)
+            )
+        else:
+            left += Text(f" {index}", style=Style(color="#e8a662", bgcolor=session_bg))
         left += Text(f" {name} ", style=Style(color=palette["fg"], bgcolor=session_bg))
         left += divide(session_bg, palette["base"])
         if file_info:

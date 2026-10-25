@@ -32,9 +32,14 @@ class IdentityStatusTests(unittest.IsolatedAsyncioTestCase):
             app.backend.request.return_value = ["/tmp/deep/long/path\tbash"]
             await app.status.refresh()
             bar = app.query_one("#status", StatusBar)
-            self.assertIn("$7:%19", bar._content.plain)
+            self.assertIn("7:19", bar._content.plain)
+            start = bar._content.plain.index("7:19")
+            self.assertNotEqual(
+                bar._content.get_style_at_offset(app.console, start).color,
+                bar._content.get_style_at_offset(app.console, start + 2).color,
+            )
             self.assertIn("COPY 54/124:6 44%", bar._content.plain)
             pane.copy_mode = False
             await app.status.refresh()
             self.assertNotIn("COPY", bar._content.plain)
-            self.assertIn("$7:%19", bar._content.plain)
+            self.assertIn("7:19", bar._content.plain)
