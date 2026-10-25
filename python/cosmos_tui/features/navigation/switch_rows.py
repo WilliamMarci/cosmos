@@ -8,6 +8,9 @@ from cosmos_tui.ui.theme import blend
 
 
 class SwitchRow(Widget):
+    # Navigation controls, not selectable text. A refresh can detach a row
+    # while Textual's compositor still has its mouse hit-test entry.
+    ALLOW_SELECT = False
     DEFAULT_CSS = "SwitchRow { height: 1; width: 100%; }"
 
     class Action(Message):

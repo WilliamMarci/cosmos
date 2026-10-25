@@ -16,6 +16,7 @@ from cosmos_tui.terminal import targets
 
 
 class Switcher(CosmosModal):
+    ALLOW_SELECT = False
     zone = Zone.POP_WINDOW
     AUTO_FOCUS = "#switch-filter"
     BINDINGS = [Binding("escape", "cancel", show=False)]

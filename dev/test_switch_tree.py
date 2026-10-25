@@ -4,6 +4,7 @@ import tempfile
 import shlex
 import unittest
 from unittest.mock import patch
+from textual.geometry import Offset
 from textual.widgets import ListView, Input
 from test_navigation import Probe as BaseProbe
 from cosmos_tui.features.navigation.switcher import Switcher
@@ -96,6 +97,37 @@ class Backend:
 
 
 class SwitchTreeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_more_mouse_down_with_stale_compositor_row(self):
+        with tempfile.TemporaryDirectory() as root:
+            app = BaseProbe()
+            async with app.run_test(size=(100, 30)) as pilot:
+                app.backend = Backend(root)
+                await pilot.press("ctrl+b", "s")
+                screen = app.screen
+                await screen.inventory_ready.wait()
+                await pilot.press("right")
+                screen.query_one(ListView).index = 1
+                await pilot.pause()
+                widget = screen.query(SwitchRow)[1]
+                widget.render()
+                x = widget.hits[-1][0] + 1
+                stale = SwitchRow(widget.row, False)
+                self.assertIsNone(stale.parent)
+                # Inventory refresh has detached the old row, but the rendered
+                # grid may still return it for selection hit testing.
+                with patch.object(
+                    screen, "get_widget_and_offset_at", return_value=(stale, Offset())
+                ):
+                    await pilot.mouse_down(widget, offset=(x, 0))
+                await pilot.mouse_up(widget, offset=(x, 0))
+                await pilot.click(widget, offset=(x, 0))
+                await pilot.pause()
+                from cosmos_tui.ui.menus import CompactMenu
+
+                self.assertIsInstance(app.screen, CompactMenu)
+                await pilot.press("escape")
+                self.assertIs(app.screen, screen)
+
     async def test_tree_controls_rename_and_pane_selection(self):
         with tempfile.TemporaryDirectory() as root:
             app = BaseProbe()
