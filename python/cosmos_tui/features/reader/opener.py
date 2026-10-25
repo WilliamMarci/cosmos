@@ -20,6 +20,15 @@ SUPPORTED = {
 }
 
 
+def preview(path, bounds, *, media, documents, columns=40, rows=30):
+    """Read-only quick-open API; return a Preview without changing pane state."""
+    from cosmos_tui.features.reader.preview import preview as render_preview
+
+    return render_preview(
+        path, bounds, media=media, documents=documents, columns=columns, rows=rows
+    )
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="+")

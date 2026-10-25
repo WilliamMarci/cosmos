@@ -30,6 +30,9 @@ class ReaderController(Controller):
         self.loading = LoadingFrames(self)
         self.reader = Reader(self.media)
         self.documents = Documents(self.media, self.reader)
+        from cosmos_tui.features.reader.preview import QuickPreview
+
+        self.preview = QuickPreview(self.media, self.documents)
         self.frames = {}
         self.pages = {}
         self.revisions = {}
@@ -251,6 +254,7 @@ class ReaderController(Controller):
         self.searches.clear()
 
     async def close(self):
+        self.preview.close()
         await self.loading.close()
         self.clear_cache()
         if self.prefetch_task:
@@ -777,6 +781,11 @@ class ReaderController(Controller):
                     4 * (cw if i == 0 else ch) / self.view_scale(pane, state, frame)
                 ) * (1 if event.key in ("right", "down") else -1)
         await self.update_viewer(pane, state)
+
+    def quick_preview(self, owner, path, bounds, columns, rows):
+        return self.preview.request(
+            owner, path, bounds, columns, rows, self.app.settings
+        )
 
     async def prepare(self, pane):
         app = self.app

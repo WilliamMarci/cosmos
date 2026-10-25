@@ -26,6 +26,9 @@ class LoadingFrames:
         app = self.controller.app
         return (
             pane.viewer,
+            self.controller.preview.revision
+            if self.controller.state(pane).get("kind") == "files"
+            else 0,
             app.settings.get("viewer_image_max_mb", 32),
             app.settings.get("files_icons", False),
             app.settings.get("files_border", "dividers"),

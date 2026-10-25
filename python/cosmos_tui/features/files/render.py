@@ -3,7 +3,7 @@
 from pathlib import Path
 from PIL import Image, ImageDraw
 from rich.text import Text
-from cosmos_tui.features.files.model import display, preview
+from cosmos_tui.features.files.model import display
 from cosmos_tui.features.files.style import appearance
 from cosmos_tui.features.reader.flow import put
 from cosmos_tui.features.reader.layout import ReadingFrame
@@ -31,6 +31,10 @@ def render(manager, pane, state, palette, cell):
     hits = []
 
     def line(x, y, text, limit):
+        # The shared crop helper retains spans, not Text.style.
+        text = text.copy()
+        if text.style:
+            text.stylize_before(text.style)
         put(lines, x, y, text, max(0, limit))
 
     def column(values, x, size, active=None, clicks=False):
@@ -58,7 +62,18 @@ def render(manager, pane, state, palette, cell):
             if clicks:
                 hits.append((x, y, size, 1, ("file_entry", i)))
 
-    path = Text(" " + display(state["path"]), style=palette["accl"])
+    address_style = f"{palette['accl']} on {palette['base']}"
+    line(
+        inset,
+        inset,
+        Text(" " * (width - 2 * inset), style=address_style),
+        width - 2 * inset,
+    )
+    ImageDraw.Draw(canvas).rectangle(
+        (inset * cw, inset * ch, (width - inset) * cw - 1, (inset + 1) * ch - 1),
+        fill=palette["base"],
+    )
+    path = Text(" " + display(state["path"]), style=address_style)
     path.truncate(max(1, width - 2 * inset), overflow="ellipsis")
     line(inset, inset, path, width - 2 * inset)
     if left:
@@ -97,14 +112,59 @@ def render(manager, pane, state, palette, cell):
                 )
                 column(children, x, max(1, size))
             else:
-                for y, text in enumerate(preview(item).splitlines()[:rows], start_y):
-                    line(
-                        x,
-                        y,
-                        Text(display(text.expandtabs(4)), style=palette["mute"]),
-                        size,
+                result = manager.controller.quick_preview(
+                    pane.id,
+                    item["path"],
+                    (max(1, size * cw), rows * ch),
+                    max(1, size),
+                    rows,
+                )
+                if result.image is not None:
+                    image = result.image
+                    px = x * cw + max(0, (size * cw - image.width) // 2)
+                    py = start_y * ch + max(0, (rows * ch - image.height) // 2)
+                    canvas.paste(image, (px, py))
+                    if not manager.controller.app.graphics.enabled:
+                        from cosmos_tui.render.graphics import halfblocks
+
+                        pixels = halfblocks(canvas, width, height)
+                        for y in range(start_y, height - inset):
+                            line(x, y, pixels[y][x : x + size], size)
+                elif result.loading or result.error:
+                    for y in range(start_y, height - inset):
+                        line(
+                            x,
+                            y,
+                            Text(" " * max(0, size), style=f"on {palette['base']}"),
+                            size,
+                        )
+                    draw = ImageDraw.Draw(canvas)
+                    draw.rectangle(
+                        (
+                            x * cw,
+                            start_y * ch,
+                            (x + size) * cw - 1,
+                            (height - inset) * ch - 1,
+                        ),
+                        fill=palette["base"],
+                        outline=palette["mute"],
                     )
-        except OSError as error:
+                    label = "⠋ Preview" if result.loading else result.error
+                    line(
+                        x + 1,
+                        height - inset - 1,
+                        Text(
+                            display(label),
+                            style=f"{palette['mute']} on {palette['base']}",
+                        ),
+                        size - 2,
+                    )
+                else:
+                    for y, text in enumerate(result.lines[:rows], start_y):
+                        text = text.copy()
+                        text.stylize_before(palette["fg"])
+                        line(x, y, text, size)
+        except (OSError, ValueError, RuntimeError) as error:
             line(
                 x,
                 start_y,

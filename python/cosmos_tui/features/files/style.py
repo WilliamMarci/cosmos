@@ -3,7 +3,7 @@
 import stat
 from pathlib import Path
 from rich.text import Text
-from cosmos_tui.ui.theme import SEMANTIC_COLORS
+from cosmos_tui.ui.theme import SEMANTIC_COLORS, blend
 
 
 def category(item):
@@ -39,9 +39,12 @@ def appearance(item, palette):
         "code": ("accl", "󰅩"),
         "file": ("mute", "󰈔"),
     }[kind]
-    return palette.get(
+    color = palette.get(
         "files." + kind, palette.get(role, SEMANTIC_COLORS.get(role, palette["accl"]))
-    ), icon
+    )
+    if item["name"].startswith("."):
+        color = blend(color, palette["bg"], 0.3)
+    return color, icon
 
 
 def size_label(size):

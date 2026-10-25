@@ -43,6 +43,7 @@ class FileManager:
         controller = self.controller
         key, char = event.key, event.character
         if key in ("q", "escape"):
+            controller.preview.release(pane.id)
             pane.viewer = ""
             controller.frames.pop(pane.id, None)
             await controller.app.backend.request(
@@ -79,8 +80,13 @@ class FileManager:
                 )
             )
         elif key == "left":
+            origin = state["path"]
             state.update(
-                path=str(Path(state["path"]).parent), cursor=0, filter="", selected=[]
+                path=str(Path(origin).parent), cursor=0, filter="", selected=[]
+            )
+            parents = await asyncio.to_thread(self.listing, state)
+            state["cursor"] = next(
+                (i for i, item in enumerate(parents) if item["path"] == origin), 0
             )
         elif key in ("right", "enter") and items:
             item = items[cursor]
