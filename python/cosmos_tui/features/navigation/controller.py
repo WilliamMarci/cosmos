@@ -221,6 +221,8 @@ class NavigationController(Controller):
                 app.action_context_actions()
             elif command.id == "global.start":
                 app.action_start_menu()
+            elif command.id == "global.keyboard_passthrough":
+                app.inputs.toggle_passthrough()
             elif command.context == "workspace" or command.id.startswith("global.ime_"):
                 await app.action_leader_key(command.target)
             elif command.context == "copy":

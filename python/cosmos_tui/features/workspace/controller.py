@@ -62,6 +62,9 @@ class WorkspaceController(Controller):
         return event.key == "escape"
 
     async def action_leader_key(self, key):
+        if key == "keyboard_passthrough":
+            self.app.inputs.toggle_passthrough()
+            return
         app = self.app
         logging.getLogger(__name__).debug("action_leader_key %s", key)
         app.prefix = False

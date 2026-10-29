@@ -86,3 +86,7 @@ OpenCode tool names are `cosmos_terminal_<tool>`. Default permission rules allow
 ## Module boundaries
 
 `profile.py` owns private storage and direct provider settings; `configuration.py` assembles the native Agent/MCP configuration; `launch.py` selects and launches the runtime. `sessions.py` extends terminal operations with session management and terminal-history export. `conversations.py` exports native model conversations. `theme.py` installs the initial theme without overwriting user choices; `migration.py` handles earlier Cosmos-only storage. `actions.py` and `action_ui.py` retain the service/client Action boundary.
+
+## Child application shortcut conflicts
+
+`Leader → F12` toggles **keyboard passthrough** for the current Cosmos client. In a terminal pane, keys bypass Cosmos Actions, pane shortcuts and IME and go directly to the child application; for example, `Ctrl+P` opens the Agent's own command menu. The configured passthrough toggle remains reserved so it can restore Cosmos controls. A Leader followed by any other key is forwarded as both original keys. Mouse controls and Cosmos dialogs remain available; Reader/Files surfaces retain their own controls. The status bar displays `KEYS OFF` when space permits. This temporary state is not persisted or shared with other clients. `global.keyboard_passthrough` is available in Actions and Settings → Keybindings; its default binding is `leader+f12`.

@@ -63,6 +63,13 @@ for name, label, keys, target in [
     )
 register("global.actions", "global", "Context actions", ["ctrl+p"], "actions")
 register(
+    "global.keyboard_passthrough",
+    "global",
+    "Toggle keyboard passthrough",
+    ["leader+f12"],
+    "keyboard_passthrough",
+)
+register(
     "global.ime_toggle",
     "global",
     "Input language · Chinese / English",

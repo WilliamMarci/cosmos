@@ -23,8 +23,53 @@ from cosmos_tui.ui.menus import CompactMenu
 
 
 class InputRouter(Controller):
+    def toggle_passthrough(self):
+        self.keyboard_passthrough = not getattr(self, "keyboard_passthrough", False)
+        self.passthrough_prefix = None
+        self.app.prefix = False
+
+    async def forward_passthrough(self, event):
+        """Reserve only the configured escape chord; forward all other keys."""
+        app = self.app
+        if event.key in MODIFIER_KEYS:
+            return
+        key = leader_key(event.key, event.character)
+        pending = getattr(self, "passthrough_prefix", None)
+        if pending:
+            self.passthrough_prefix = None
+            chord, names = pending
+            for name in names:
+                command = keymap.resolve("global", name + "+" + key, app.settings)
+                if command and command.target == "keyboard_passthrough":
+                    self.toggle_passthrough()
+                    return
+            await app.backend.send(chord)
+            await app.backend.send(event.key, event.character)
+            return
+        command = keymap.resolve("global", key, app.settings)
+        if command and command.target == "keyboard_passthrough":
+            self.toggle_passthrough()
+            return
+        names = tuple(
+            name
+            for name, chord in keymap.active_leader_chords(app.settings).items()
+            if chord == event.key
+        )
+        if names:
+            self.passthrough_prefix = (event.key, names)
+        else:
+            await app.backend.send(event.key, event.character)
+
     async def on_event(self, event):
         app = self.app
+        if (
+            isinstance(event, events.Key)
+            and not event.is_forwarded
+            and getattr(self, "keyboard_passthrough", False)
+            and self.key_context() == "workspace"
+        ):
+            await self.forward_passthrough(event)
+            return
         if isinstance(event, events.Key) and not event.is_forwarded:
             if await app.workspace.identify_key(event):
                 return
@@ -37,7 +82,9 @@ class InputRouter(Controller):
                 "global", leader_key(event.key, event.character), app.settings
             )
             if command:
-                if command.target == "actions":
+                if command.target == "keyboard_passthrough":
+                    self.toggle_passthrough()
+                elif command.target == "actions":
                     app.action_context_actions()
                 elif command.target == "start":
                     app.action_start_menu()
@@ -79,7 +126,9 @@ class InputRouter(Controller):
                     None,
                 )
                 if command:
-                    if (
+                    if command.target == "keyboard_passthrough":
+                        self.toggle_passthrough()
+                    elif (
                         app._screen_stack
                         and getattr(app.screen, "mod_context", None) == command.context
                     ):
