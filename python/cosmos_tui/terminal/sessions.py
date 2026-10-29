@@ -42,11 +42,10 @@ async def create(name, cwd=None):
         "-s",
         name,
     ]
-    if cwd:
-        directory = Path(cwd).expanduser().resolve(strict=True)
-        if not directory.is_dir():
-            raise ValueError(f"not a directory: {directory}")
-        arguments += ["-c", str(directory)]
+    directory = Path(cwd).expanduser().resolve(strict=True) if cwd else Path.home()
+    if not directory.is_dir():
+        raise ValueError(f"not a directory: {directory}")
+    arguments += ["-c", str(directory)]
     session_id = (await backend.cli(*arguments, backend.shell_command())).strip()
     await backend.cli(
         "set-option", "-t", session_id, "default-command", backend.shell_command()

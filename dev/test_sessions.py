@@ -190,6 +190,10 @@ class ConnectTests(unittest.IsolatedAsyncioTestCase):
                     self.assertTrue(await backend.connect())
                     self.assertTrue((backend.session_id or "").startswith("$"))
                     self.assertEqual(
+                        tmux("display-message", "-p", "-t", backend.session_id, "#{pane_current_path}").stdout.strip(),
+                        directory,
+                    )
+                    self.assertEqual(
                         tmux("has-session", "-t", "=alpha").returncode, 0
                     )
                     self.assertEqual(

@@ -7,6 +7,7 @@ import json
 import os
 import re
 import shlex
+from pathlib import Path
 from dataclasses import dataclass
 
 from cosmos_tui.core.paths import PROJECT_ROOT
@@ -136,6 +137,8 @@ class Tmux:
                         "#{session_id}",
                         "-s",
                         self.session,
+                        "-c",
+                        str(Path.home()),
                         self.shell_command(),
                     )
                 ).strip()
