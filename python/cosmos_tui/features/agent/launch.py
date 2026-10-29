@@ -8,6 +8,7 @@ import shutil
 import sys
 
 from cosmos_tui.core.paths import PROJECT_ROOT
+from cosmos_tui.core.hints import unavailable
 from cosmos_tui.features.agent.configuration import configuration
 from cosmos_tui.features.agent.profile import (
     initialize_profile,
@@ -42,7 +43,7 @@ def runtime():
     binary = PROJECT_ROOT / "bin/cosmos-agent"
     if mode == "bundled" or (mode == "auto" and binary.is_file()):
         if not binary.is_file() or not os.access(binary, os.X_OK):
-            raise RuntimeError("Bundled Cosmos Agent is unavailable")
+            raise RuntimeError(unavailable("Bundled Cosmos Agent"))
         return [str(binary)], None
     root = PROJECT_ROOT / "vendor/opencode"
     bun = shutil.which("bun") or str(
@@ -55,13 +56,13 @@ def runtime():
     )
     if mode == "source" or (mode == "auto" and source_ready):
         if not source_ready:
-            raise RuntimeError(
-                "Cosmos Agent development runtime is missing; run dev/setup_agent.sh"
-            )
+            raise RuntimeError(unavailable("Cosmos Agent source runtime"))
         return [bun, "run", "src/index.ts"], root / "packages/cli"
     executable = shutil.which(os.getenv("COSMOS_OPENCODE", "opencode"))
     if not executable:
-        raise RuntimeError("OpenCode not found; install it or run dev/setup_agent.sh")
+        raise RuntimeError(
+            unavailable("Cosmos Agent runtime (bundled, source or system OpenCode)")
+        )
     return [executable], None
 
 

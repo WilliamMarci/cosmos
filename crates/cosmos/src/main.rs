@@ -114,7 +114,8 @@ fn run() -> Result<i32, String> {
             Ok(0)
         }
         "stop" => {
-            println!("{}", server::rpc("daemon.shutdown", json!({}))?);
+            server::rpc("daemon.shutdown", json!({}))?;
+            println!("Cosmos is stopping · terminal sessions retained");
             Ok(0)
         }
         "rpc" => {
@@ -133,7 +134,7 @@ fn run() -> Result<i32, String> {
             Ok(0)
         }
         "help" | "--help" | "-h" => {
-            println!("Cosmos coordinator and management CLI\nUI: ./cosmos [SESSION] [--debug]; attach/workspace forward to the Python UI.\nManagement: daemon | doctor | config | stop | events | mod ... | action ID | rpc METHOD [JSON]\nFile bridge: open FILE | cache-clear\nLegacy Rust UI commands panel/native/view are disabled.\nCOSMOS_TMUX selects the tmux executable. Existing user tmux service is untouched.");
+            println!("Cosmos coordinator and management CLI\nUI: cosmos [SESSION] [--debug]; attach/workspace forward to the Python UI.\nManagement: daemon | doctor | config | stop | events | mod ... | action ID | rpc METHOD [JSON]\nFile bridge: open FILE | cache-clear\nLegacy Rust UI commands panel/native/view are disabled.\nCOSMOS_TMUX selects the tmux executable. Existing user tmux service is untouched.");
             Ok(0)
         }
         _ => Err("unknown command; run cosmos help".into()),

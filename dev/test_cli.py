@@ -128,7 +128,6 @@ class CLITests(unittest.TestCase):
             env = dict(os.environ, COSMOS_BINARY=str(binary))
             for arguments, expected in (
                 (["rpc", "health", "{}"], ["rpc", "health", "{}"]),
-                (["st"], ["stop"]),
                 (["da"], ["daemon"]),
                 (["con"], ["config"]),
                 (["ac", "demo"], ["action", "demo"]),

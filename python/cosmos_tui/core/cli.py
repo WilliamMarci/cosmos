@@ -536,6 +536,12 @@ def main(argv=None):
                 "Reader disk cache cleared; active clients retain their memory caches"
             )
             return 0
+        if operation == "stop":
+            from cosmos_tui.core import rpc
+
+            asyncio.run(rpc.call("daemon.shutdown", {}))
+            print("Cosmos is stopping · terminal sessions retained")
+            return 0
         if operation == "open" and Path(args.file).expanduser().is_dir():
             from cosmos_tui.features.files.opener import open_directory
 

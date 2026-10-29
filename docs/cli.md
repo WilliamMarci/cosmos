@@ -111,3 +111,7 @@ cosmos history '$3' --pane '%8' --json
 IDs survive renaming for the lifetime of that Tmux server. A missing ID is an error, and `cosmos new` requires a name. List output begins with the session ID; JSON session listings expose it as `id`. History JSON additionally includes `session_id`. The existing `--pane '%ID'` option checks that the pane belongs to the requested session. Switch displays stable `$`/`@`/`%` IDs separately from the local window/pane indices; see [Switch](switch.md).
 
 New sessions opened without `--cwd` start in `$HOME`, independently of the launch directory or retained Tmux server cwd. Reattaching preserves the existing working directory. Explicit `cosmos new --cwd ...`, Files → Open terminal here, task-created sessions and splits retain their specified or inherited directory.
+
+User-facing command hints are formatted centrally by `core/hints.py` using the public `cosmos` entry point, independently of its installation path. Reconnect/restart and missing-component hints use public commands; developer setup scripts belong in development documentation. Actual file locations, log paths and diagnostic errors remain visible where needed.
+
+`cosmos stop` prints a concise shutdown acknowledgement (`Cosmos is stopping · terminal sessions retained`). For the raw structured response use `cosmos rpc daemon.shutdown`.

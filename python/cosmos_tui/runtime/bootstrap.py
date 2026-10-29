@@ -1,10 +1,10 @@
 import asyncio
 import os
-import shlex
 import subprocess
 from pathlib import Path
 
 from cosmos_tui.core import rpc
+from cosmos_tui.core.hints import command, restart_commands
 from cosmos_tui.core.diagnostics import configure
 from cosmos_tui.core.paths import PROJECT_ROOT
 from cosmos_tui.ui.farewell import show_farewell
@@ -90,7 +90,7 @@ def run(args):
         process.terminate()
         process.wait(timeout=2)
         raise RuntimeError(
-            "coordinator startup failed; run cosmos daemon for diagnostics"
+            f"coordinator startup failed; run {command('daemon')} for diagnostics"
         )
 
     async def prepare():
@@ -104,11 +104,7 @@ def run(args):
                 + ", ".join(missing)
                 + ". A new terminal reconnects to the same background service.\n"
                 + "Detach other Cosmos clients, then run:\n  "
-                + "cosmos stop"
-                + "\n  "
-                + shlex.join(
-                    ["cosmos", args.session] + (["--debug"] if args.debug else [])
-                )
+                + restart_commands(args.session, args.debug)
                 + "\nTmux applications are retained; coordinator-managed Mods will stop."
             )
 

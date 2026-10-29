@@ -1,12 +1,12 @@
 """Post-TUI summary, written only after the terminal driver has restored stdout."""
 
-import shlex
 import subprocess
 import sys
 
 from rich.text import Text
 
 from cosmos_tui.core.paths import ASSET_DIR
+from cosmos_tui.core.hints import command
 
 
 def show_farewell(result, backend, stream=None):
@@ -32,7 +32,7 @@ def show_farewell(result, backend, stream=None):
     stream.write(f"{reason} · {backend.session}\n")
     if retained:
         stream.write("Session retained · applications continue running\n")
-        stream.write(f"Reconnect: {shlex.join(['cosmos', backend.session])}\n")
+        stream.write(f"Reconnect: {command(backend.session)}\n")
     elif retained is False:
         stream.write("Session ended · no session to reconnect\n")
     else:

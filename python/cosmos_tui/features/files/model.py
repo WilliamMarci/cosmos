@@ -5,13 +5,14 @@ from functools import cmp_to_key, lru_cache
 import os
 from pathlib import Path
 from cosmos_tui.core.paths import PROJECT_ROOT
+from cosmos_tui.core.hints import unavailable
 
 
 @lru_cache(maxsize=1)
 def sorter():
     library = PROJECT_ROOT / ".build/libcosmos_files.so"
     if not library.is_file():
-        raise RuntimeError("Build the Cosmos file backend: bash dev/build_files.sh")
+        raise RuntimeError(unavailable("Cosmos file backend"))
     native = ctypes.CDLL(str(library))
     function = native.cosmos_natsort
     function.argtypes = [
