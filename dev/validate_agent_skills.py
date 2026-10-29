@@ -1,129 +1,183 @@
-"""Manual native-registry validation with temporary fixtures; no model calls.
+"""Check real skill/MCP/command discovery and exclusion of foreign config.
 
-Run from the Cosmos root with PYTHONPATH=python:terminal_agent.
+Run with PYTHONPATH=python:terminal_agent; --system checks installed OpenCode.
+All fixtures and the private server use temporary directories; no model calls.
 """
 
+import argparse
 import asyncio
 import base64
 import json
 import os
-import tempfile
 from pathlib import Path
-from urllib.request import Request, urlopen
+import shutil
+import sys
+import tempfile
+from unittest.mock import patch
 from urllib.parse import urlencode
-from cosmos_tui.features.agent.launch import configuration
+from urllib.request import Request, urlopen
+
 from cosmos_tui.core.paths import PROJECT_ROOT
+from cosmos_tui.features.agent.launch import environment
 
 
-async def main():
-    with tempfile.TemporaryDirectory(prefix="cosmos-skills-") as d:
-        root = Path(d)
+def skill(directory, name):
+    directory.mkdir(parents=True)
+    (directory / "SKILL.md").write_text(
+        f"---\nname: {name}\ndescription: Isolated fixture workflow.\n---\nInspect the screen.\n"
+    )
+
+
+async def main(system=False):
+    with tempfile.TemporaryDirectory(prefix="cosmos-agent-scope-") as temporary:
+        root = Path(temporary)
         project = root / "project"
         project.mkdir()
-        env = dict(
-            os.environ,
-            XDG_CONFIG_HOME=str(root / "config"),
-            XDG_DATA_HOME=str(root / "data"),
-            XDG_STATE_HOME=str(root / "state"),
-            XDG_CACHE_HOME=str(root / "cache"),
-            OPENCODE_DISABLE_MODELS_FETCH="1",
-            OPENCODE_PASSWORD="cosmos-skill-test",
-            OPENCODE_CONFIG_PROJECT_DISABLE="1",
-        )
-        old = Path.cwd()
-        os.chdir(project)
+        user_home = root / "user-home"
+        user_home.mkdir()
+        sentinel = root / "foreign-mcp-was-started"
+        foreign = {
+            "mcp": {
+                "servers": {
+                    "foreign-mcp": {
+                        "type": "local",
+                        "command": [
+                            sys.executable,
+                            "-c",
+                            f"from pathlib import Path; Path({str(sentinel)!r}).touch()",
+                        ],
+                    }
+                }
+            },
+            "commands": {"foreign-command": {"template": "Do not load this."}},
+        }
+        for file in (
+            root / "config/opencode/opencode.json",
+            project / ".opencode/opencode.json",
+            project / "opencode.json",
+        ):
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_text(json.dumps(foreign))
+        for directory, name in (
+            (user_home / ".agents/skills/foreign-home", "foreign-home"),
+            (user_home / ".claude/skills/foreign-claude", "foreign-claude"),
+            (project / ".agents/skills/foreign-project", "foreign-project"),
+            (root / "foreign-env", "foreign-env"),
+            (project / ".cosmos/skills/vim-task", "vim-task"),
+            (root / "config/cosmos/skills/personal-task", "personal-task"),
+        ):
+            skill(directory, name)
+        original_cwd = Path.cwd()
         try:
-            before = dict(os.environ)
-            os.environ.update(env)
-            try:
-                config = configuration("cosmos-skill-test", "%0")
-            finally:
-                os.environ.clear()
-                os.environ.update(before)
+            os.chdir(project)
+            with patch.dict(
+                os.environ,
+                HOME=str(user_home),
+                XDG_CONFIG_HOME=str(root / "config"),
+                XDG_DATA_HOME=str(root / "data"),
+                XDG_STATE_HOME=str(root / "state"),
+                XDG_CACHE_HOME=str(root / "cache"),
+                OPENCODE_CONFIG_CONTENT=json.dumps(
+                    dict(foreign, skills=[str(root / "foreign-env")])
+                ),
+                OPENCODE_CONFIG=str(project / "opencode.json"),
+            ):
+                env = environment("cosmos-skill-test", "%0")
         finally:
-            os.chdir(old)
-        learned = project / ".cosmos/skills/vim-task"
-        learned.mkdir(parents=True)
-        (learned / "SKILL.md").write_text(
-            "---\nname: vim-task\ndescription: Edit a fixture in Vim.\n---\nRead the current screen before acting.\n"
+            os.chdir(original_cwd)
+        config_file = Path(env["OPENCODE_CONFIG"])
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+        config_file.write_text(
+            json.dumps(
+                {"commands": {"cosmos-custom": {"template": "Cosmos-owned command"}}}
+            )
         )
-        personal = root / "config/cosmos/skills/personal-task"
-        personal.mkdir(parents=True)
-        (personal / "SKILL.md").write_text(
-            "---\nname: personal-task\ndescription: Reuse a personal workflow.\n---\nInspect the current screen.\n"
+        env.update(
+            OPENCODE_DISABLE_MODELS_FETCH="1", OPENCODE_PASSWORD="cosmos-skill-test"
         )
-        env["OPENCODE_CONFIG_CONTENT"] = json.dumps(config)
-        bun = str(PROJECT_ROOT / ".build/agent-runtime/node_modules/.bin/bun")
-        log = (root / "server.log").open("wb")
-        p = await asyncio.create_subprocess_exec(
-            bun,
-            "run",
-            "src/index.ts",
-            "serve",
-            "--stdio",
-            "--port",
-            "0",
-            cwd=PROJECT_ROOT / "vendor/opencode/packages/cli",
-            env=env,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=log,
+        command = (
+            [shutil.which("opencode")]
+            if system
+            else [
+                str(PROJECT_ROOT / ".build/agent-runtime/node_modules/.bin/bun"),
+                "run",
+                "src/index.ts",
+            ]
         )
-        try:
-            ready = await asyncio.wait_for(p.stdout.readline(), 30)
-            assert ready, (root / "server.log").read_text()
-            url = json.loads(ready)["url"]
-            headers = {
-                "Authorization": "Basic "
-                + base64.b64encode(b"opencode:cosmos-skill-test").decode()
-            }
+        with (root / "server.log").open("wb") as log:
+            process = await asyncio.create_subprocess_exec(
+                *command,
+                "serve",
+                "--stdio",
+                "--port",
+                "0",
+                cwd=PROJECT_ROOT / "vendor/opencode/packages/cli",
+                env=env,
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=log,
+            )
+            try:
+                ready = await asyncio.wait_for(process.stdout.readline(), 30)
+                assert ready, (root / "server.log").read_text()
+                url = json.loads(ready)["url"]
+                headers = {
+                    "Authorization": "Basic "
+                    + base64.b64encode(b"opencode:cosmos-skill-test").decode()
+                }
 
-            def get(route):
-                req = Request(
-                    url
-                    + route
-                    + "?"
-                    + urlencode({"location[directory]": str(project)}),
-                    headers=headers,
-                )
-                with urlopen(req, timeout=30) as r:
-                    return json.load(r)
+                def get(route):
+                    request = Request(
+                        url
+                        + route
+                        + "?"
+                        + urlencode({"location[directory]": str(project)}),
+                        headers=headers,
+                    )
+                    with urlopen(request, timeout=30) as response:
+                        return json.load(response)
 
-            await asyncio.to_thread(get, "/api/config")
-            skills = {}
-            for _ in range(30):
-                skills = await asyncio.to_thread(get, "/api/skill")
-                if {
+                await asyncio.to_thread(get, "/api/config")
+                expected = {
                     "cosmos-tui",
                     "cosmos-skill-export",
                     "vim-task",
                     "personal-task",
-                } <= {s["name"] for s in skills["data"]}:
-                    break
-                await asyncio.sleep(0.2)
-            commands = await asyncio.to_thread(get, "/api/command")
-            names = {s["name"] for s in skills["data"]}
-            assert {
-                "cosmos-tui",
-                "cosmos-skill-export",
-                "vim-task",
-                "personal-task",
-            } <= names
-            assert "cosmos-export-skill" in {c["name"] for c in commands["data"]}
-            print("Skills:", ", ".join(sorted(names)))
-            print("Commands:", ", ".join(c["name"] for c in commands["data"]))
-            print(
-                "PASS: actual OpenCode discovers bundled + learned project skills and export command"
-            )
-        finally:
-            p.stdin.close()
-            try:
-                await asyncio.wait_for(p.wait(), 5)
-            except asyncio.TimeoutError:
-                p.kill()
-                await p.wait()
-            log.close()
+                }
+                for _ in range(40):
+                    names = {
+                        item["name"]
+                        for item in (await asyncio.to_thread(get, "/api/skill"))["data"]
+                    }
+                    if expected <= names:
+                        break
+                    await asyncio.sleep(0.2)
+                commands = {
+                    item["name"]
+                    for item in (await asyncio.to_thread(get, "/api/command"))["data"]
+                }
+                mcps = await asyncio.to_thread(get, "/api/mcp")
+                assert expected <= names, names
+                assert not any(name.startswith("foreign-") for name in names | commands)
+                assert "foreign-mcp" not in json.dumps(mcps), mcps
+                assert not sentinel.exists(), "foreign MCP was executed"
+                assert {"cosmos-export-skill", "cosmos-custom"} <= commands, commands
+                assert env["HOME"] == str(user_home), "shell HOME must remain intact"
+                print("Skills:", ", ".join(sorted(names)))
+                print("Commands:", ", ".join(sorted(commands)))
+                print(
+                    "PASS: Cosmos libraries/config work; foreign skills, MCPs and commands excluded"
+                )
+            finally:
+                process.stdin.close()
+                try:
+                    await asyncio.wait_for(process.wait(), 5)
+                except asyncio.TimeoutError:
+                    process.kill()
+                    await process.wait()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--system", action="store_true")
+    asyncio.run(main(parser.parse_args().system))

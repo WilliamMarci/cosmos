@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 import sys
 
-from cosmos_tui.core.paths import PROJECT_ROOT
+from cosmos_tui.core.paths import PROJECT_ROOT, config_home
 
 
 def arguments(backend, source_pane, prompt=""):
@@ -109,28 +109,42 @@ def runtime():
     return [executable], None
 
 
-def launch(socket, source_pane, prompt=""):
-    executable, workdir = runtime()
-    # The frontend and its --standalone child server inherit these settings;
-    # ordinary OpenCode processes and user config files are not modified.
-    env = dict(os.environ)
-    env["PATH"] = str(Path(executable[0]).parent) + os.pathsep + env.get("PATH", "")
-    base = json.loads(env.get("OPENCODE_CONFIG_CONTENT", "{}"))
-    if not isinstance(base, dict):
-        raise ValueError("OPENCODE_CONFIG_CONTENT must be a JSON object")
-    config = configuration(socket, source_pane)
-    base["default_agent"] = config["default_agent"]
-    base["skills"] = list(dict.fromkeys(config["skills"] + base.get("skills", [])))
-    base["commands"] = {**base.get("commands", {}), **config["commands"]}
-    base["agents"] = {**base.get("agents", {}), **config["agents"]}
-    mcp = base.setdefault("mcp", {})
-    mcp["servers"] = {**mcp.get("servers", {}), **config["mcp"]["servers"]}
-    base["permissions"] = config["permissions"] + base.get("permissions", [])
+def environment(socket, source_pane):
+    # Capture Cosmos paths before redirecting OpenCode's XDG bases. Never
+    # import an inherited OpenCode overlay, plugins, MCPs or discovery flags.
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith("OPENCODE_")
+    }
+    root = config_home() / "cosmos/agent"
+    home = Path.home()
     env.update(
         COSMOS_AGENT="1",
-        OPENCODE_CONFIG_CONTENT=json.dumps(base),
+        OPENCODE_CONFIG_DIR=str(root),
+        OPENCODE_CONFIG=str(root / "opencode.json"),
+        OPENCODE_CONFIG_CONTENT=json.dumps(configuration(socket, source_pane)),
+        OPENCODE_CONFIG_PROJECT_DISABLE="1",
+        OPENCODE_DISABLE_CLAUDE_CODE="1",
+        # Stock OpenCode 2.1.2 exposes this discovery-home override. It fences
+        # ~/.agents without changing HOME seen by terminal applications.
+        OPENCODE_TEST_HOME=str(root / "home"),
         OPENCODE_DISABLE_AUTOUPDATE="1",
     )
+    for variable, default in (
+        ("XDG_CONFIG_HOME", home / ".config"),
+        ("XDG_DATA_HOME", home / ".local/share"),
+        ("XDG_CACHE_HOME", home / ".cache"),
+        ("XDG_STATE_HOME", home / ".local/state"),
+    ):
+        env[variable] = str(Path(os.environ.get(variable) or default) / "cosmos/agent")
+    return env
+
+
+def launch(socket, source_pane, prompt=""):
+    executable, workdir = runtime()
+    env = environment(socket, source_pane)
+    env["PATH"] = str(Path(executable[0]).parent) + os.pathsep + env.get("PATH", "")
     current = os.environ.get("TMUX_PANE")
     if current:
         from cosmos_tui.features.agent.terminal import TerminalTools

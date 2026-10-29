@@ -1,0 +1,13 @@
+diff --git a/packages/cli/src/server-process.ts b/packages/cli/src/server-process.ts
+index 1078218..482e204 100644
+--- a/packages/cli/src/server-process.ts
++++ b/packages/cli/src/server-process.ts
+@@ -119,6 +119,8 @@ const processEffect = Effect.fnUntraced(function* (options: Options) {
+             fetch: !truthy(process.env.OPENCODE_DISABLE_MODELS_FETCH),
+           },
+           config: {
++            // Cosmos owns its configuration and explicitly supplies its skill roots.
++            global: process.env.COSMOS_AGENT === "1" ? false : undefined,
+             directory: process.env.OPENCODE_CONFIG_DIR,
+             project: !truthy(
+               process.env.OPENCODE_CONFIG_PROJECT_DISABLE ?? process.env.OPENCODE_DISABLE_PROJECT_CONFIG,

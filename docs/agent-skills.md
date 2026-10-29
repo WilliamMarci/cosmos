@@ -10,7 +10,7 @@ Every Cosmos Agent launch adds these discovery roots:
 - Personal: `${XDG_CONFIG_HOME:-~/.config}/cosmos/skills/`.
 - Project: `<Agent working directory>/.cosmos/skills/`.
 
-OpenCode's normal skill sources remain available. Additional paths already supplied in `OPENCODE_CONFIG_CONTENT.skills` are retained. Directories are not created merely by launching the Agent. Existing same-name skills should be inspected before updating; use distinct task names when multiple sources provide different procedures.
+Ordinary OpenCode, Claude and `.agents` skill sources are not imported. Inherited `OPENCODE_CONFIG_CONTENT` is discarded rather than merged. Explicit additional sources must be configured in Cosmos's own `~/.config/cosmos/agent/opencode.json`. Directories are not created merely by launching the Agent. Existing same-name skills should be inspected before updating; use distinct task names when multiple sources provide different procedures.
 
 Skills are listed by metadata and loaded on demand through the existing tool. OpenCode watches the configured directories and refreshes the registry after files change; when file watching is disabled, reopen the Agent to rescan. Skills work with the bundled/source runtime and compatible system OpenCode using the same injected configuration.
 
@@ -50,4 +50,4 @@ To import, inspect and extract that single directory into the destination person
 
 ## Validation
 
-`dev/test_agent_skills.py` verifies directory resolution, command registration, archive export/import and rejection of missing references. `dev/validate_agent_skills.py` starts a private OpenCode server with temporary XDG/project fixtures and verifies its actual `/api/skill` and `/api/command` registries discover bundled, personal and project skills plus the two slash commands. These checks do not call a model or claim that a model-generated skill has been behaviorally replayed.
+`dev/test_agent_skills.py` verifies directory resolution, command registration, archive export/import and rejection of missing references. `dev/validate_agent_skills.py` starts a private OpenCode server with temporary XDG/project fixtures and verifies its actual `/api/skill` and `/api/command` registries discover bundled, personal and project skills plus the two slash commands. The fixtures also contain foreign home/project skills, OpenCode commands and an MCP that would write a sentinel if started; the test checks they are excluded and the sentinel is absent. `--system` verifies the same boundary using installed OpenCode 2.1.2. These checks do not call a model or claim that a model-generated skill has been behaviorally replayed.

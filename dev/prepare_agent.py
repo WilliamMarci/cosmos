@@ -12,16 +12,18 @@ from cosmos_tui.ui.logo import logo_lines  # noqa: E402
 
 def prepare():
     vendor = ROOT / "vendor/opencode"
-    patch = ROOT / "integrations/opencode/branding.patch"
-    check = subprocess.run(
-        ["git", "apply", "--check", str(patch)], cwd=vendor, capture_output=True
-    )
-    if check.returncode == 0:
-        subprocess.run(["git", "apply", str(patch)], cwd=vendor, check=True)
-    else:
-        subprocess.run(
-            ["git", "apply", "--reverse", "--check", str(patch)], cwd=vendor, check=True
+    for patch in sorted((ROOT / "integrations/opencode").glob("*.patch")):
+        check = subprocess.run(
+            ["git", "apply", "--check", str(patch)], cwd=vendor, capture_output=True
         )
+        if check.returncode == 0:
+            subprocess.run(["git", "apply", str(patch)], cwd=vendor, check=True)
+        else:
+            subprocess.run(
+                ["git", "apply", "--reverse", "--check", str(patch)],
+                cwd=vendor,
+                check=True,
+            )
     component = vendor / "packages/tui/src/component"
     (component / "cosmos-logo.tsx").write_text(
         (ROOT / "integrations/opencode/cosmos-logo.tsx").read_text()
