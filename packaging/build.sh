@@ -65,7 +65,7 @@ cp terminal_agent/shell/agent.bash "dist/$bundle_name/terminal_agent/shell/"
 cp terminal_agent/native/readline.c "dist/$bundle_name/terminal_agent/native/"
 
 python3 packaging/licenses.py "dist/$bundle_name/licenses"
-cp docs/agent.md docs/agent-skills.md "dist/$bundle_name/docs/"
+cp docs/agent.md docs/agent-skills.md docs/agent-actions.md "dist/$bundle_name/docs/"
 if [[ $with_agent == 1 ]]; then
     bash packaging/build_agent.sh "$project_root/dist/$bundle_name"
 else

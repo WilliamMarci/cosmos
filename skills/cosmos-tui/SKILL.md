@@ -25,4 +25,6 @@ Preserve the user's editor buffers and ongoing commands. Escape, control keys, R
 
 ## Reuse learned operations
 
+For Cosmos-owned interfaces (Reader, Files, settings and Mod entries), use `cosmos_actions.list_actions` and `invoke_action` rather than guessing terminal key injection. Select a client explicitly if several are connected, and refresh its live context after an action. A dispatched result acknowledges routing, not completion of a dialog or task. UI-dependent actions need a connected Cosmos UI; service actions use the coordinator registry.
+
 When the user asks to save what worked, load `cosmos-skill-export` or use `/cosmos-export-skill`. Preserve the method and observable checkpoints, not a raw transcript. Do not automatically save every interaction as a new skill.

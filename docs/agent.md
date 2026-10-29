@@ -21,7 +21,7 @@ For example, `COSMOS_AGENT_RUNTIME=system cosmos` uses an existing installation.
 
 The launcher runs `python -m cosmos_tui.features.agent launch --socket SOCKET --source-pane %ID`, then executes the patched frontend with `--standalone`. Each frontend owns a private OpenCode server. SSH or Cosmos UI detachment leaves its Tmux process running; reconnecting redraws the retained pane. Closing the Agent frontend ends that private server. OpenCode owns conversation persistence; databases are stored below Cosmos's own data directory. The source runtime uses `opencode-local.db`, the bundled build uses `opencode-cosmos.db`, and the system route follows its installed channel within that same private data root. Model/provider configuration and authentication remain OpenCode's responsibility.
 
-Cosmos injects an in-memory `OPENCODE_CONFIG_CONTENT` configuration for the `cosmos` primary agent and `cosmos_terminal` MCP server. It does **not** merge inherited OpenCode configuration content, plugin configuration or credentials. Additional Agent configuration belongs in `${XDG_CONFIG_HOME:-~/.config}/cosmos/agent/opencode.json`. Standard OpenCode/Claude/.agents configuration and project `.opencode`/`opencode.json` discovery are disabled. A shared ordinary OpenCode server is not reused.
+Cosmos injects an in-memory `OPENCODE_CONFIG_CONTENT` configuration for the `cosmos` primary agent and `cosmos_terminal` / `cosmos_actions` MCP servers. It does **not** merge inherited OpenCode configuration content, plugin configuration or credentials. Additional Agent configuration belongs in `${XDG_CONFIG_HOME:-~/.config}/cosmos/agent/opencode.json`. Standard OpenCode/Claude/.agents configuration and project `.opencode`/`opencode.json` discovery are disabled. A shared ordinary OpenCode server is not reused.
 
 OpenCode's XDG config/data/cache/state bases are redirected under the corresponding `cosmos/agent/` subtree. Its normal `opencode/` data/cache/state subdirectory stays inside that subtree. `OPENCODE_CONFIG_DIR` points directly to the Cosmos Agent configuration directory. This isolates settings, plugin configuration, model/provider credentials and conversations from ordinary OpenCode. Existing user credentials are not copied; configure providers/login inside Cosmos Agent. Ordinary `HOME` is unchanged, so terminal applications keep the user's normal home. A private discovery-home override excludes the user's `.agents` skills in compatible stock OpenCode 2.1.2. The bundled/source patch additionally disables upstream global configuration discovery.
 
@@ -32,6 +32,10 @@ The home screen and exit wordmark use the canonical Cosmos glyphs in theme-relat
 ## Reusable software skills
 
 Cosmos skills use OpenCode's native discovery and skill tool. Bundled, personal and project skill libraries are injected at launch. `/cosmos-learn` starts a software-learning task; `/cosmos-export-skill` saves the observed method as a portable `SKILL.md` directory. See [Agent skills](agent-skills.md) for prompts, paths and ZIP export.
+
+## Cosmos Actions
+
+`cosmos_actions.list_actions` discovers service/Mod actions and connected clients' live UI actions. `invoke_action` routes them through the coordinator or existing UI dispatcher, with explicit client selection when needed. See [Agent Actions](agent-actions.md) for scopes, parameters, acknowledgements and lifecycle.
 
 ## Terminal tools
 

@@ -58,10 +58,31 @@ def configuration(socket, source_pane):
                         socket,
                     ],
                     "environment": {"PYTHONPATH": str(PROJECT_ROOT / "python")},
-                }
+                },
+                "cosmos_actions": {
+                    "type": "local",
+                    "codemode": False,
+                    "command": [
+                        sys.executable,
+                        "-m",
+                        "cosmos_tui.features.agent",
+                        "mcp",
+                        "--socket",
+                        socket,
+                        "--toolset",
+                        "actions",
+                    ],
+                    "environment": {"PYTHONPATH": str(PROJECT_ROOT / "python")},
+                },
             }
         },
         "permissions": [
+            {"action": "cosmos_actions_*", "resource": "*", "effect": "ask"},
+            {
+                "action": "cosmos_actions_list_actions",
+                "resource": "*",
+                "effect": "allow",
+            },
             {"action": "cosmos_terminal_*", "resource": "*", "effect": "ask"},
             {
                 "action": "cosmos_terminal_list_panes",

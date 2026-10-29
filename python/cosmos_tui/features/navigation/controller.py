@@ -199,36 +199,46 @@ class NavigationController(Controller):
         await app.reader_ui.update_viewer(pane, dict(kind="files", path=path, cursor=0))
 
     async def invoke_entry(self, row, source):
-        app = self.app
         try:
-            if row["kind"] == "settings":
-                app.push_screen(Palette(row.get("menu", "settings")))
-            elif row["kind"] == "about":
-                app.push_screen(About())
-            elif row["kind"] == "mod":
-                await rpc.call(
-                    "actions.invoke",
-                    {"id": row["id"], "params": {"client": app.client}},
-                )
-            elif row["kind"] == "command":
-                command = row["command"]
-                if command.context == "workspace" or command.id.startswith(
-                    "global.ime_"
-                ):
-                    await app.action_leader_key(command.target)
-                elif command.context == "copy":
-                    await app.copy_action(command.target)
-                elif (
-                    command.context.startswith("assistant")
-                    or command.context == "content_search"
-                ):
-                    await source.run_action(command.target)
-                else:
-                    app.post_message(
-                        events.Key(
-                            command.target,
-                            command.target if len(command.target) == 1 else None,
-                        )
-                    )
+            await self.execute_entry(row, source)
         except (OSError, RuntimeError) as error:
-            await app.action_error("menu action", error)
+            await self.app.action_error("menu action", error)
+
+    async def execute_entry(self, row, source):
+        app = self.app
+        if row["kind"] == "settings":
+            app.push_screen(Palette(row.get("menu", "settings")))
+        elif row["kind"] == "about":
+            app.push_screen(About())
+        elif row["kind"] == "mod":
+            await rpc.call(
+                "actions.invoke",
+                {"id": row["id"], "params": {"client": app.client}},
+            )
+        elif row["kind"] == "command":
+            command = row["command"]
+            if command.id == "global.actions":
+                app.action_context_actions()
+            elif command.id == "global.start":
+                app.action_start_menu()
+            elif command.context == "workspace" or command.id.startswith("global.ime_"):
+                await app.action_leader_key(command.target)
+            elif command.context == "copy":
+                await app.copy_action(command.target)
+            elif (
+                command.context.startswith("assistant")
+                or command.context == "content_search"
+                or (
+                    command.context == "palette"
+                    and command.target
+                    in ("cycle_previous", "cycle_next", "parent", "child")
+                )
+            ):
+                await source.run_action(command.target)
+            else:
+                app.post_message(
+                    events.Key(
+                        command.target,
+                        command.target if len(command.target) == 1 else None,
+                    )
+                )

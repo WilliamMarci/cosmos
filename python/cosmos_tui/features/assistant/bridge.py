@@ -25,6 +25,9 @@ class AgentBridge:
             self.handle, path=self.path, limit=1024 * 1024
         )
         os.chmod(self.path, 0o600)
+        await self.app.backend.request(
+            f"set-option -g @cosmos_agent_actions_{self.app.client} {self.app.backend.quote(self.path)}"
+        )
 
     async def handle(self, reader, writer):
         self.writers.add(writer)
@@ -36,6 +39,16 @@ class AgentBridge:
             if uid != os.getuid():
                 return
             request = json.loads(await asyncio.wait_for(reader.readline(), 3))
+            if request.get("type") == "cosmos.actions":
+                from cosmos_tui.features.agent.action_ui import handle
+
+                try:
+                    response = await handle(self.app, request)
+                except (OSError, ValueError, RuntimeError) as error:
+                    response = dict(error=str(error))
+                writer.write(json.dumps(response).encode() + b"\n")
+                await writer.drain()
+                return
             if request.get("version") != 1 or not any(
                 p.id == request.get("pane") for p in self.app.panes
             ):
@@ -137,6 +150,12 @@ class AgentBridge:
             await writer.wait_closed()
 
     async def close(self):
+        try:
+            await self.app.backend.request(
+                f"set-option -gu @cosmos_agent_actions_{self.app.client}"
+            )
+        except (OSError, RuntimeError):
+            pass
         if self.server:
             self.server.close()
             await self.server.wait_closed()

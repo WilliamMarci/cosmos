@@ -40,7 +40,9 @@ class SkillTests(unittest.TestCase):
             self.assertNotIn("OPENCODE_CLI_CONFIG_CONTENT", env)
             config = json.loads(env["OPENCODE_CONFIG_CONTENT"])
             self.assertNotIn("/foreign/skills", config["skills"])
-            self.assertEqual(set(config["mcp"]["servers"]), {"cosmos_terminal"})
+            self.assertEqual(
+                set(config["mcp"]["servers"]), {"cosmos_terminal", "cosmos_actions"}
+            )
 
     def test_library_paths_and_export_prompt(self):
         with (

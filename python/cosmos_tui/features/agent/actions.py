@@ -1,0 +1,105 @@
+"""Discover and invoke the existing service/client Action registries."""
+
+import asyncio
+import json
+import shlex
+from pathlib import Path
+
+from cosmos_tui.core import rpc
+from cosmos_tui.features.agent.terminal import TerminalTools
+
+PREFIX = "@cosmos_agent_actions_"
+
+
+class ActionTools(TerminalTools):
+    server_name = "cosmos-actions"
+
+    async def clients(self):
+        text = await self.backend.cli("show-options", "-g")
+        result = {}
+        for line in text.splitlines():
+            parts = shlex.split(line)
+            if (
+                len(parts) == 2
+                and parts[0].startswith(PREFIX)
+                and Path(parts[1]).is_socket()
+            ):
+                result[parts[0][len(PREFIX) :]] = parts[1]
+        return result
+
+    async def ui_call(self, client, request):
+        clients = await self.clients()
+        if client is None:
+            if len(clients) != 1:
+                raise ValueError(
+                    "specify a client from list_actions; no unique connected Cosmos UI"
+                )
+            client = next(iter(clients))
+        if client not in clients:
+            raise ValueError("Cosmos UI client is no longer connected")
+        async with asyncio.timeout(10):
+            reader, writer = await asyncio.open_unix_connection(
+                clients[client], limit=1024 * 1024
+            )
+            try:
+                writer.write(
+                    (
+                        json.dumps(dict(request, type="cosmos.actions", client=client))
+                        + "\n"
+                    ).encode()
+                )
+                await writer.drain()
+                line = await reader.readline()
+                if not line:
+                    raise RuntimeError(
+                        "Cosmos UI disconnected before acknowledging the action"
+                    )
+                response = json.loads(line)
+                if "error" in response:
+                    raise RuntimeError(response["error"])
+                return response
+            finally:
+                writer.close()
+                await writer.wait_closed()
+
+    async def list_actions(self, client=None):
+        service = await rpc.call("actions.list")
+        clients = await self.clients()
+        result = dict(
+            service_actions=[
+                dict(row, scope="service", requires_ui=row.get("kind") == "menu")
+                for row in service
+            ],
+            clients=list(clients),
+            ui=None,
+        )
+        if client is not None or len(clients) == 1:
+            result["ui"] = await self.ui_call(client, dict(operation="list"))
+        return result
+
+    async def invoke_action(self, id, scope, client=None, params=None):
+        if (
+            not isinstance(id, str)
+            or scope not in ("service", "ui")
+            or (params is not None and not isinstance(params, dict))
+        ):
+            raise ValueError("provide an action ID, service/ui scope and object params")
+        if scope == "ui":
+            return await self.ui_call(
+                client, dict(operation="invoke", id=id, params=params or {})
+            )
+        actions = await rpc.call("actions.list")
+        action = next((row for row in actions if row["id"] == id), None)
+        if not action:
+            raise ValueError("unknown service action; refresh list_actions")
+        if action.get("kind") == "menu":
+            if params:
+                raise ValueError("menu actions do not accept params")
+            return await self.ui_call(client, dict(operation="menu", id=id))
+        args = dict(params or {})
+        if client:
+            if client not in await self.clients():
+                raise ValueError("unknown UI client")
+            args["client"] = client
+        result = await rpc.call("actions.invoke", dict(id=id, params=args))
+        return dict(scope="service", result=result)

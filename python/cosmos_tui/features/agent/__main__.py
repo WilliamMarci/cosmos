@@ -10,11 +10,14 @@ def main():
     parser.add_argument("--socket", required=True)
     parser.add_argument("--source-pane", default="")
     parser.add_argument("--prompt", default="")
+    parser.add_argument(
+        "--toolset", choices=("terminal", "actions"), default="terminal"
+    )
     args = parser.parse_args()
     if args.mode == "mcp":
         from cosmos_tui.features.agent.mcp import serve
 
-        serve(args.socket)
+        serve(args.socket, args.toolset)
     else:
         from cosmos_tui.features.agent.launch import launch
 

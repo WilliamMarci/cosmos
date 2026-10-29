@@ -13,11 +13,14 @@ describe("Cosmos Agent terminal permissions", () => {
     if (normalized.type !== "normalized") throw new Error(JSON.stringify(normalized))
     const parsed = Schema.decodeUnknownSync(Info)(normalized.encoded)
     expect(parsed.default_agent).toBe("cosmos")
+    expect(parsed.mcp?.servers?.cosmos_actions.type).toBe("local")
     expect(parsed.mcp?.servers?.cosmos_terminal.type).toBe("local")
     expect(parsed.agents?.cosmos.system).toContain("untrusted")
   })
 
   test("reads allow, mutations ask, explicit deny wins", () => {
+    expect(Permission.evaluate("cosmos_actions_list_actions", "*", config.permissions).effect).toBe("allow")
+    expect(Permission.evaluate("cosmos_actions_invoke_action", "*", config.permissions).effect).toBe("ask")
     expect(Permission.evaluate("cosmos_terminal_read_screen", "*", config.permissions).effect).toBe("allow")
     expect(Permission.evaluate("cosmos_terminal_list_panes", "*", config.permissions).effect).toBe("allow")
     for (const tool of ["send_text", "send_keys", "mouse", "create_terminal"]) {

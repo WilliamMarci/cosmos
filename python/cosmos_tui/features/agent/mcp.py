@@ -82,22 +82,47 @@ TOOLS = [
 ]
 
 
-async def dispatch(tools, message):
+ACTION_TOOLS = [
+    dict(
+        name="list_actions",
+        description="Discover Cosmos service/Mod actions and connected UI clients. Pass client to inspect that client's current context actions. Multiple clients require explicit selection before UI operations.",
+        inputSchema=schema(dict(client=dict(type="string"))),
+        annotations=dict(readOnlyHint=True),
+    ),
+    dict(
+        name="invoke_action",
+        description="Invoke a discovered Cosmos Action by exact ID and scope (service or ui). UI actions use the selected client's live context and normal dispatcher; they may open dialogs, change panes/settings, or detach the UI. Returns dispatch acknowledgement, not proof a dialog/task completed. Refresh list_actions after state changes. Mutating operation: obey OpenCode confirmation.",
+        inputSchema=schema(
+            dict(
+                id=dict(type="string"),
+                scope=dict(type="string", enum=["service", "ui"]),
+                client=dict(type="string"),
+                params=dict(type="object"),
+            ),
+            ("id", "scope"),
+        ),
+    ),
+]
+
+
+async def dispatch(tools, message, catalog=TOOLS):
     method = message.get("method")
     if method == "initialize":
         return dict(
             protocolVersion="2024-11-05",
             capabilities=dict(tools={}),
-            serverInfo=dict(name="cosmos-terminal", version="0.1.0"),
+            serverInfo=dict(
+                name=getattr(tools, "server_name", "cosmos-terminal"), version="0.1.0"
+            ),
         )
     if method == "ping":
         return {}
     if method == "tools/list":
-        return dict(tools=TOOLS)
+        return dict(tools=catalog)
     if method == "tools/call":
         params = message.get("params", {})
         name = params.get("name")
-        spec = next((t for t in TOOLS if t["name"] == name), None)
+        spec = next((t for t in catalog if t["name"] == name), None)
         if spec is None:
             raise ValueError("unknown terminal tool")
         args = params.get("arguments", {})
@@ -125,8 +150,13 @@ async def dispatch(tools, message):
     raise LookupError("method not found")
 
 
-def serve(socket):
-    tools = TerminalTools(socket)
+def serve(socket, toolset="terminal"):
+    if toolset == "actions":
+        from cosmos_tui.features.agent.actions import ActionTools
+
+        tools, catalog = ActionTools(socket), ACTION_TOOLS
+    else:
+        tools, catalog = TerminalTools(socket), TOOLS
     with asyncio.Runner() as runner:
         while line := sys.stdin.buffer.readline(262145):
             message = None
@@ -141,7 +171,7 @@ def serve(socket):
                 response = dict(
                     jsonrpc="2.0",
                     id=message["id"],
-                    result=runner.run(dispatch(tools, message)),
+                    result=runner.run(dispatch(tools, message, catalog)),
                 )
             except (ValueError, LookupError) as error:
                 response = dict(

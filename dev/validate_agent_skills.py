@@ -160,6 +160,7 @@ async def main(system=False):
                 assert expected <= names, names
                 assert not any(name.startswith("foreign-") for name in names | commands)
                 assert "foreign-mcp" not in json.dumps(mcps), mcps
+                assert "cosmos_actions" in json.dumps(mcps), mcps
                 assert not sentinel.exists(), "foreign MCP was executed"
                 assert {"cosmos-export-skill", "cosmos-custom"} <= commands, commands
                 assert env["HOME"] == str(user_home), "shell HOME must remain intact"
