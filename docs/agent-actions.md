@@ -32,7 +32,7 @@ A response with `status="dispatched"` acknowledges routing only. A dialog may st
 
 ## Client transport and lifecycle
 
-The existing private UI bridge also accepts `type="cosmos.actions"` requests from the same Unix UID. Requests specify a client plus `operation="list"`, `"invoke"` or `"menu"`; invocation includes an Action `id`. Responses are one newline-delimited JSON object, with an `error` field on failure. The socket is mode 0600.
+The existing private UI bridge also accepts `type="cosmos.actions"` requests from the same Unix UID. Requests specify a client plus `operation="list"`, `"invoke"` , `"menu"` or `"focus"`; focus includes a stable `pane` and reuses Switch target selection. Invocation includes an Action `id`. Responses are one newline-delimited JSON object, with an `error` field on failure. The socket is mode 0600.
 
 Each connected UI publishes its private socket path in its Tmux service under `@cosmos_agent_actions_<client>`. Graceful shutdown removes the entry. Discovery ignores missing socket paths. A stale/unreachable entry returns an explicit connection error; the bridge does not retarget another client. A newly attached UI publishes a new client entry, so a retained Agent can refresh discovery after reconnection.
 

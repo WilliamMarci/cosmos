@@ -45,6 +45,37 @@ class AgentActionTests(unittest.IsolatedAsyncioTestCase):
                         "workspace.palette",
                         {row["id"] for row in catalog["ui"]["actions"]},
                     )
+                    from cosmos_tui.features.agent.sessions import WorkspaceTools
+
+                    row = dict(
+                        pane_id="%19",
+                        window_id="@4",
+                        session_id="$7",
+                        session_name="task",
+                    )
+                    with (
+                        patch(
+                            "cosmos_tui.features.agent.terminal.TerminalTools.pane",
+                            AsyncMock(return_value=row),
+                        ),
+                        patch(
+                            "cosmos_tui.terminal.targets.select", AsyncMock()
+                        ) as select,
+                    ):
+                        focused = await tools.ui_call(
+                            None, dict(operation="focus", pane="%19")
+                        )
+                        self.assertEqual(focused["session"], "$7")
+                        self.assertEqual(select.await_args.args[1]["pane_id"], "%19")
+                    workspace = WorkspaceTools("test")
+                    workspace.pane = AsyncMock(return_value=row)
+                    with patch.object(
+                        ActionTools, "ui_call", AsyncMock(return_value=focused)
+                    ) as focus:
+                        await workspace.focus_pane("%19", client=app.client)
+                        focus.assert_awaited_once_with(
+                            app.client, dict(operation="focus", pane="%19")
+                        )
                     result = await tools.invoke_action("workspace.palette", "ui")
                     self.assertEqual(result["status"], "dispatched")
                     await pilot.pause()

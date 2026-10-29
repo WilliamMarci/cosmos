@@ -7,7 +7,13 @@ from pathlib import Path
 import shutil
 import sys
 
-from cosmos_tui.core.paths import PROJECT_ROOT, config_home
+from cosmos_tui.core.paths import PROJECT_ROOT
+from cosmos_tui.features.agent.configuration import configuration
+from cosmos_tui.features.agent.profile import (
+    initialize_profile,
+    load_profile,
+    profile_root,
+)
 
 
 def arguments(backend, source_pane, prompt=""):
@@ -25,77 +31,6 @@ def arguments(backend, source_pane, prompt=""):
     if prompt:
         args += ["--prompt", prompt]
     return args
-
-
-def configuration(socket, source_pane):
-    from cosmos_tui.features.agent.skills import commands, personal_skills, skill_paths
-
-    return {
-        "skills": skill_paths(),
-        "commands": commands(),
-        "default_agent": "cosmos",
-        "agents": {
-            "cosmos": {
-                "mode": "primary",
-                "description": "Cosmos terminal workspace agent",
-                "system": (PROJECT_ROOT / "config/cosmos-agent-prompt.md").read_text()
-                + f"\nSource pane: {source_pane}. Cosmos Tmux service: {socket}.\n"
-                + f"Personal Cosmos skill library: {personal_skills()}.\n"
-                + f"Skill export helper Python: {sys.executable}.\n",
-            }
-        },
-        "mcp": {
-            "servers": {
-                "cosmos_terminal": {
-                    "type": "local",
-                    "codemode": False,
-                    "command": [
-                        sys.executable,
-                        "-m",
-                        "cosmos_tui.features.agent",
-                        "mcp",
-                        "--socket",
-                        socket,
-                    ],
-                    "environment": {"PYTHONPATH": str(PROJECT_ROOT / "python")},
-                },
-                "cosmos_actions": {
-                    "type": "local",
-                    "codemode": False,
-                    "command": [
-                        sys.executable,
-                        "-m",
-                        "cosmos_tui.features.agent",
-                        "mcp",
-                        "--socket",
-                        socket,
-                        "--toolset",
-                        "actions",
-                    ],
-                    "environment": {"PYTHONPATH": str(PROJECT_ROOT / "python")},
-                },
-            }
-        },
-        "permissions": [
-            {"action": "cosmos_actions_*", "resource": "*", "effect": "ask"},
-            {
-                "action": "cosmos_actions_list_actions",
-                "resource": "*",
-                "effect": "allow",
-            },
-            {"action": "cosmos_terminal_*", "resource": "*", "effect": "ask"},
-            {
-                "action": "cosmos_terminal_list_panes",
-                "resource": "*",
-                "effect": "allow",
-            },
-            {
-                "action": "cosmos_terminal_read_screen",
-                "resource": "*",
-                "effect": "allow",
-            },
-        ],
-    }
 
 
 def runtime():
@@ -138,10 +73,14 @@ def environment(socket, source_pane):
         for key, value in os.environ.items()
         if not key.startswith("OPENCODE_")
     }
-    root = config_home() / "cosmos/agent"
-    home = Path.home()
+    root = profile_root()
+    settings, keys = load_profile()
+    env.pop("COSMOS_AGENT_API_KEY", None)
+    if keys.get(settings["provider"]):
+        env["COSMOS_AGENT_API_KEY"] = keys[settings["provider"]]
     env.update(
         COSMOS_AGENT="1",
+        COSMOS_AGENT_PROFILE=str(root),
         OPENCODE_CONFIG_DIR=str(root),
         OPENCODE_CONFIG=str(root / "opencode.json"),
         OPENCODE_CONFIG_CONTENT=json.dumps(configuration(socket, source_pane)),
@@ -151,19 +90,29 @@ def environment(socket, source_pane):
         # ~/.agents without changing HOME seen by terminal applications.
         OPENCODE_TEST_HOME=str(root / "home"),
         OPENCODE_DISABLE_AUTOUPDATE="1",
+        OPENCODE_DISABLE_FREE_MODELS="1",
     )
-    for variable, default in (
-        ("XDG_CONFIG_HOME", home / ".config"),
-        ("XDG_DATA_HOME", home / ".local/share"),
-        ("XDG_CACHE_HOME", home / ".cache"),
-        ("XDG_STATE_HOME", home / ".local/state"),
+    for variable, subdir in (
+        ("XDG_CONFIG_HOME", "config"),
+        ("XDG_DATA_HOME", "data"),
+        ("XDG_CACHE_HOME", "cache"),
+        ("XDG_STATE_HOME", "state"),
     ):
-        env[variable] = str(Path(os.environ.get(variable) or default) / "cosmos/agent")
+        env[variable] = str(root / subdir)
+    env["TMPDIR"] = str(root / "tmp")
     return env
 
 
 def launch(socket, source_pane, prompt=""):
     executable, workdir = runtime()
+    os.umask(0o077)
+    root = initialize_profile()
+    from cosmos_tui.features.agent.profile import private_directory
+
+    private_directory(root / "tmp")
+    from cosmos_tui.features.agent.theme import install_theme
+
+    install_theme()
     env = environment(socket, source_pane)
     env["PATH"] = str(Path(executable[0]).parent) + os.pathsep + env.get("PATH", "")
     current = os.environ.get("TMUX_PANE")

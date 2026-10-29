@@ -10,11 +10,12 @@ import zipfile
 
 import yaml
 
-from cosmos_tui.core.paths import PROJECT_ROOT, config_home
+from cosmos_tui.core.paths import PROJECT_ROOT
+from cosmos_tui.features.agent.profile import profile_root
 
 
 def personal_skills():
-    return config_home() / "cosmos/skills"
+    return profile_root() / "skills"
 
 
 def skill_paths(cwd=None):

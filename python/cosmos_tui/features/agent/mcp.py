@@ -4,8 +4,6 @@ import asyncio
 import json
 import sys
 
-from cosmos_tui.features.agent.terminal import TerminalTools
-
 
 def schema(properties, required=()):
     return dict(
@@ -78,6 +76,43 @@ TOOLS = [
         name="create_terminal",
         description="Create a retained Bash terminal in a new background window of the source pane's session, inheriting its cwd. Does not steal focus. Returns its stable pane ID.",
         inputSchema=schema(dict(source_pane=PANE), ("source_pane",)),
+    ),
+]
+
+
+TOOLS += [
+    dict(
+        name="list_sessions",
+        description="List all Cosmos sessions with stable IDs, names, windows and panes.",
+        inputSchema=schema({}),
+        annotations=dict(readOnlyHint=True),
+    ),
+    dict(
+        name="create_session",
+        description="Create a new retained Cosmos session with a required task name, inheriting the source pane's cwd. It starts in the background; use focus_pane to switch a UI client.",
+        inputSchema=schema(
+            dict(name=dict(type="string"), source_pane=PANE), ("name", "source_pane")
+        ),
+    ),
+    dict(
+        name="rename_target",
+        description="Rename a stable $session, @window or %pane to describe the task. Does not change its stable ID.",
+        inputSchema=schema(
+            dict(target=dict(type="string"), name=dict(type="string")),
+            ("target", "name"),
+        ),
+    ),
+    dict(
+        name="focus_pane",
+        description="Switch a selected Cosmos UI client to a pane, including across sessions, through the normal Switch backend. Multiple clients require explicit client selection. Does not switch a hidden or disconnected client.",
+        inputSchema=schema(dict(pane=PANE, client=dict(type="string")), ("pane",)),
+    ),
+    dict(
+        name="export_history",
+        description="Export retained output from every pane of a stable $session to a private JSON file. Default destination is Cosmos Agent's exports directory; an optional output path must not exist. This exports terminal history, not model conversations. Returns a path, not all transcript text.",
+        inputSchema=schema(
+            dict(session=dict(type="string"), output=dict(type="string")), ("session",)
+        ),
     ),
 ]
 
@@ -156,7 +191,9 @@ def serve(socket, toolset="terminal"):
 
         tools, catalog = ActionTools(socket), ACTION_TOOLS
     else:
-        tools, catalog = TerminalTools(socket), TOOLS
+        from cosmos_tui.features.agent.sessions import WorkspaceTools
+
+        tools, catalog = WorkspaceTools(socket), TOOLS
     with asyncio.Runner() as runner:
         while line := sys.stdin.buffer.readline(262145):
             message = None

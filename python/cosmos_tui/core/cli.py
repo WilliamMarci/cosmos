@@ -61,6 +61,9 @@ SESSION_COMMANDS = (
 )
 
 TOP_LEVEL_COMMANDS = SESSION_COMMANDS + (
+    CommandSpec(
+        "agent", "[ag]ent", (), "configure Cosmos Agent or export its conversations"
+    ),
     CommandSpec("session", "session", (), "manage sessions through a command group"),
     CommandSpec("daemon", "[da]emon", (), "run the coordinator in the foreground"),
     CommandSpec(
@@ -276,7 +279,28 @@ def add_session_arguments(target, operation):
 
 
 def add_management_arguments(target, operation):
-    if operation == "mod":
+    if operation == "agent":
+        operations = target.add_subparsers(dest="operation", required=True)
+        operations.add_parser(
+            "migrate", help="move legacy Cosmos Agent data; close Agent frontends first"
+        )
+        setup = operations.add_parser(
+            "configure", help="configure a direct provider API"
+        )
+        setup.add_argument("--provider")
+        setup.add_argument("--model")
+        setup.add_argument("--base-url")
+        setup.add_argument(
+            "--set-key", action="store_true", help="prompt for the API key without echo"
+        )
+        export = operations.add_parser(
+            "export", help="export an Agent conversation as sanitized JSON"
+        )
+        export.add_argument("id", help="OpenCode conversation ID (ses_...)")
+        export.add_argument(
+            "--output", help="new output file; default: private Agent exports directory"
+        )
+    elif operation == "mod":
         operations = target.add_subparsers(dest="operation")
         operations.add_parser("list", help="list registered Mods")
         operations.add_parser(
@@ -429,6 +453,26 @@ def main(argv=None):
         else:
             operation = PARSER_NAMES[args.command]
             target = commands[args.command]
+        if operation == "agent":
+            if args.operation == "migrate":
+                from cosmos_tui.features.agent.migration import migrate
+
+                moved = migrate()
+                print(
+                    "\n".join(moved) if moved else "No legacy Cosmos Agent data found"
+                )
+            elif args.operation == "configure":
+                from cosmos_tui.features.agent.profile import configure
+
+                provider, model = configure(
+                    args.provider, args.model, args.base_url, args.set_key
+                )
+                print(f"Cosmos Agent provider: {provider}; model: {model}")
+            else:
+                from cosmos_tui.features.agent.conversations import export_conversation
+
+                print(export_conversation(args.id, args.output))
+            return 0
         if operation == "new":
             from cosmos_tui.terminal import sessions
 

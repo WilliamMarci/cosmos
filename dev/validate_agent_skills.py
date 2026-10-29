@@ -64,7 +64,7 @@ async def main(system=False):
             (project / ".agents/skills/foreign-project", "foreign-project"),
             (root / "foreign-env", "foreign-env"),
             (project / ".cosmos/skills/vim-task", "vim-task"),
-            (root / "config/cosmos/skills/personal-task", "personal-task"),
+            (root / "config/cosmos/agent/skills/personal-task", "personal-task"),
         ):
             skill(directory, name)
         original_cwd = Path.cwd()
@@ -137,7 +137,10 @@ async def main(system=False):
                     with urlopen(request, timeout=30) as response:
                         return json.load(response)
 
-                await asyncio.to_thread(get, "/api/config")
+                config = await asyncio.to_thread(get, "/api/config")
+                assert "deepseek-flash" in json.dumps(config), config
+                assert "deepseek" in json.dumps(config), config
+                print("PASS: direct DeepSeek provider configuration accepted")
                 expected = {
                     "cosmos-tui",
                     "cosmos-skill-export",
@@ -164,6 +167,37 @@ async def main(system=False):
                 assert not sentinel.exists(), "foreign MCP was executed"
                 assert {"cosmos-export-skill", "cosmos-custom"} <= commands, commands
                 assert env["HOME"] == str(user_home), "shell HOME must remain intact"
+
+                def create_conversation():
+                    request = Request(
+                        url + "/api/session",
+                        data=json.dumps(
+                            {
+                                "title": "Export fixture",
+                                "agent": "cosmos",
+                                "location": {"directory": str(project)},
+                            }
+                        ).encode(),
+                        headers={**headers, "Content-Type": "application/json"},
+                        method="POST",
+                    )
+                    with urlopen(request, timeout=30) as response:
+                        return json.load(response)["data"]["id"]
+
+                conversation = await asyncio.to_thread(create_conversation)
+                from cosmos_tui.features.agent.conversations import export_conversation
+
+                with patch.dict(
+                    os.environ,
+                    XDG_CONFIG_HOME=str(root / "config"),
+                    COSMOS_AGENT_RUNTIME="system" if system else "source",
+                ):
+                    exported = await asyncio.to_thread(
+                        export_conversation, conversation
+                    )
+                assert conversation in exported.read_text(), exported
+                assert exported.stat().st_mode & 0o777 == 0o600
+                print("PASS: native conversation export, private file, no model call")
                 print("Skills:", ", ".join(sorted(names)))
                 print("Commands:", ", ".join(sorted(commands)))
                 print(

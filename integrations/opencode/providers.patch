@@ -1,0 +1,12 @@
+diff --git a/packages/core/src/plugin/provider/opencode.ts b/packages/core/src/plugin/provider/opencode.ts
+index 329d9c3..edfbe39 100644
+--- a/packages/core/src/plugin/provider/opencode.ts
++++ b/packages/core/src/plugin/provider/opencode.ts
+@@ -211,6 +211,7 @@ export const OpencodePlugin = define<
+ >({
+   id: "opencode.provider.opencode",
+   effect: Effect.fn(function* (ctx) {
++    if (process.env.COSMOS_AGENT === "1") return
+     const disableFree = ["1", "true"].includes(process.env.OPENCODE_DISABLE_FREE_MODELS?.toLowerCase() ?? "")
+     const bus = yield* Bus.Service
+     const client = yield* HttpClient.HttpClient

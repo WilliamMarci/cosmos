@@ -7,10 +7,10 @@ Cosmos uses OpenCode's native skill registry and `skill` tool. A skill is a port
 Every Cosmos Agent launch adds these discovery roots:
 
 - Bundled: `<Cosmos installation>/skills/`.
-- Personal: `${XDG_CONFIG_HOME:-~/.config}/cosmos/skills/`.
+- Personal: `${XDG_CONFIG_HOME:-~/.config}/cosmos/agent/skills/`.
 - Project: `<Agent working directory>/.cosmos/skills/`.
 
-Ordinary OpenCode, Claude and `.agents` skill sources are not imported. Inherited `OPENCODE_CONFIG_CONTENT` is discarded rather than merged. Explicit additional sources must be configured in Cosmos's own `~/.config/cosmos/agent/opencode.json`. Directories are not created merely by launching the Agent. Existing same-name skills should be inspected before updating; use distinct task names when multiple sources provide different procedures.
+Ordinary OpenCode, Claude and `.agents` skill sources are not imported. Inherited `OPENCODE_CONFIG_CONTENT` is discarded rather than merged. Explicit additional sources must be configured in Cosmos's own `~/.config/cosmos/agent/opencode.json`. The private profile is initialized at Agent launch; skill directories are created when skills are saved. Existing same-name skills should be inspected before updating; use distinct task names when multiple sources provide different procedures.
 
 Skills are listed by metadata and loaded on demand through the existing tool. OpenCode watches the configured directories and refreshes the registry after files change; when file watching is disabled, reopen the Agent to rescan. Skills work with the bundled/source runtime and compatible system OpenCode using the same injected configuration.
 
@@ -40,8 +40,8 @@ The prompt files are maintained in `config/agent-commands/`; the shared Agent sy
 The export helper is independent of the model. From a Cosmos environment, using the installation's Python interpreter:
 
 ```sh
-python -m cosmos_tui.features.agent.skills validate ~/.config/cosmos/skills/vim-search-replace
-python -m cosmos_tui.features.agent.skills pack ~/.config/cosmos/skills/vim-search-replace --output ./vim-search-replace.zip
+python -m cosmos_tui.features.agent.skills validate ~/.config/cosmos/agent/skills/vim-search-replace
+python -m cosmos_tui.features.agent.skills pack ~/.config/cosmos/agent/skills/vim-search-replace --output ./vim-search-replace.zip
 ```
 
 The Agent system context supplies its exact Python interpreter and personal-library path. The helper validates YAML frontmatter, a lowercase hyphenated name under 64 characters, a nonempty description/body and local Markdown references. It writes one skill-root directory in the ZIP, using the frontmatter name. It includes ordinary supporting files but skips dotfiles, cache directories and node_modules, rejects symlinks and broken/outside references, and limits the bundle to 32 MiB. Existing output archives are not overwritten, and output must be outside the skill directory. File modes for scripts are retained in ZIP metadata.

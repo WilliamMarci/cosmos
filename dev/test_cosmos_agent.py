@@ -10,7 +10,7 @@ import tempfile
 import unittest
 import uuid
 
-from cosmos_tui.features.agent.terminal import TerminalTools
+from cosmos_tui.features.agent.sessions import WorkspaceTools as TerminalTools
 
 
 @unittest.skipUnless(
@@ -89,6 +89,29 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(created["session_id"], screen["session_id"])
         self.assertEqual(created["pane_current_path"], self.directory.name)
 
+    async def test_session_management_and_private_history_export(self):
+        from unittest.mock import patch
+
+        self.tools.backend.shell_command = lambda: "bash --noprofile --norc"
+        created = await self.tools.create_session("agent-task", self.pane)
+        sid, pane = created["session_id"], created["pane_id"]
+        await self.tools.rename_target(sid, "renamed-task")
+        await self.tools.rename_target(created["window_id"], "work")
+        await self.tools.rename_target(pane, "agent-shell")
+        sessions = await self.tools.list_sessions()
+        self.assertIn("renamed-task", {s["name"] for s in sessions})
+        await self.tools.send_text(pane, "echo COSMOS_HISTORY_FIXTURE")
+        await self.tools.send_keys(pane, ["Enter"])
+        await self.tools.read_screen(pane, wait_ms=100)
+        with patch.dict(os.environ, XDG_CONFIG_HOME=self.directory.name):
+            exported = await self.tools.export_history(sid)
+        path = Path(exported["path"])
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+        self.assertIn("COSMOS_HISTORY_FIXTURE", path.read_text())
+        self.assertEqual(json.loads(path.read_text())["session"], sid)
+        with self.assertRaises(ValueError):
+            await self.tools.rename_target("$999999", "missing")
+
     async def test_stdio_discovery_and_tool_call(self):
         env = dict(
             os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "python")
@@ -130,7 +153,7 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(process.returncode, 0, err)
         replies = [json.loads(line) for line in out.splitlines()]
         self.assertEqual(len(replies), 4)
-        self.assertEqual(len(replies[1]["result"]["tools"]), 6)
+        self.assertEqual(len(replies[1]["result"]["tools"]), 11)
         self.assertIn("row 000", replies[2]["result"]["content"][0]["text"])
         self.assertTrue(replies[3]["result"]["isError"])
 

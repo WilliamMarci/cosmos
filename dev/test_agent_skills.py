@@ -35,7 +35,7 @@ class SkillTests(unittest.TestCase):
                 str(Path(root) / "config/cosmos/agent/opencode.json"),
             )
             self.assertEqual(
-                env["XDG_DATA_HOME"], str(Path(root) / "data/cosmos/agent")
+                env["XDG_DATA_HOME"], str(Path(root) / "config/cosmos/agent/data")
             )
             self.assertNotIn("OPENCODE_CLI_CONFIG_CONTENT", env)
             config = json.loads(env["OPENCODE_CONFIG_CONTENT"])
@@ -50,7 +50,7 @@ class SkillTests(unittest.TestCase):
             patch.dict(os.environ, XDG_CONFIG_HOME=root),
         ):
             paths = skill_paths(root)
-            self.assertEqual(paths[1], str(Path(root) / "cosmos/skills"))
+            self.assertEqual(paths[1], str(Path(root) / "cosmos/agent/skills"))
             self.assertEqual(paths[2], str(Path(root) / ".cosmos/skills"))
             config = configuration("service", "%12")
             self.assertIn("cosmos-export-skill", config["commands"])
@@ -58,7 +58,7 @@ class SkillTests(unittest.TestCase):
                 "$ARGUMENTS", config["commands"]["cosmos-export-skill"]["template"]
             )
             self.assertIn(paths[1], config["agents"]["cosmos"]["system"])
-            self.assertFalse((Path(root) / "cosmos/skills").exists())
+            self.assertFalse((Path(root) / "cosmos/agent/skills").exists())
 
     def test_builtin_skill_export_roundtrip(self):
         with tempfile.TemporaryDirectory() as root:

@@ -25,6 +25,30 @@ async def handle(app, request):
         raise ValueError("request targets a different UI client")
     if request.get("operation") == "list":
         return catalog(app)
+    if request.get("operation") == "focus":
+        from cosmos_tui.features.agent.terminal import TerminalTools
+        from cosmos_tui.terminal import targets
+
+        if app.screen is not app._workspace_screen:
+            raise ValueError("Close the current UI dialog before switching sessions")
+        row = await TerminalTools(app.backend.argv[2]).pane(request.get("pane"))
+        await targets.select(
+            app.backend,
+            dict(
+                kind="pane",
+                pane_id=row["pane_id"],
+                window_id=row["window_id"],
+                session_id=row["session_id"],
+                session=row["session_name"],
+            ),
+        )
+        app.panes = await app.backend.snapshot()
+        return dict(
+            client=app.client,
+            pane=row["pane_id"],
+            session=row["session_id"],
+            status="selected",
+        )
     if request.get("operation") == "menu":
         actions = await rpc.call("actions.list")
         row = next(

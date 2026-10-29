@@ -1,0 +1,15 @@
+diff --git a/packages/tui/src/theme/v1.ts b/packages/tui/src/theme/v1.ts
+index 5f76c65..383459f 100644
+--- a/packages/tui/src/theme/v1.ts
++++ b/packages/tui/src/theme/v1.ts
+@@ -34,7 +34,10 @@ import zenburn from "./assets/zenburn.json" with { type: "json" }
+ 
+ export type { ColorValue, Theme, ThemeColor, ThemeV1Json } from "@opencode/theme/tui/v1"
+ 
++import cosmos from "./assets/cosmos.json" with { type: "json" }
++
+ export const DEFAULT_THEMES: Record<string, ThemeV1Json> = {
++  cosmos,
+   aura,
+   ayu,
+   catppuccin,

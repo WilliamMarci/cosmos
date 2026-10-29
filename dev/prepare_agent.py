@@ -24,6 +24,9 @@ def prepare():
                 cwd=vendor,
                 check=True,
             )
+    (vendor / "packages/tui/src/theme/assets/cosmos.json").write_text(
+        (ROOT / "python/cosmos_tui/assets/agent-cosmos.json").read_text()
+    )
     component = vendor / "packages/tui/src/component"
     (component / "cosmos-logo.tsx").write_text(
         (ROOT / "integrations/opencode/cosmos-logo.tsx").read_text()
