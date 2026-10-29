@@ -55,6 +55,7 @@ Cosmos skills use OpenCode's native discovery and skill tool. Bundled, personal 
 
 The MCP server speaks newline-delimited stdio JSON-RPC. It has no listening network port. It is pinned to the Cosmos Tmux service supplied by the launcher; it does not attach a control client, resize user panes, or use the caller's inherited `TMUX` socket. Tools apply to all sessions in that service. An Agent can inspect the following tools through OpenCode's normal tool discovery:
 
+- `observe(pane, layers=None, region=None, since=None)` returns layered, positioned text/styled-grid snapshots and explicitly inferred control candidates. It does not grant control or read real image pixels. Private panes are denied; see [Agent observations](agent-observation.md) for the current contract and limits.
 - `list_sessions()` groups all sessions by stable `$ID`, with names and window/pane IDs.
 - `create_session(name, source_pane)` creates a retained named session in the source cwd without interrupting existing work.
 - `rename_target(target, name)` renames a stable `$session`, `@window` or `%pane` target; pane labels use the same `@cosmos_name` field as Switch.

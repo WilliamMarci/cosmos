@@ -112,6 +112,31 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await self.tools.rename_target("$999999", "missing")
 
+    async def test_observation_layers_and_private_pane(self):
+        result = await self.tools.observe(
+            self.pane, ["text", "presentation", "controls"]
+        )
+        self.assertFalse(result["capabilities"]["image"])
+        self.assertIn("row 000", str(result["text"]))
+        self.assertIn("presentation", result)
+        unchanged = await self.tools.observe(self.pane, since=result["snapshot_id"])
+        self.assertTrue(unchanged["unchanged"])
+        session_id = (await self.tools.pane(self.pane))["session_id"]
+        await self.tools.backend.cli(
+            "set-option", "-p", "-t", self.pane, "@cosmos_private", "1"
+        )
+        for operation in (
+            self.tools.observe(self.pane),
+            self.tools.read_screen(self.pane),
+            self.tools.send_text(self.pane, "must not send"),
+            self.tools.export_history(session_id),
+        ):
+            with self.assertRaises((PermissionError, ValueError)):
+                await operation
+        rows = await self.tools.panes()
+        self.assertTrue(rows[0]["private"])
+        self.assertEqual(rows[0]["pane_current_path"], "")
+
     async def test_stdio_discovery_and_tool_call(self):
         env = dict(
             os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "python")
@@ -153,7 +178,7 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(process.returncode, 0, err)
         replies = [json.loads(line) for line in out.splitlines()]
         self.assertEqual(len(replies), 4)
-        self.assertEqual(len(replies[1]["result"]["tools"]), 11)
+        self.assertEqual(len(replies[1]["result"]["tools"]), 12)
         self.assertIn("row 000", replies[2]["result"]["content"][0]["text"])
         self.assertTrue(replies[3]["result"]["isError"])
 

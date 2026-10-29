@@ -29,6 +29,7 @@ FIELDS = (
     "mouse_all_flag",
     "mouse_utf8_flag",
     "mouse_sgr_flag",
+    "@cosmos_private",
 )
 NUMBERS = {
     "window_index",
@@ -68,6 +69,10 @@ class TerminalTools:
                 row[key] = int(row[key])
             for key in FLAGS:
                 row[key] = row[key] == "1"
+            row["private"] = row.pop("@cosmos_private") in ("1", "on", "true")
+            if row["private"]:
+                row["pane_current_path"] = ""
+                row["pane_current_command"] = ""
             result.append(row)
         return result
 
@@ -76,6 +81,8 @@ class TerminalTools:
             raise ValueError("pane must be a stable %ID returned by list_panes")
         for row in await self.panes():
             if row["pane_id"] == ident:
+                if row["private"]:
+                    raise PermissionError("Pane is private; Agent access is disabled")
                 return row
         raise ValueError(f"pane no longer exists in this Cosmos service: {ident}")
 
@@ -90,12 +97,56 @@ class TerminalTools:
         if history:
             args += ["-S", str(-history)]
         text = await self.backend.cli(*args)
+        await self.pane(pane)
+        text = self.redact(text)
         raw = text.encode("utf-8")
         row.update(
             text=raw[:65536].decode("utf-8", errors="ignore"),
             truncated=len(raw) > 65536,
         )
         return row
+
+    @staticmethod
+    def redact(text):
+        from cosmos_tui.features.agent.profile import load_profile
+        from rich.cells import cell_len
+
+        _, credentials = load_profile()
+        for value in sorted(set(credentials.values()), key=len, reverse=True):
+            if value:
+                text = text.replace(value, "*" * cell_len(value))
+        return text
+
+    async def observe(self, pane, layers=None, region=None, since=None):
+        from cosmos_tui.features.agent.observation.snapshot import (
+            LAYERS,
+            Observations,
+            build,
+        )
+
+        layers = ["text", "controls"] if layers is None else layers
+        if (
+            not isinstance(layers, list)
+            or not layers
+            or any(layer not in LAYERS for layer in layers)
+        ):
+            raise ValueError(
+                "layers must be a nonempty list of text, presentation, controls"
+            )
+        row = await self.pane(pane)
+        raw = await self.backend.cli("capture-pane", "-p", "-e", "-t", pane)
+        current = await self.pane(pane)
+        if any(
+            row[k] != current[k]
+            for k in ("pane_width", "pane_height", "pane_current_command")
+        ):
+            raise ValueError("Pane changed during capture; observe again")
+        if len(raw.encode()) > 65536:
+            raise ValueError("Observation exceeds 64 KiB; use a smaller terminal")
+        result = build(row, self.redact(raw), layers, region)
+        if not hasattr(self, "observations"):
+            self.observations = Observations()
+        return self.observations.finish(result, since)
 
     async def send_text(self, pane, text):
         await self.pane(pane)

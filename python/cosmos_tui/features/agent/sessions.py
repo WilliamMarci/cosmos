@@ -82,9 +82,12 @@ class WorkspaceTools(TerminalTools):
             raise ValueError("session no longer exists")
         history = []
         for pane in panes:
+            await self.pane(pane["pane_id"])
             text = await self.backend.cli(
                 "capture-pane", "-p", "-t", pane["pane_id"], "-S", "-", "-E", "-"
             )
+            await self.pane(pane["pane_id"])
+            text = self.redact(text)
             raw = text.encode()
             if len(raw) > 16 * 1024 * 1024:
                 raise ValueError(

@@ -61,6 +61,7 @@ class NavigationController(Controller):
                     "zoom",
                     "agent",
                     "mouse_passthrough",
+                    "private_pane",
                 }
                 available.update("focus_" + d for d in ("left", "down", "up", "right"))
                 available.update("resize_" + d for d in ("left", "down", "up", "right"))

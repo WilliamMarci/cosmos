@@ -82,6 +82,13 @@ register("global.ime_disable", "global", "Disable IME", [], "ime_disable")
 register("workspace.quit", "workspace", "Quit / Exit Cosmos", [], "quit")
 register("workspace.new_session", "workspace", "New session", [], "new_session")
 register(
+    "workspace.private_pane",
+    "workspace",
+    "Toggle private pane · Agent access",
+    [],
+    "private_pane",
+)
+register(
     "workspace.mouse_passthrough",
     "workspace",
     "Toggle mouse passthrough",

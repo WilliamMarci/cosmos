@@ -62,6 +62,24 @@ class WorkspaceController(Controller):
         return event.key == "escape"
 
     async def action_leader_key(self, key):
+        if key == "private_pane":
+            pane = self.app.active()
+            if pane:
+                current = await self.app.backend.request(
+                    f"show-options -pqv -t {pane.id} @cosmos_private"
+                )
+                enabled = current not in (["1"], ["on"], ["true"])
+                await self.app.backend.request(
+                    f"set-option -p -t {pane.id} @cosmos_private {int(enabled)}"
+                )
+                await self.app.notification_events.publish(
+                    "Pane private · Agent access disabled"
+                    if enabled
+                    else "Pane privacy disabled",
+                    source="workspace",
+                    level="info",
+                )
+            return
         if key == "keyboard_passthrough":
             self.app.inputs.toggle_passthrough()
             return
