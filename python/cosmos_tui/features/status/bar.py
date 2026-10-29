@@ -129,8 +129,6 @@ class StatusBar(Static):
             app.settings.get("status_path_depth", 3),
             app.settings.get("status_path_max_length", 40),
         )
-        if branch:
-            path += f" ({branch})"
         # Reserve the clock and IME hit targets before allocating path space.
         budget = max(
             0,
@@ -141,27 +139,45 @@ class StatusBar(Static):
             - 2 * len(separator)
             - (len(history) + 2 if history else 0),
         )
+        branch_text = Text(branch or "")
+        branch_text.truncate(min(24, max(0, budget // 2)), overflow="ellipsis")
+        branch = branch_text.plain
+        branch_space = branch_text.cell_len + 3 if branch else 0
+        path_budget = max(0, budget - branch_space)
         path = (
             short_path(
-                path, 0, min(app.settings.get("status_path_max_length", 40), budget)
+                path,
+                0,
+                min(app.settings.get("status_path_max_length", 40), path_budget),
             )
-            if budget
+            if path_budget
             else ""
         )
         path_text = Text(style=base)
-        if path:
+        if path or branch:
             direction = "left" if alignment in ("right", "center") else "right"
             before = palette["base"]
             if alignment == "left":
                 if separator:
                     left = left[:-1]
                 before = session_bg
-            path_text = divide(before, path_bg, direction)
-            path_text += Text(
-                " " + path + " ", style=Style(color=palette["fg"], bgcolor=path_bg)
-            )
+            after = before
+            if path:
+                path_text = divide(before, path_bg, direction)
+                path_text += Text(
+                    " " + path + " ", style=Style(color=palette["fg"], bgcolor=path_bg)
+                )
+                after = path_bg
+            if branch:
+                branch_bg = "#d0d4dc" if light else "#292d38"
+                path_text += divide(after, branch_bg, direction)
+                path_text += Text(
+                    " " + branch + " ",
+                    style=Style(color=palette["accl"], bgcolor=branch_bg),
+                )
+                after = branch_bg
             path_text += divide(
-                path_bg,
+                after,
                 palette["bg"] if alignment == "right" else palette["base"],
                 "right"
                 if alignment == "center" or separator_style == "capsule"
@@ -197,7 +213,7 @@ class StatusBar(Static):
         )
         width_offset = right.cell_len
         right.append(
-            " " + ("●" if app.ime.full else "◐") + " ",
+            " " + ("▧" if app.ime.full else "◐") + " ",
             style=Style(color=palette["accl"], bgcolor=palette["bg"], bold=False),
         )
         clock_offset = right.cell_len

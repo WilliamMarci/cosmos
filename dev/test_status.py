@@ -31,7 +31,16 @@ class StatusTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(text.cell_len, 100)
             self.assertIn("1 bash", text.plain)
             self.assertNotIn("¹", text.plain)
-            self.assertIn("~/Program (main)", text.plain)
+            self.assertIn("~/Program", text.plain)
+            self.assertIn(" main ", text.plain)
+            path_style = text.get_style_at_offset(
+                app.console, text.plain.index("~/Program")
+            )
+            branch_style = text.get_style_at_offset(
+                app.console, text.plain.index("main")
+            )
+            self.assertNotEqual(path_style.bgcolor, branch_style.bgcolor)
+            self.assertNotEqual(path_style.color, branch_style.color)
             self.assertTrue(text.plain.endswith("12:00 Oct 22 "))
             self.assertNotIn("|", text.plain)
             self.assertIn("En", text.plain)
@@ -62,6 +71,29 @@ class StatusTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn(
                 "#208040", str(bar._content.get_style_at_offset(app.console, 0))
             )
+
+    async def test_branch_has_independent_limit(self):
+        app = Probe()
+        async with app.run_test(size=(120, 30)):
+            bar = app.query_one("#status", StatusBar)
+            for alignment in ("left", "center", "right"):
+                app.settings.update(
+                    status_path_align=alignment, status_path_max_length=12
+                )
+                bar.present(
+                    label="COSMOS",
+                    index=1,
+                    name="bash",
+                    path="~/Program/cosmos",
+                    branch="feature/" + "x" * 80,
+                    clock="12:00",
+                )
+                text = bar._content
+                self.assertEqual(text.cell_len, 120)
+                if alignment != "center" or "feature/" in text.plain:
+                    self.assertIn("feature/" + "x" * 15 + "…", text.plain)
+                self.assertNotIn("x" * 24, text.plain)
+                self.assertTrue(text.plain.endswith("12:00 "))
 
     async def test_focus_modes_and_reader_metadata(self):
         import base64

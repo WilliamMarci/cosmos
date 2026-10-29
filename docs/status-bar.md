@@ -4,7 +4,7 @@ The bar is composed by `features/status/controller.py` and `features/status/bar.
 
 - Left: clickable start button, then the current Tmux window index in normal-size amber digits and its name on a separate background level. The index remains the actual backend index; it is not renumbered.
 - Center: registered Mod status widgets, shown at the screen center when they fit without overlapping the left or right groups.
-- Right by default: a slightly brighter gray path block and Git branch when available, independently clickable input language and width, then local time/date (`HH:MM Mon DD`). Home paths are abbreviated as `~`.
+- Right by default: a slightly brighter gray path block and a separate darker Git branch block in the accent foreground when available, independently clickable input language and width, then local time/date (`HH:MM Mon DD`). Home paths are abbreviated as `~`.
 
 Directory/program and Git branch are refreshed on pane changes and at most once every two seconds. Git uses read-only `symbolic-ref`; non-repositories and detached HEAD have no branch label. Paths retain their most recent components and prefix omitted components with `…/`; remaining long text is shortened from the left with an ellipsis. Essential clock/IME controls reserve space before the path. Tight widths truncate remaining text. The bar respects the existing visibility setting.
 
@@ -45,10 +45,12 @@ The reader footer keeps its filename on the left and aligns collection/page inde
 Settings → Status bar provides left/right choice controls for these shared fields:
 
 - `status_path_depth`: recent path components, default 3; 0 shows all, configuration permits 0–32.
-- `status_path_max_length`: path/branch block content width in terminal cells, default 40, range 8–240. The bar reduces this further when space is tight.
+- `status_path_max_length`: path block content width in terminal cells, default 40, range 8–240. The bar reduces this further when space is tight.
 - `status_path_align`: left, center, or right (default). The center block shares available space with registered Mod widgets.
 - `status_separator`: powerline (default ``), capsule (`` / ``), slash (`╱` / `╲`), vertical (`│`), or none. Left-aligned blocks point right (``); right-aligned blocks point left (``). Center blocks use outward edges. Capsule blocks use rounded outer edges. Every seam uses the immediate left/right background colors; the COSMOS gradient contributes its nearest endpoint, including explicit solid mode colors. Select another style if the terminal font lacks Powerline glyphs.
 
 These fields are validated and persisted through settings.replace. Existing configuration files load the defaults. Upgrading a running coordinator requires a restart before the fields can be saved.
 
 The clock segment is a generic UI-Mod action slot. The bundled calendar package registers it and displays its own popup; the status bar contains no calendar logic. Disabling that package removes the click action. See ui-mods.md for relocation and notification permissions.
+
+Git branch names have their own 24-cell maximum (including a trailing ellipsis), reduced further on narrow terminals. They do not consume the configured path-length limit. Both blocks follow path alignment and the chosen separators, with seam colors taken from the adjacent backgrounds.
