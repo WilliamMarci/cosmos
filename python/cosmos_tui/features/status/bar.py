@@ -113,6 +113,11 @@ class StatusBar(Static):
         else:
             left += Text(f" {index}", style=Style(color="#e8a662", bgcolor=session_bg))
         left += Text(f" {name} ", style=Style(color=palette["fg"], bgcolor=session_bg))
+        if getattr(app.inputs, "keyboard_passthrough", False):
+            left += Text(
+                "KEYS OFF ",
+                style=Style(color=palette["accl"], bgcolor=session_bg, bold=True),
+            )
         left += divide(session_bg, palette["base"])
         if file_info:
             from cosmos_tui.features.files.model import display
@@ -228,8 +233,6 @@ class StatusBar(Static):
         right_x = max(left.cell_len, width - right.cell_len)
         middle = Text(" " * max(0, right_x - left.cell_len), style=base)
         center_text = path_text.copy() if alignment == "center" else Text(style=base)
-        if getattr(app.inputs, "keyboard_passthrough", False):
-            center_text.append(" KEYS OFF ", style=palette["accl"])
         for text, role in center:
             center_text.append(
                 " " + text + " ", style=palette.get(role, palette["mute"])

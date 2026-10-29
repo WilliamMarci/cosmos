@@ -28,7 +28,9 @@ class PassthroughTests(unittest.IsolatedAsyncioTestCase):
             bar.present(
                 label="COSMOS", index=0, name="bash", path="", branch="", clock="12:00"
             )
-            self.assertIn("KEYS OFF", bar._content.plain)
+            self.assertIn("bash KEYS OFF", bar._content.plain)
+            offset = bar._content.plain.index("KEYS OFF")
+            self.assertTrue(bar._content.get_style_at_offset(app.console, offset).bold)
             await pilot.press("ctrl+b", "f12")
             self.assertFalse(app.inputs.keyboard_passthrough)
             await pilot.press("ctrl+p")
