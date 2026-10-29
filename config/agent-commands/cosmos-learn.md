@@ -1,0 +1,3 @@
+Learn how to perform this software task: $ARGUMENTS
+
+Load cosmos-tui and any matching existing application skill. Inspect the current Cosmos terminal workspace, choose the appropriate target, and learn the controls needed for this task using the application's own help and observed output. Prefer an isolated terminal or temporary fixture for experimentation. Complete the requested task and verify the visible result. Keep notes of the non-obvious controls, checkpoints and actual failures so the workflow can be reused. If a reusable skill should be saved, explain its proposed scope and use /cosmos-export-skill when the user asks to export; do not silently create unrelated permanent files.

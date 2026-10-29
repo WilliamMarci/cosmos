@@ -28,14 +28,20 @@ def arguments(backend, source_pane, prompt=""):
 
 
 def configuration(socket, source_pane):
+    from cosmos_tui.features.agent.skills import commands, personal_skills, skill_paths
+
     return {
+        "skills": skill_paths(),
+        "commands": commands(),
         "default_agent": "cosmos",
         "agents": {
             "cosmos": {
                 "mode": "primary",
                 "description": "Cosmos terminal workspace agent",
                 "system": (PROJECT_ROOT / "config/cosmos-agent-prompt.md").read_text()
-                + f"\nSource pane: {source_pane}. Cosmos Tmux service: {socket}.\n",
+                + f"\nSource pane: {source_pane}. Cosmos Tmux service: {socket}.\n"
+                + f"Personal Cosmos skill library: {personal_skills()}.\n"
+                + f"Skill export helper Python: {sys.executable}.\n",
             }
         },
         "mcp": {
@@ -114,6 +120,8 @@ def launch(socket, source_pane, prompt=""):
         raise ValueError("OPENCODE_CONFIG_CONTENT must be a JSON object")
     config = configuration(socket, source_pane)
     base["default_agent"] = config["default_agent"]
+    base["skills"] = list(dict.fromkeys(config["skills"] + base.get("skills", [])))
+    base["commands"] = {**base.get("commands", {}), **config["commands"]}
     base["agents"] = {**base.get("agents", {}), **config["agents"]}
     mcp = base.setdefault("mcp", {})
     mcp["servers"] = {**mcp.get("servers", {}), **config["mcp"]["servers"]}

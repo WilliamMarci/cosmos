@@ -25,6 +25,10 @@ Cosmos injects an in-memory `OPENCODE_CONFIG_CONTENT` configuration for the `cos
 
 The home screen and exit wordmark use the canonical Cosmos glyphs in theme-relative monochrome, with **powered by opencode** underneath. Semantic normal/muted text roles adapt to OpenCode's selected theme. Narrow terminals display a compact COSMOS label. Upstream source and provenance are recorded in `integrations/opencode/`.
 
+## Reusable software skills
+
+Cosmos skills use OpenCode's native discovery and skill tool. Bundled, personal and project skill libraries are injected at launch. `/cosmos-learn` starts a software-learning task; `/cosmos-export-skill` saves the observed method as a portable `SKILL.md` directory. See [Agent skills](agent-skills.md) for prompts, paths and ZIP export.
+
 ## Terminal tools
 
 The MCP server speaks newline-delimited stdio JSON-RPC. It has no listening network port. It is pinned to the Cosmos Tmux service supplied by the launcher; it does not attach a control client, resize user panes, or use the caller's inherited `TMUX` socket. Tools apply to all sessions in that service. An Agent can inspect the following tools through OpenCode's normal tool discovery:
