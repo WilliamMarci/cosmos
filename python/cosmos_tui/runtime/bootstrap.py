@@ -99,22 +99,15 @@ def run(args):
         settings = await rpc.call("settings.get")
         missing = compatibility_gaps(capabilities, settings)
         if missing:
-            binary = Path(
-                os.getenv(
-                    "COSMOS_BINARY",
-                    PROJECT_ROOT / "target/release/cosmos",
-                )
-            )
-            entry = PROJECT_ROOT / "cosmos"
             raise RuntimeError(
                 "the persistent coordinator is incompatible with this UI: "
                 + ", ".join(missing)
                 + ". A new terminal reconnects to the same background service.\n"
                 + "Detach other Cosmos clients, then run:\n  "
-                + shlex.join([str(binary), "stop"])
+                + "cosmos stop"
                 + "\n  "
                 + shlex.join(
-                    [str(entry), args.session] + (["--debug"] if args.debug else [])
+                    ["cosmos", args.session] + (["--debug"] if args.debug else [])
                 )
                 + "\nTmux applications are retained; coordinator-managed Mods will stop."
             )

@@ -20,6 +20,7 @@ class FarewellTests(unittest.TestCase):
             return_value=SimpleNamespace(returncode=0),
         ) as run:
             show_farewell({"reason": "detach"}, backend, stream)
+        self.assertIn(f"Reconnect: cosmos {backend.session}\n", stream.getvalue())
         self.assertEqual(
             run.call_args.args[0],
             ["tmux", "-L", "isolated", "has-session", "-t", "study"],
