@@ -36,8 +36,8 @@ class RuntimeController(Controller):
     async def on_mount(self):
         app = self.app
         app._workspace_screen = app.screen
-        await app.assistant_ui.start()
         created = await app.backend.connect()
+        await app.assistant_ui.start()
         await rpc.call(
             "ui.attach",
             {

@@ -154,7 +154,7 @@ class AgentBridge:
             await self.app.backend.request(
                 f"set-option -gu @cosmos_agent_actions_{self.app.client}"
             )
-        except (OSError, RuntimeError):
+        except (OSError, RuntimeError, EOFError, TimeoutError):
             pass
         if self.server:
             self.server.close()
