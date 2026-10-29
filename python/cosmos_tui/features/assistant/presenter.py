@@ -84,6 +84,7 @@ class ActionMenu(CompactMenu):
 
 
 class Assistant(CosmosModal):
+    preserve_workspace_graphics = True
     zone = Zone.INSERT_COVER
     DEFAULT_CSS = """
     Assistant { background: transparent; background-tint: transparent; }
@@ -157,6 +158,20 @@ class Assistant(CosmosModal):
         remaining = self.view.completion_timestamp + 0.6 - time.monotonic()
         if remaining > 0:
             self.set_timer(remaining, self.paint)
+
+    def cover_reader_image(self, image, pane):
+        plan = self.layout_data
+        if not plan:
+            return image
+        return self.app.graphics.cover(
+            ("assistant", pane.id),
+            image,
+            pane.x,
+            pane.y,
+            self.app.reader_ui.cell_pixels(),
+            [plan.bounds],
+            self.app.role_colors["base"],
+        )
 
     def source(self):
         return next((p for p in self.app.panes if p.id == self.request["pane"]), None)

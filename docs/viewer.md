@@ -66,3 +66,5 @@ PDF 不按压缩页内容的 3 MiB 大小拒绝加载。`viewer_pdf_edge` 默认
 大 PDF 页的文字层提取失败不再阻止显示已渲染位图；正文检索仍会单独报告提取失败。不能将磁盘预算或栅格预算理解为整个进程 RSS 的硬限制。
 
 富文本内嵌图片单独使用后台缩略栅格任务（两工作线程、最多四个在途任务），不阻塞文字布局。未解码的图片仅在其占位尺寸内绘制灰框与 Braille 动画，正文、大纲和底栏保持；首个文字帧尚未解析完成时不套用图片/PDF 的大图占位。清理作废旧任务回填，缩放后位图 LRU 占 Reader 内存预算的 10%。
+
+The command-assistant island preserves workspace reader graphics. Only image pixels overlapping the island bounds are masked; images, document pages and thumbnails in other panes remain visible. It uses the shared graphics cover/compositor path and does not clear all placements when opened.
