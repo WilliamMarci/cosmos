@@ -2,6 +2,19 @@
 set -euo pipefail
 project_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$project_root"
+with_agent=1
+for option in "$@"; do
+    case "$option" in
+        --with-agent) with_agent=1 ;;
+        --without-agent) with_agent=0 ;;
+        -h|--help)
+            echo 'Usage: packaging/build.sh [--with-agent | --without-agent]'
+            echo 'Default: build and bundle the Cosmos-branded OpenCode Agent.'
+            echo '--without-agent: omit it and use system OpenCode at runtime.'
+            exit 0 ;;
+        *) echo "Unknown build option: $option" >&2; exit 2 ;;
+    esac
+done
 cargo build --release --locked --offline
 read -r release_version release_codename < <(python3 -c 'import runpy; m=runpy.run_path("python/cosmos_tui/core/metadata.py"); print(m["VERSION"], m["CODENAME"].lower())')
 bundle_name="cosmos-$release_version-$release_codename-linux-x86_64"
@@ -12,6 +25,7 @@ fi
 mkdir -p "dist/$bundle_name/bin" "dist/$bundle_name/config"
 cp target/release/cosmos "dist/$bundle_name/bin/"
 cp config/config.toml config/cosmosrc config/terminal-agent-prompt.md "dist/$bundle_name/config/"
+cp config/cosmos-agent-prompt.md "dist/$bundle_name/config/"
 cp README.md RELEASE.md "dist/$bundle_name/"
 cp cosmos "dist/$bundle_name/"
 mkdir -p "dist/$bundle_name/design"
@@ -48,6 +62,13 @@ cp terminal_agent/shell/agent.bash "dist/$bundle_name/terminal_agent/shell/"
 cp terminal_agent/native/readline.c "dist/$bundle_name/terminal_agent/native/"
 
 python3 packaging/licenses.py "dist/$bundle_name/licenses"
+cp docs/agent.md "dist/$bundle_name/docs/"
+if [[ $with_agent == 1 ]]; then
+    bash packaging/build_agent.sh "$project_root/dist/$bundle_name"
+else
+    rm -f "dist/$bundle_name/bin/cosmos-agent"
+    rm -rf "dist/$bundle_name/licenses/opencode"
+fi
 printf '%s\n' 'PDF viewing requires pdfinfo, pdftoppm, pdftotext (Poppler / poppler-utils) on PATH; not bundled.' > "dist/$bundle_name/pdf-dependencies.txt"
 ldd target/release/cosmos > "dist/$bundle_name/runtime-dependencies.txt"
 (cd "dist/$bundle_name" && find bin config licenses docs examples sdk design python dev shell terminal_agent mods -type f -exec sha256sum {} + > SHA256SUMS && sha256sum cosmos README.md RELEASE.md runtime-dependencies.txt pdf-dependencies.txt >> SHA256SUMS)

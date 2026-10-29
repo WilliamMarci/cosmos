@@ -38,6 +38,7 @@ python/cosmos_tui/
     help.py, menus.py    # 共用帮助与动作选择控件
     farewell.py          # TUI 完全退出后的 Logo/状态输出
   features/
+    agent/               # Cosmos Agent 启动、OpenCode 配置与独立终端 MCP 工具；见 agent.md
     assistant/           # presenter、布局、原生桥与启动/被动提示生命周期
     ime/                 # librime C API、逐目标组字、光标附近候选展示
     history/             # Tmux copy-mode 操作及选区几何

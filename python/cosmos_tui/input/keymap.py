@@ -24,7 +24,7 @@ def register(id, context, label, keys, target):
 for name, label, keys, target in [
     ("palette", "Settings panel", ["p"], "p"),
     ("assistant", "Command assistant", ["a"], "a"),
-    ("agent", "Split OpenCode", ["g"], "g"),
+    ("agent", "Split Cosmos Agent", ["g"], "g"),
     ("switch", "Switch window / session", ["s"], "s"),
     ("files", "Open files", [], "files"),
     ("help", "Context help", ["question_mark"], "question_mark"),

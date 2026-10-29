@@ -1,0 +1,34 @@
+diff --git a/packages/tui/src/component/logo.tsx b/packages/tui/src/component/logo.tsx
+index 2c3abc3..11ea342 100644
+--- a/packages/tui/src/component/logo.tsx
++++ b/packages/tui/src/component/logo.tsx
+@@ -4,8 +4,10 @@ import { useTerminalDimensions } from "@opentui/solid"
+ import { useTheme } from "../context/theme"
+ import { tint } from "../theme/color"
+ import { go, logo } from "../logo"
++import { CosmosLogo } from "./cosmos-logo"
+ 
+ export function Logo() {
++  if (process.env.COSMOS_AGENT === "1") return <CosmosLogo />
+   const theme = useTheme()
+   const dimensions = useTerminalDimensions()
+ 
+diff --git a/packages/tui/src/util/presentation.ts b/packages/tui/src/util/presentation.ts
+index eb24ad0..9e710e4 100644
+--- a/packages/tui/src/util/presentation.ts
++++ b/packages/tui/src/util/presentation.ts
+@@ -1,10 +1,14 @@
+ import { logo } from "../logo"
++import { cosmosLines } from "../component/cosmos-logo-data"
+ 
+ const reset = "\x1b[0m"
+ const bold = "\x1b[1m"
+ const dim = "\x1b[90m"
+ 
+ function wordmark(pad = "") {
++  if (process.env.COSMOS_AGENT === "1") {
++    return [...cosmosLines.map((line) => `${pad}${dim}${line}${reset}`), `${pad}${dim}powered by opencode${reset}`]
++  }
+   const draw = (line: string, fg: string, shadow: string, bg: string) =>
+     [...line]
+       .map((char) => {

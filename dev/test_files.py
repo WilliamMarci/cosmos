@@ -84,6 +84,7 @@ class FilesUITests(unittest.IsolatedAsyncioTestCase):
 
             with (
                 patch("cosmos_tui.core.rpc.call", side_effect=rpc),
+                patch("cosmos_tui.features.agent.launch.runtime"),
                 patch.dict(
                     os.environ, {"XDG_DATA_HOME": str(Path(root) / "data-home")}
                 ),
@@ -128,11 +129,11 @@ class FilesUITests(unittest.IsolatedAsyncioTestCase):
                         app.session_windows.open.await_args_list[0].kwargs["cwd"],
                         str(directory),
                     )
-                    self.assertTrue(
-                        app.session_windows.open.await_args_list[1]
-                        .args[0][0]
-                        .endswith("opencode")
+                    command = app.session_windows.open.await_args_list[1].args[0]
+                    self.assertEqual(
+                        command[1:4], ["-m", "cosmos_tui.features.agent", "launch"]
                     )
+                    self.assertIn(pane.id, command)
                     await pilot.press("space", "y")
                     self.assertEqual(
                         manager.clipboard[0], (str(directory / "file2.py"),)

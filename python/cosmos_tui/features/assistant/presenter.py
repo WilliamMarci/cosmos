@@ -76,7 +76,7 @@ class PresenterCallbacks:
 class ActionMenu(CompactMenu):
     def __init__(self, available):
         labels = {
-            "agent": "a  OpenCode",
+            "agent": "a  Cosmos Agent",
             "cancel": "×  Close",
             "run": "↵  Run current command",
         }

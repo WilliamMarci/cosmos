@@ -1,6 +1,3 @@
-import os
-import shutil
-
 from textual.widgets import Static
 
 from cosmos_tui.core.controller import Controller
@@ -55,18 +52,14 @@ class AssistantLauncher(Controller):
         return
 
     async def open_agent(self):
+        from cosmos_tui.features.agent.launch import arguments
+
         app = self.app
-        executable = shutil.which(os.getenv("COSMOS_OPENCODE", "opencode"))
-        if not executable:
-            app.message = "OpenCode not found on PATH"
-            return
-        arguments = [executable]
-        if self.prompt:
-            arguments += ["--prompt", self.prompt]
-        self.prompt = ""
         pane = app.active()
+        command = arguments(app.backend, pane.id, self.prompt) if pane else None
+        self.prompt = ""
         if pane:
-            await app.session_windows.split(pane.id, arguments)
+            await app.session_windows.split(pane.id, command)
         app.panes = await app.backend.snapshot()
         return
 

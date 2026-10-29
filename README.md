@@ -37,7 +37,7 @@ source <(cosmos completion bash)
 - 图片/PDF 阅读、缩略图、缩放平移、搜索高亮、跳页、大纲、内存/磁盘缓存与相邻页预读；大 PDF 页自适应降低栅格分辨率。
 - EPUB/Markdown/HTML 富文本阅读，复用 ZhihuViewer 解析器，支持本地内嵌图片、逻辑页和大纲。
 - 可移动 UI Mod 包；calendar 注册日期点击弹窗，启用和通知权限在 Settings → Mods 分别管理。
-- terminal_agent 命令生成助手及 Cosmos 自绘输入；分屏启动 OpenCode。
+- terminal_agent 命令生成助手及 Cosmos 自绘输入；分屏启动基于 OpenCode 的 [Cosmos Agent](docs/agent.md)，提供终端 TUI 操作工具。
 - librime 输入法、逐输入目标组字、候选与全半角；命令助手自绘编辑器也支持 IME。
 - 分级通知、来源会话标记、重复计数、终端响铃通知，以及可配置状态栏。
 - 可信 Mod 注册和生命周期、事件回放、公开 RPC/SDK 与部分 UI 扩展接口。

@@ -30,7 +30,9 @@ class StatusController(Controller):
             self.cached, self.updated = key, now
             rows = await app.backend.request(
                 f"display-message -p -t {pane.id} "
-                + shlex.quote("#{pane_current_path}\t#{pane_current_command}")
+                + shlex.quote(
+                    "#{pane_current_path}\t#{?@cosmos_agent,cosmos-agent,#{pane_current_command}}"
+                )
             )
             parts = "\n".join(rows).split("\t", 1)
             self.metadata = tuple(parts) if len(parts) == 2 else ("", "")
@@ -101,7 +103,7 @@ class StatusController(Controller):
                         name="Unavailable", size="", permissions="", position=""
                     )
             path = "" if file_info is not None else state["path"]
-        elif Path(program).name in ("opencode", "claude", "codex"):
+        elif Path(program).name in ("cosmos-agent", "opencode", "claude", "codex"):
             mode, label = "agent", "AGENT"
         elif Path(program).name == "yazi":
             mode, label = "files", "FILES"

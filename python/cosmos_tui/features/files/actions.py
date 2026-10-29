@@ -1,8 +1,6 @@
 """File commands orchestrate pure operations, shared dialogs and host services."""
 
 import asyncio
-import os
-import shutil
 from pathlib import Path
 from cosmos_tui.features.files import operations
 from cosmos_tui.ui.menus import CompactMenu
@@ -174,15 +172,10 @@ async def handle(manager, event, pane, state, items, cursor):
         state["reverse"] = not state.get("reverse", False)
         await manager.controller.update_viewer(pane, state)
     elif char in ("t", "g"):
-        executable = (
-            shutil.which(os.getenv("COSMOS_OPENCODE", "opencode"))
-            if char == "g"
-            else None
-        )
-        if char == "g" and not executable:
-            raise RuntimeError("OpenCode not found on PATH")
+        from cosmos_tui.features.agent.launch import arguments
+
         await app.session_windows.open(
-            (executable,) if executable else (),
+            arguments(app.backend, pane.id) if char == "g" else (),
             name="agent" if char == "g" else None,
             cwd=state["path"],
         )
