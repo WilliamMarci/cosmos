@@ -62,6 +62,8 @@ class NavigationController(Controller):
                     "agent",
                     "mouse_passthrough",
                     "private_pane",
+                    "resume_control",
+                    "end_control",
                 }
                 available.update("focus_" + d for d in ("left", "down", "up", "right"))
                 available.update("resize_" + d for d in ("left", "down", "up", "right"))

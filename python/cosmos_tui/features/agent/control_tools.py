@@ -1,0 +1,127 @@
+"""MCP-facing control lifecycle; terminal transport remains in TerminalTools."""
+
+import asyncio
+
+
+class ControlledInput:
+    async def input_dispatch(
+        self, pane, method, arguments, token=None, snapshot_id=None
+    ):
+        from cosmos_tui.features.agent.control import ControlStore
+
+        await self.pane(pane)
+        store = ControlStore(self.backend.argv[2])
+
+        async def deliver():
+            if token is not None:
+                row = await self.pane(pane)
+                expected = self.control_geometry.get(token)
+                actual = tuple(
+                    row[k] for k in ("pid", "window_id", "pane_width", "pane_height")
+                )
+                if expected != actual:
+                    raise ValueError(
+                        "Pane layout changed; observe and acquire a fresh token"
+                    )
+                if method == "mouse":
+                    request = self.observation_requests.get(snapshot_id)
+                    if not request or request[0] != pane:
+                        raise ValueError(
+                            "Mouse input requires a current observation snapshot_id"
+                        )
+                    fresh = await self.observe(pane, ["text"], request[1])
+                    if fresh["snapshot_id"] != snapshot_id:
+                        raise ValueError("Mouse target snapshot changed; observe again")
+                    rect = fresh["region"]
+                    if not (
+                        rect["x"] <= arguments["x"] < rect["x"] + rect["width"]
+                        and rect["y"] <= arguments["y"] < rect["y"] + rect["height"]
+                    ):
+                        raise ValueError("Mouse target is outside the observed region")
+            return await getattr(self, "_" + method)(pane, **arguments)
+
+        def send():
+            return asyncio.run(deliver())
+
+        if token is not None:
+            return await asyncio.to_thread(store.guarded, pane, self.owner, token, send)
+        return await asyncio.to_thread(store.legacy_guarded, pane, send)
+
+    async def send_text(self, pane, text):
+        return await self.input_dispatch(pane, "send_text", dict(text=text))
+
+    async def send_keys(self, pane, keys):
+        return await self.input_dispatch(pane, "send_keys", dict(keys=keys))
+
+    async def mouse(self, pane, x, y, button="left", action="click"):
+        return await self.input_dispatch(
+            pane, "mouse", dict(x=x, y=y, button=button, action=action)
+        )
+
+    async def control_status(self):
+        from cosmos_tui.features.agent.control import ControlStore
+
+        return await asyncio.to_thread(ControlStore(self.backend.argv[2]).status)
+
+    async def acquire_control(self, pane, snapshot_id, task):
+        from cosmos_tui.features.agent.control import ControlStore
+
+        if (
+            not isinstance(task, str)
+            or not 1 <= len(task) <= 120
+            or not task.isprintable()
+        ):
+            raise ValueError("task must be printable text, 1–120 characters")
+        request = self.observation_requests.get(snapshot_id)
+        if not request or request[0] != pane:
+            raise ValueError(
+                "Observe the pane with this tool connection before acquiring control"
+            )
+        current = await self.observe(pane, ["text"], request[1])
+        if current["snapshot_id"] != snapshot_id:
+            raise ValueError("Snapshot changed; observe again before acquiring control")
+        row = await self.pane(pane)
+        lease = await asyncio.to_thread(
+            ControlStore(self.backend.argv[2]).acquire, pane, self.owner, task
+        )
+        old = self.control_tokens.get(pane)
+        self.control_geometry.pop(old, None)
+        self.control_tokens[pane] = lease["token"]
+        self.control_geometry[lease["token"]] = tuple(
+            row[k] for k in ("pid", "window_id", "pane_width", "pane_height")
+        )
+        return lease
+
+    async def release_control(self, pane, token):
+        from cosmos_tui.features.agent.control import ControlStore
+
+        result = await asyncio.to_thread(
+            ControlStore(self.backend.argv[2]).release, pane, self.owner, token
+        )
+        self.control_geometry.pop(token, None)
+        self.control_tokens.pop(pane, None)
+        return result
+
+    async def control_input(self, pane, token, kind, arguments, snapshot_id=None):
+        allowed = {
+            "send_text": {"text"},
+            "send_keys": {"keys"},
+            "mouse": {"x", "y", "button", "action"},
+        }
+        if (
+            kind not in allowed
+            or not isinstance(arguments, dict)
+            or set(arguments) - allowed[kind]
+            or not {"send_text": {"text"}, "send_keys": {"keys"}, "mouse": {"x", "y"}}[
+                kind
+            ]
+            <= set(arguments)
+        ):
+            raise ValueError("Invalid controlled input kind or arguments")
+        result = await self.input_dispatch(pane, kind, arguments, token, snapshot_id)
+        return dict(
+            delivery="delivered",
+            action_complete=False,
+            task_complete=False,
+            result=result,
+        )

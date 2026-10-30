@@ -7,8 +7,10 @@ from types import SimpleNamespace
 
 from cosmos_tui.input.mouse_protocol import encode
 from cosmos_tui.terminal.tmux import Tmux
+from cosmos_tui.features.agent.control_tools import ControlledInput
 
 FIELDS = (
+    "pid",
     "session_id",
     "session_name",
     "window_id",
@@ -50,8 +52,12 @@ FLAGS = {
 }
 
 
-class TerminalTools:
+class TerminalTools(ControlledInput):
     def __init__(self, socket):
+        self.owner = uuid.uuid4().hex
+        self.observation_requests = {}
+        self.control_geometry = {}
+        self.control_tokens = {}
         self.backend = Tmux()
         # Use the service captured by the launcher, not a shell's inherited TMUX.
         self.backend.argv = self.backend.argv[:1] + ["-L", socket]
@@ -146,9 +152,12 @@ class TerminalTools:
         result = build(row, self.redact(raw), layers, region)
         if not hasattr(self, "observations"):
             self.observations = Observations()
+        self.observation_requests[result["snapshot_id"]] = (pane, region)
+        while len(self.observation_requests) > 32:
+            del self.observation_requests[next(iter(self.observation_requests))]
         return self.observations.finish(result, since)
 
-    async def send_text(self, pane, text):
+    async def _send_text(self, pane, text):
         await self.pane(pane)
         if not isinstance(text, str) or len(text.encode()) > 32768:
             raise ValueError("text must be at most 32 KiB")
@@ -157,6 +166,9 @@ class TerminalTools:
         name = "cosmos-agent-" + uuid.uuid4().hex
         try:
             await self.backend.cli("set-buffer", "-b", name, "--", text)
+            from cosmos_tui.features.agent.control import ControlStore
+
+            ControlStore(self.backend.argv[2]).check(pane)
             await self.backend.cli("paste-buffer", "-p", "-d", "-b", name, "-t", pane)
         finally:
             try:
@@ -165,7 +177,7 @@ class TerminalTools:
                 pass
         return {"pane": pane, "pasted": len(text), "return_sent": False}
 
-    async def send_keys(self, pane, keys):
+    async def _send_keys(self, pane, keys):
         await self.pane(pane)
         if not isinstance(keys, list) or not 1 <= len(keys) <= 64:
             raise ValueError("keys must contain 1–64 Tmux key names")
@@ -174,10 +186,13 @@ class TerminalTools:
             raise ValueError(
                 "use named Tmux keys (Enter, C-c, Escape, Down…); send text with send_text"
             )
+        from cosmos_tui.features.agent.control import ControlStore
+
+        ControlStore(self.backend.argv[2]).check(pane)
         await self.backend.cli("send-keys", "-t", pane, "--", *keys)
         return {"pane": pane, "keys": keys}
 
-    async def mouse(self, pane, x, y, button="left", action="click"):
+    async def _mouse(self, pane, x, y, button="left", action="click"):
         row = await self.pane(pane)
         if (
             type(x) is not int
@@ -213,6 +228,9 @@ class TerminalTools:
             raise ValueError("application has not enabled mouse motion")
         if action == "click" and button in ("left", "middle", "right"):
             sequence += encode(flags, buttons[button], x, y, release=True)
+        from cosmos_tui.features.agent.control import ControlStore
+
+        ControlStore(self.backend.argv[2]).check(pane)
         await self.backend.cli(
             "send-keys", "-H", "-t", pane, *(f"{b:02x}" for b in sequence)
         )

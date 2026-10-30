@@ -137,6 +137,60 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(rows[0]["private"])
         self.assertEqual(rows[0]["pane_current_path"], "")
 
+    async def test_control_requires_fresh_observation_and_manual_resume(self):
+        from cosmos_tui.features.agent.control import ControlStore
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, XDG_RUNTIME_DIR=self.directory.name):
+            observation = await self.tools.observe(self.pane)
+            lease = await self.tools.acquire_control(
+                self.pane, observation["snapshot_id"], "Vim task"
+            )
+            rival = TerminalTools(self.socket)
+            rival_observation = await rival.observe(self.pane)
+            with self.assertRaises(ValueError):
+                await rival.acquire_control(
+                    self.pane, rival_observation["snapshot_id"], "Other task"
+                )
+            with self.assertRaises(ValueError):
+                await self.tools.send_keys(self.pane, ["Right"])
+            delivered = await self.tools.control_input(
+                self.pane, lease["token"], "send_keys", {"keys": ["Right"]}
+            )
+            self.assertEqual(delivered["delivery"], "delivered")
+            self.assertFalse(delivered["task_complete"])
+            store = ControlStore(self.socket)
+            store.change(self.pane, "pause")
+            with self.assertRaises(ValueError):
+                await self.tools.control_input(
+                    self.pane, lease["token"], "send_keys", {"keys": ["Right"]}
+                )
+            fresh = await self.tools.observe(self.pane)
+            with self.assertRaises(ValueError):
+                await self.tools.acquire_control(
+                    self.pane, fresh["snapshot_id"], "Vim task"
+                )
+            store.change(self.pane, "resume")
+            with self.assertRaises(ValueError):
+                await self.tools.control_input(
+                    self.pane, lease["token"], "send_keys", {"keys": ["Right"]}
+                )
+            fresh = await self.tools.observe(self.pane)
+            resumed = await self.tools.acquire_control(
+                self.pane, fresh["snapshot_id"], "Vim task"
+            )
+            row = await self.tools.pane(self.pane)
+            await self.tools.backend.cli(
+                "resize-window", "-t", row["window_id"], "-x", "72", "-y", "22"
+            )
+            with self.assertRaises(ValueError):
+                await self.tools.control_input(
+                    self.pane, resumed["token"], "send_keys", {"keys": ["Right"]}
+                )
+            await self.tools.release_control(self.pane, resumed["token"])
+            self.assertEqual(await self.tools.control_status(), [])
+            self.assertIn("row 000", (await self.tools.read_screen(self.pane))["text"])
+
     async def test_stdio_discovery_and_tool_call(self):
         env = dict(
             os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "python")
@@ -178,7 +232,7 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(process.returncode, 0, err)
         replies = [json.loads(line) for line in out.splitlines()]
         self.assertEqual(len(replies), 4)
-        self.assertEqual(len(replies[1]["result"]["tools"]), 12)
+        self.assertEqual(len(replies[1]["result"]["tools"]), 16)
         self.assertIn("row 000", replies[2]["result"]["content"][0]["text"])
         self.assertTrue(replies[3]["result"]["isError"])
 

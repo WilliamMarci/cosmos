@@ -65,6 +65,15 @@ class InputRouter(Controller):
         if (
             isinstance(event, events.Key)
             and not event.is_forwarded
+            and event.key not in MODIFIER_KEYS
+            and self.key_context() == "workspace"
+        ):
+            from cosmos_tui.features.agent.control import human_input
+
+            await human_input(app, app.active())
+        if (
+            isinstance(event, events.Key)
+            and not event.is_forwarded
             and getattr(self, "keyboard_passthrough", False)
             and self.key_context() == "workspace"
         ):
@@ -325,6 +334,10 @@ class InputRouter(Controller):
 
     async def on_paste(self, event: events.Paste):
         app = self.app
+        if app.screen is app._workspace_screen:
+            from cosmos_tui.features.agent.control import human_input
+
+            await human_input(app, app.active())
         if app.screen is app._workspace_screen:
             event.stop()
             if app.search is not None:

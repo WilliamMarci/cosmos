@@ -62,6 +62,18 @@ class WorkspaceController(Controller):
         return event.key == "escape"
 
     async def action_leader_key(self, key):
+        if key in ("resume_control", "end_control"):
+            import asyncio
+            from cosmos_tui.features.agent.control import ControlStore
+
+            pane = self.app.active()
+            if pane:
+                await asyncio.to_thread(
+                    ControlStore(self.app.backend.argv[2]).change,
+                    pane.id,
+                    "resume" if key == "resume_control" else "cancel",
+                )
+            return
         if key == "private_pane":
             pane = self.app.active()
             if pane:

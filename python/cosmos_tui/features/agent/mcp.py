@@ -143,6 +143,51 @@ TOOLS += [
     ),
 ]
 
+TOOLS.extend(
+    [
+        dict(
+            name="control_status",
+            description="Read pane control-task states without exposing ownership tokens. Paused means the user must explicitly resume; do not bypass it.",
+            inputSchema=schema({}),
+            annotations=dict(readOnlyHint=True),
+        ),
+        dict(
+            name="acquire_control",
+            description="Acquire exclusive pane input ownership after a fresh observe snapshot. Cannot override a manually paused task. Does not grant model/tool permissions.",
+            inputSchema=schema(
+                dict(
+                    pane=PANE, snapshot_id=dict(type="string"), task=dict(type="string")
+                ),
+                ("pane", "snapshot_id", "task"),
+            ),
+        ),
+        dict(
+            name="control_input",
+            description="Deliver token-validated send_text/send_keys/mouse input. Revoked or manually paused tokens fail. Delivered is not action/task completion.",
+            inputSchema=schema(
+                dict(
+                    pane=PANE,
+                    token=dict(type="string"),
+                    kind=dict(type="string", enum=["send_text", "send_keys", "mouse"]),
+                    arguments=dict(type="object"),
+                    snapshot_id=dict(
+                        type="string",
+                        description="Required for mouse; fresh observe snapshot covering the target",
+                    ),
+                ),
+                ("pane", "token", "kind", "arguments"),
+            ),
+        ),
+        dict(
+            name="release_control",
+            description="End this pane control task and revoke its token; does not interrupt the terminal program. Also allowed for this task's manually paused token.",
+            inputSchema=schema(
+                dict(pane=PANE, token=dict(type="string")), ("pane", "token")
+            ),
+        ),
+    ]
+)
+
 
 ACTION_TOOLS = [
     dict(

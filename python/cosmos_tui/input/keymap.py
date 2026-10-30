@@ -80,6 +80,11 @@ register("global.ime_width", "global", "Input width · Half / Full", [], "ime_wi
 register("global.ime_enable", "global", "Enable IME", [], "ime_enable")
 register("global.ime_disable", "global", "Disable IME", [], "ime_disable")
 register("workspace.quit", "workspace", "Quit / Exit Cosmos", [], "quit")
+for target, label in (
+    ("resume_control", "Resume pane Agent control"),
+    ("end_control", "End pane Agent control task"),
+):
+    register("workspace." + target, "workspace", label, [], target)
 register("workspace.new_session", "workspace", "New session", [], "new_session")
 register(
     "workspace.private_pane",

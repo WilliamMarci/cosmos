@@ -43,6 +43,9 @@ class PointerRouter(Controller):
         )
 
     async def send(self, pane, button, event, *, release=False, motion=False):
+        from cosmos_tui.features.agent.control import human_input
+
+        await human_input(self.app, pane)
         x = event.screen_x - pane.x + 1
         y = event.screen_y - pane.y + 1
         data = mouse_protocol.encode(
@@ -68,6 +71,10 @@ class PointerRouter(Controller):
         app = self.app
         if app.screen is app._workspace_screen:
             target = self.pane_at(event)
+            if target and event.button in (1, 2, 3):
+                from cosmos_tui.features.agent.control import human_input
+
+                await human_input(app, target)
             if target and event.button == 1 and not target.active:
                 await app.backend.request(f"select-pane -t {target.id}")
                 app.panes = await app.backend.snapshot()
