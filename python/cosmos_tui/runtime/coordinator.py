@@ -84,7 +84,13 @@ class RuntimeController(Controller):
             await app.backend.resize(
                 max(1, terminal.size.width), max(1, terminal.size.height)
             )
+            if not hasattr(self, "headers"):
+                from cosmos_tui.features.agent.header_ui import HeaderController
+
+                self.headers = HeaderController(app)
+            await self.headers.layout()
             panes = await app.backend.snapshot()
+            self.headers.refresh(panes, terminal)
             lines = {}
             images = []
             snapshot = await rpc.call("ui.snapshot", {"client": app.client})

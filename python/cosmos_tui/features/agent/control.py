@@ -40,7 +40,7 @@ class ControlStore:
             raise ValueError("Control paused by user input")
 
     @contextmanager
-    def locked(self):
+    def locked(self, write=True):
         descriptor = os.open(
             str(self.path) + ".lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600
         )
@@ -61,25 +61,32 @@ class ControlStore:
             ):
                 raise ValueError("Invalid Agent control state")
             yield state
-            fd, temporary = tempfile.mkstemp(dir=self.path.parent)
-            try:
-                with os.fdopen(fd, "w") as stream:
-                    json.dump(state, stream)
-                os.replace(temporary, self.path)
-            finally:
-                if os.path.exists(temporary):
-                    os.unlink(temporary)
+            if write:
+                fd, temporary = tempfile.mkstemp(dir=self.path.parent)
+                try:
+                    with os.fdopen(fd, "w") as stream:
+                        json.dump(state, stream)
+                    os.replace(temporary, self.path)
+                finally:
+                    if os.path.exists(temporary):
+                        os.unlink(temporary)
         finally:
             os.close(descriptor)
 
-    def acquire(self, pane, owner, task):
+    def acquire(self, pane, owner, task, server_pid=None):
         with self.locked() as state:
             self.check(pane)
             current = state.get(pane)
             if current and (current["owner"] != owner or current["state"] == "paused"):
                 raise ValueError("Pane already controlled or manually paused")
             token = secrets.token_urlsafe(32)
-            state[pane] = dict(owner=owner, task=task, token=token, state="active")
+            state[pane] = dict(
+                owner=owner,
+                task=task,
+                token=token,
+                state="active",
+                server_pid=server_pid,
+            )
             return dict(pane=pane, token=token, state="active", task=task)
 
     def change(self, pane, action):
@@ -118,7 +125,7 @@ class ControlStore:
     def status(self):
         if not self.path.exists():
             return []
-        with self.locked() as state:
+        with self.locked(write=False) as state:
             return [
                 dict(pane=pane, state=value["state"], task=value["task"])
                 for pane, value in state.items()

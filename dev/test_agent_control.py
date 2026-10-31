@@ -77,3 +77,20 @@ class ControlUITests(unittest.IsolatedAsyncioTestCase):
 
                 await app.inputs.on_paste(events.Paste("manual paste"))
                 app.backend.paste.assert_awaited_once_with("manual paste")
+
+    async def test_header_click_pauses_without_application_mouse_input(self):
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, XDG_RUNTIME_DIR=directory),
+        ):
+            app = Probe()
+            async with app.run_test(size=(100, 30)) as pilot:
+                app.panes[0].y = 1
+                app._agent_headers = {"%0": dict(state="active", task="Task")}
+                store = ControlStore(app.backend.argv[2])
+                store.acquire("%0", "fixture-owner", "Task")
+                app.notification_events.publish = AsyncMock()
+                app.backend.send_bytes = AsyncMock()
+                await pilot.click("#terminal", offset=(1, 0))
+                self.assertEqual(store.status()[0]["state"], "paused")
+                app.backend.send_bytes.assert_not_awaited()

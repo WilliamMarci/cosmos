@@ -1,6 +1,6 @@
 # Pane input ownership
 
-This increment implements cross-process input ownership and user revocation. It does not yet implement the shared Taking over/PAUSED top row, animated pointer, model-run cancellation, monitor wakeups or persistent task scheduler.
+This increment implements cross-process input ownership and user revocation. The shared Taking over/PAUSED top row is implemented. Animated pointer, model-run cancellation, monitor wakeups and the persistent task scheduler remain unavailable.
 
 ## Tools
 
@@ -17,7 +17,7 @@ A physical non-modifier key in a workspace terminal, pasted text or a click on a
 
 A pause marker is published before waiting for an in-flight sender's lock. Controlled input checks it immediately before dispatch; queued/stale tokens fail. Input already dispatched cannot be recalled. This is not a hard real-time guarantee and does not cancel a native model request already running. The Agent prompt requires returning to the user after observing paused state, without retrying input or resuming itself.
 
-Actions → **Resume pane Agent control** changes the task to `ready` and invalidates the old token. The same Agent connection must observe again and acquire a fresh token. No input or model continuation is automatically started. **End pane Agent control task** revokes the record and token; the terminal program continues. Both actions can be assigned in Settings → Keybindings and have no default shortcut. The full shared PAUSED top row is a subsequent UI increment.
+Actions → **Resume pane Agent control** changes the task to `ready` and invalidates the old token. The same Agent connection must observe again and acquire a fresh token. No input or model continuation is automatically started. **End pane Agent control task** revokes the record and token; the terminal program continues. Both actions can be assigned in Settings → Keybindings and have no default shortcut. The shared PAUSED top row remains reserved until the control task ends.
 
 ## Runtime scope
 
@@ -28,3 +28,11 @@ Abandoned task records fail closed; the user can end them via Actions. There is 
 Legacy `send_text`/`send_keys`/`mouse` still work for panes without a control task. When a task exists (including paused/ready), legacy input rejects it; an Agent cannot bypass a revoked token using these tools. Same-user shell programs or raw Tmux commands are outside this trusted-tool policy, which is not an OS sandbox. The Agent prompt forbids bypassing these boundaries.
 
 Implementation boundaries: `control.py` owns shared ownership/revocation state; `control_tools.py` adapts lifecycle and token validation to terminal tools. Input and pointer routers only report human intervention, using the existing terminal delivery and notification systems.
+
+## Shared takeover header
+
+An active task displays `COSMOS Taking over`, a locally animated braille indicator and its task label. A manually paused task displays static `COSMOS PAUSED`; `ready` adds a reminder that fresh observation is required. The same pane status is visible in every connected Cosmos client. Clicking the header pauses control without forwarding a mouse event into the application. Text is drawn by the existing `TerminalSurface`, never written into shell history.
+
+Reservation uses Tmux's native window-level `pane-border-status=top`. While any controlled pane remains in a window, all its panes therefore have native top-border positions, but only controlled panes show takeover text. This backend granularity is intentional: actual PTY dimensions, captured grids, application cursor and input coordinates remain consistent across clients. The prior local option (or inherited setting) is restored when the last control task ends; pause/resume does not resize. A `@cosmos_control_header` window option records restoration metadata, not tokens.
+
+Acquisition re-observes after reservation and returns the resulting `snapshot_id` and `dimensions`; geometry validation uses the resized application area. Tools remain one-based application-content cells, excluding the header. The UI reconciles shared state and layout, refreshing active header rows for animation; paused rows do not animate. UI detach keeps reservations/tasks intact. End/release restores layout; there is still no automatic orphan-task expiry or model continuation. `headers.py` handles native reservation, and `header_ui.py` handles character composition.

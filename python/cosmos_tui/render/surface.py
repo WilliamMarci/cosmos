@@ -185,4 +185,6 @@ class TerminalSurface(Widget):
                     strip.crop(rect["x"] + rect["width"], width),
                 ]
             ).crop(0, width)
-        return strip
+        from cosmos_tui.features.agent.header_ui import paint_headers
+
+        return paint_headers(self.app, strip, y, width)

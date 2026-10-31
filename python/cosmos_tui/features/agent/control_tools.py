@@ -82,8 +82,29 @@ class ControlledInput:
             raise ValueError("Snapshot changed; observe again before acquiring control")
         row = await self.pane(pane)
         lease = await asyncio.to_thread(
-            ControlStore(self.backend.argv[2]).acquire, pane, self.owner, task
+            ControlStore(self.backend.argv[2]).acquire,
+            pane,
+            self.owner,
+            task,
+            row["pid"],
         )
+        from cosmos_tui.features.agent.headers import synchronize
+
+        try:
+            await asyncio.to_thread(synchronize, self.backend.argv)
+            observed = await self.observe(pane, ["text"])
+            row = await self.pane(pane)
+        except Exception:
+            await asyncio.to_thread(
+                ControlStore(self.backend.argv[2]).release,
+                pane,
+                self.owner,
+                lease["token"],
+            )
+            await asyncio.to_thread(synchronize, self.backend.argv)
+            raise
+        lease["snapshot_id"] = observed["snapshot_id"]
+        lease["dimensions"] = observed["dimensions"]
         old = self.control_tokens.get(pane)
         self.control_geometry.pop(old, None)
         self.control_tokens[pane] = lease["token"]
@@ -98,6 +119,9 @@ class ControlledInput:
         result = await asyncio.to_thread(
             ControlStore(self.backend.argv[2]).release, pane, self.owner, token
         )
+        from cosmos_tui.features.agent.headers import synchronize
+
+        await asyncio.to_thread(synchronize, self.backend.argv)
         self.control_geometry.pop(token, None)
         self.control_tokens.pop(pane, None)
         return result

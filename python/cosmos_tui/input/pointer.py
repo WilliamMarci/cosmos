@@ -71,6 +71,23 @@ class PointerRouter(Controller):
         app = self.app
         if app.screen is app._workspace_screen:
             target = self.pane_at(event)
+            if target is None and event.button in (1, 2, 3):
+                header = next(
+                    (
+                        pane
+                        for pane in app.panes
+                        if pane.id in getattr(app, "_agent_headers", {})
+                        and event.screen_y == pane.y - 1
+                        and pane.x <= event.screen_x < pane.x + pane.width
+                    ),
+                    None,
+                )
+                if header:
+                    from cosmos_tui.features.agent.control import human_input
+
+                    await human_input(app, header)
+                    event.stop()
+                    return
             if target and event.button in (1, 2, 3):
                 from cosmos_tui.features.agent.control import human_input
 
