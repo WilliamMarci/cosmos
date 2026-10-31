@@ -44,7 +44,20 @@ class ControlledInput:
             return asyncio.run(deliver())
 
         if token is not None:
-            return await asyncio.to_thread(store.guarded, pane, self.owner, token, send)
+            geometry = self.control_geometry.get(token)
+            pointer = (
+                dict(
+                    x=arguments.get("x"),
+                    y=arguments.get("y"),
+                    width=geometry[-2],
+                    height=geometry[-1],
+                )
+                if method == "mouse" and geometry
+                else None
+            )
+            return await asyncio.to_thread(
+                store.guarded, pane, self.owner, token, send, pointer
+            )
         return await asyncio.to_thread(store.legacy_guarded, pane, send)
 
     async def send_text(self, pane, text):

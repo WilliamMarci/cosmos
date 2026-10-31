@@ -191,6 +191,45 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await self.tools.control_status(), [])
             self.assertIn("row 000", (await self.tools.read_screen(self.pane))["text"])
 
+    async def test_controlled_mouse_publishes_distinct_pointer(self):
+        from cosmos_tui.features.agent.control import ControlStore
+        from cosmos_tui.features.agent.headers import synchronize
+        from unittest.mock import patch
+
+        with patch.dict(os.environ, XDG_RUNTIME_DIR=self.directory.name):
+            await self.tools.send_keys(self.pane, [":"])
+            await self.tools.send_text(self.pane, "set mouse=a ttymouse=sgr")
+            await self.tools.send_keys(self.pane, ["Enter"])
+            await self.tools.read_screen(self.pane, wait_ms=100)
+            snapshot = await self.tools.observe(self.pane)
+            lease = await self.tools.acquire_control(
+                self.pane, snapshot["snapshot_id"], "Mouse task"
+            )
+            snapshot = await self.tools.observe(self.pane)
+            await self.tools.control_input(
+                self.pane,
+                lease["token"],
+                "mouse",
+                dict(x=4, y=5),
+                snapshot["snapshot_id"],
+            )
+            record = next(
+                r
+                for r in synchronize(self.tools.backend.argv)
+                if r["pane"] == self.pane
+            )
+            self.assertEqual((record["pointer"]["x"], record["pointer"]["y"]), (4, 5))
+            ControlStore(self.socket).change(self.pane, "pause")
+            self.assertEqual(
+                next(
+                    r
+                    for r in synchronize(self.tools.backend.argv)
+                    if r["pane"] == self.pane
+                )["state"],
+                "paused",
+            )
+            await self.tools.release_control(self.pane, lease["token"])
+
     async def test_stdio_discovery_and_tool_call(self):
         env = dict(
             os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1] / "python")
@@ -232,7 +271,7 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(process.returncode, 0, err)
         replies = [json.loads(line) for line in out.splitlines()]
         self.assertEqual(len(replies), 4)
-        self.assertEqual(len(replies[1]["result"]["tools"]), 16)
+        self.assertEqual(len(replies[1]["result"]["tools"]), 19)
         self.assertIn("row 000", replies[2]["result"]["content"][0]["text"])
         self.assertTrue(replies[3]["result"]["isError"])
 

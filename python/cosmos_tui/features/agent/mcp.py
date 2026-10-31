@@ -188,6 +188,44 @@ TOOLS.extend(
     ]
 )
 
+TOOLS.extend(
+    [
+        dict(
+            name="watch_terminal",
+            description="Register a background terminal condition/timeout and return immediately. Optional control_token releases this task's control/header while waiting. No model wakeup yet: report the pending watch, do not sleep/poll or claim success.",
+            inputSchema=schema(
+                dict(
+                    pane=PANE,
+                    condition=dict(
+                        type="string",
+                        enum=[
+                            "text_present",
+                            "text_absent",
+                            "changed",
+                            "program_changed",
+                        ],
+                    ),
+                    text=dict(type="string"),
+                    timeout_seconds=dict(type="number", minimum=1, maximum=86400),
+                    control_token=dict(type="string"),
+                ),
+                ("pane", "condition"),
+            ),
+        ),
+        dict(
+            name="terminal_watches",
+            description="Read bounded background watch results and evidence. Matched means a condition was detected, not task completion. Never resume input into a manually paused pane.",
+            inputSchema=schema({}),
+            annotations=dict(readOnlyHint=True),
+        ),
+        dict(
+            name="cancel_terminal_watch",
+            description="Cancel a terminal watch without interrupting its terminal program.",
+            inputSchema=schema(dict(id=dict(type="string")), ("id",)),
+        ),
+    ]
+)
+
 
 ACTION_TOOLS = [
     dict(

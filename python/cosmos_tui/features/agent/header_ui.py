@@ -35,25 +35,56 @@ def header_text(record, width, palette, frame):
     return text
 
 
+def pointer_cell(record, pane):
+    pointer = record.get("pointer") if record and record["state"] == "active" else None
+    if not pointer or (pointer["width"], pointer["height"]) != (
+        pane.width,
+        pane.height,
+    ):
+        return None
+    x, y = pointer["x"], pointer["y"]
+    if not (1 <= x <= pane.width and 1 <= y <= pane.height):
+        return None
+    return pane.x + x - 1, pane.y + y - 1
+
+
 def paint_headers(app, strip, y, width):
+    reduced = getattr(app, "settings", {}).get("reduced_motion", False)
     for pane in app.panes:
         record = getattr(app, "_agent_headers", {}).get(pane.id)
-        if not record or pane.y <= 0 or y != pane.y - 1:
+        if not record:
             continue
-        text = header_text(
-            record,
-            pane.width,
-            app.role_colors,
-            0
-            if getattr(app, "settings", {}).get("reduced_motion", False)
-            else int(time.monotonic() * 8),
-        )
-        rendered = Strip(
-            Segment(s.text, s.style) for s in text.render(app.console, end="")
-        )
-        strip = Strip.join(
-            [strip.crop(0, pane.x), rendered, strip.crop(pane.x + pane.width, width)]
-        )
+        if pane.y > 0 and y == pane.y - 1:
+            text = header_text(
+                record,
+                pane.width,
+                app.role_colors,
+                0 if reduced else int(time.monotonic() * 8),
+            )
+            rendered = Strip(
+                Segment(s.text, s.style) for s in text.render(app.console, end="")
+            )
+            strip = Strip.join(
+                [
+                    strip.crop(0, pane.x),
+                    rendered,
+                    strip.crop(pane.x + pane.width, width),
+                ]
+            )
+        point = pointer_cell(record, pane)
+        if point and point[1] == y and (reduced or int(time.monotonic() * 3) % 2 == 0):
+            x = point[0]
+            marker = Strip(
+                [
+                    Segment(
+                        "◆",
+                        Style(
+                            color="#63c5da", bgcolor=app.role_colors["base"], bold=True
+                        ),
+                    )
+                ]
+            )
+            strip = Strip.join([strip.crop(0, x), marker, strip.crop(x + 1, width)])
     return strip.crop(0, width)
 
 
@@ -95,4 +126,8 @@ class HeaderController:
             ):
                 if pane.y > 0:
                     terminal.refresh(Region(pane.x, pane.y - 1, pane.width, 1))
+                for record in (before, after):
+                    point = pointer_cell(record, pane)
+                    if point:
+                        terminal.refresh(Region(point[0], point[1], 1, 1))
         self.last_frame = frame

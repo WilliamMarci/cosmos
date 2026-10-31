@@ -68,6 +68,11 @@ def configuration(socket, source_pane):
                 "resource": "*",
                 "effect": "allow",
             },
+            {
+                "action": "cosmos_terminal_terminal_watches",
+                "resource": "*",
+                "effect": "allow",
+            },
             {"action": "cosmos_terminal_observe", "resource": "*", "effect": "allow"},
             {
                 "action": "cosmos_terminal_list_sessions",

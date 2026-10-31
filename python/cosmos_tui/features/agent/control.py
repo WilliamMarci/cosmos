@@ -140,7 +140,7 @@ class ControlStore:
                 return dict(pane=pane, state="ended")
             raise ValueError("Stale control token")
 
-    def guarded(self, pane, owner, token, operation):
+    def guarded(self, pane, owner, token, operation, pointer=None):
         """Serialize validation and input delivery against manual revocation."""
         with self.locked() as state:
             self.check(pane)
@@ -154,7 +154,9 @@ class ControlStore:
                 raise ValueError(
                     "Control revoked; fresh observation and user resume may be required"
                 )
-            return operation()
+            result = operation()
+            current["pointer"] = pointer
+            return result
 
     def legacy_guarded(self, pane, operation):
         with self.locked() as state:

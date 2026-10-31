@@ -73,6 +73,11 @@ def synchronize(argv):
                     )
                 cli("set-option", "-wu", "-t", window, OPTION)
         return [
-            dict(pane=pane, state=value["state"], task=value["task"])
+            dict(
+                pane=pane,
+                state=value["state"],
+                task=value["task"],
+                pointer=value.get("pointer"),
+            )
             for pane, value in visible.items()
         ]

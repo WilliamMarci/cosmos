@@ -540,6 +540,9 @@ def main(argv=None):
             from cosmos_tui.core import rpc
 
             asyncio.run(rpc.call("daemon.shutdown", {}))
+            from cosmos_tui.features.agent.monitor.service import suspend
+
+            suspend(os.getenv("COSMOS_TMUX_SOCKET", "cosmos"))
             print("Cosmos is stopping · terminal sessions retained")
             return 0
         if operation == "open" and Path(args.file).expanduser().is_dir():

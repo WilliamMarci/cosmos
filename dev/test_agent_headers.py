@@ -151,3 +151,29 @@ class HeaderUITests(unittest.IsolatedAsyncioTestCase):
             self.assertIn("PAUSED", shown)
             self.assertNotIn("Taking over", shown)
             self.assertIn("APPLICATION_CONTENT_SENTINEL", shown)
+
+
+class AgentPointerTests(unittest.TestCase):
+    def test_pointer_is_independent_and_hidden_when_paused_or_resized(self):
+        from cosmos_tui.features.agent.header_ui import pointer_cell
+
+        pane = SimpleNamespace(id="%0", x=0, y=1, width=40, height=20)
+        record = dict(
+            state="active", task="Task", pointer=dict(x=4, y=3, width=40, height=20)
+        )
+        app = SimpleNamespace(
+            panes=[pane],
+            _agent_headers={"%0": record},
+            role_colors=DARK,
+            console=Console(),
+            settings=dict(reduced_motion=True),
+        )
+        self.assertEqual(pointer_cell(record, pane), (3, 3))
+        original = Strip.blank(40)
+        self.assertEqual(paint_headers(app, original, 3, 40).text[3], "◆")
+        record["state"] = "paused"
+        self.assertIsNone(pointer_cell(record, pane))
+        self.assertNotIn("◆", paint_headers(app, original, 3, 40).text)
+        record["state"] = "active"
+        pane.height = 19
+        self.assertIsNone(pointer_cell(record, pane))

@@ -88,6 +88,12 @@ class RuntimeController(Controller):
                 from cosmos_tui.features.agent.header_ui import HeaderController
 
                 self.headers = HeaderController(app)
+            if not getattr(self, "monitor_started", False):
+                import asyncio
+                from cosmos_tui.features.agent.monitor.service import recover
+
+                await asyncio.to_thread(recover, app.backend.argv[2])
+                self.monitor_started = True
             await self.headers.layout()
             panes = await app.backend.snapshot()
             self.headers.refresh(panes, terminal)

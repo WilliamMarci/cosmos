@@ -28,6 +28,7 @@ class CommandHintTests(unittest.TestCase):
                 "cosmos_tui.core.rpc.call", AsyncMock(return_value={"stopping": True})
             ) as rpc,
             contextlib.redirect_stdout(output),
+            patch("cosmos_tui.features.agent.monitor.service.suspend"),
         ):
             self.assertEqual(main(["stop"]), 0)
         rpc.assert_awaited_once_with("daemon.shutdown", {})

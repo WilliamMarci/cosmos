@@ -1,6 +1,6 @@
 # Pane input ownership
 
-This increment implements cross-process input ownership and user revocation. The shared Taking over/PAUSED top row is implemented. Animated pointer, model-run cancellation, monitor wakeups and the persistent task scheduler remain unavailable.
+This increment implements cross-process input ownership and user revocation. The shared Taking over/PAUSED top row is implemented. A distinct cyan mouse pointer and background terminal watches are implemented. Model-run cancellation, model wakeups and the persistent task scheduler remain unavailable.
 
 ## Tools
 
@@ -36,3 +36,9 @@ An active task displays `COSMOS Taking over`, a locally animated braille indicat
 Reservation uses Tmux's native window-level `pane-border-status=top`. While any controlled pane remains in a window, all its panes therefore have native top-border positions, but only controlled panes show takeover text. This backend granularity is intentional: actual PTY dimensions, captured grids, application cursor and input coordinates remain consistent across clients. The prior local option (or inherited setting) is restored when the last control task ends; pause/resume does not resize. A `@cosmos_control_header` window option records restoration metadata, not tokens.
 
 Acquisition re-observes after reservation and returns the resulting `snapshot_id` and `dimensions`; geometry validation uses the resized application area. Tools remain one-based application-content cells, excluding the header. The UI reconciles shared state and layout, refreshing active header rows for animation; paused rows do not animate. UI detach keeps reservations/tasks intact. End/release restores layout; there is still no automatic orphan-task expiry or model continuation. `headers.py` handles native reservation, and `header_ui.py` handles character composition.
+
+## Agent pointer
+
+After successful controlled mouse input, all Cosmos clients display a cyan diamond at the one-based application-content cell, independently of the application cursor. It blinks through the existing terminal renderer; reduced motion leaves it steady. Pausing control, releasing it, changing the geometry or sending non-mouse controlled input removes the pointer. Header and pointer animation refresh only their affected rows/cells. The pointer is character chrome, not an image-pixel inspection facility.
+
+For background waits, [terminal watches](agent-monitor.md) can release the owner's control token/header and collect evidence independently; they do not automatically wake the model.

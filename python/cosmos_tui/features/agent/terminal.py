@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from cosmos_tui.input.mouse_protocol import encode
 from cosmos_tui.terminal.tmux import Tmux
 from cosmos_tui.features.agent.control_tools import ControlledInput
+from cosmos_tui.features.agent.monitor.tools import TerminalWatches
 
 FIELDS = (
     "pid",
@@ -52,7 +53,7 @@ FLAGS = {
 }
 
 
-class TerminalTools(ControlledInput):
+class TerminalTools(ControlledInput, TerminalWatches):
     def __init__(self, socket):
         self.owner = uuid.uuid4().hex
         self.observation_requests = {}
