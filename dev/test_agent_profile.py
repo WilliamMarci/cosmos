@@ -58,7 +58,7 @@ class ProfileTests(unittest.TestCase):
             config = profile.provider_config()
             self.assertEqual(config["model"]["providerID"], "deepseek")
             self.assertEqual(
-                config["providers"]["deepseek"]["package"], "@ai-sdk/deepseek"
+                config["providers"]["deepseek"]["package"], "@opencode/ai/providers/deepseek"
             )
             for values in (
                 {"provider": "opencode"},

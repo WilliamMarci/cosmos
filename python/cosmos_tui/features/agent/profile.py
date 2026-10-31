@@ -129,9 +129,9 @@ def provider_config():
             provider: {
                 "name": provider.title() + " API",
                 "package": {
-                    "deepseek": "@ai-sdk/deepseek",
-                    "anthropic": "@ai-sdk/anthropic",
-                }.get(provider, "@ai-sdk/openai-compatible"),
+                    "deepseek": "@opencode/ai/providers/deepseek",
+                    "anthropic": "@opencode/ai/providers/anthropic",
+                }.get(provider, "@opencode/ai/providers/openai-compatible"),
                 "env": ["COSMOS_AGENT_API_KEY"],
                 "settings": {"baseURL": settings["base_url"]},
                 "models": {model: {"name": model, "capabilities": {"tools": True}}},
