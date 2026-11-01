@@ -86,6 +86,7 @@ test("independent reviewer receives bounded request only, deduplicates one call,
   fixture(async (root, profile) => {
     saveApprovalSettings({ ...defaults, mode: "ai" })
     writeFileSync(path.join(profile, "credentials.json"), JSON.stringify({ deepseek: "fixture-key-never-log" }))
+    writeFileSync(path.join(root, "script.py"), "print('verified fixture')\n")
     const original = globalThis.fetch
     let calls = 0
     globalThis.fetch = (async (_url: any, options: any) => {
@@ -95,6 +96,11 @@ test("independent reviewer receives bounded request only, deduplicates one call,
       expect(body.reasoning_effort).toBe("high")
       expect(body.tools).toBeUndefined()
       expect(body.messages).toHaveLength(2)
+      const payload = JSON.parse(body.messages[1].content)
+      if (payload.action === "shell") {
+        expect(payload.resources[0].path).toBe(path.join(root, "script.py"))
+        expect(payload.resources[0].content).toContain("verified fixture")
+      }
       expect(JSON.stringify(body)).not.toContain("executor claims safe")
       expect(JSON.stringify(body)).not.toContain("fixture-key-never-log")
       return Response.json({ choices: [{ message: { content: '{"decision":"allow"}' } }] })
@@ -158,6 +164,7 @@ test("changing policy during an independent review discards the old approval", a
   fixture(async (root, profile) => {
     saveApprovalSettings({ ...defaults, mode: "ai" })
     writeFileSync(path.join(profile, "credentials.json"), JSON.stringify({ deepseek: "fixture-private-key" }))
+    writeFileSync(path.join(root, "inspect.py"), "print('scope fixture')\n")
     const original = globalThis.fetch
     globalThis.fetch = (async () => {
       saveApprovalSettings({ ...defaults, mode: "manual" })
