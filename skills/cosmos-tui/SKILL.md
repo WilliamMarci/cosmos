@@ -5,6 +5,8 @@ description: Operate interactive terminal applications inside Cosmos using its t
 
 # Operate a Cosmos terminal application
 
+Use the connected Cosmos workspace and its designated existing terminal for interactive tasks. workspace_info reports its opaque service identity. The cosmos_terminal prefix and numeric handles are compatibility interfaces, not access to arbitrary host terminal services. A service-change error requires an explicit reconnect and fresh discovery; never fall back to a default service. Host Shell execution is separately permissioned and never included in a workspace/control grant.
+
 Use the designated existing terminal for interactive tasks. Do not start by exploring Cosmos or the application's source with shell calls. File checks can assist, but do not replace interaction in the requested pane.
 
 Resolve a user target with `resolve_target`: `1:4` means stable session `$1`, pane `%4`, **not** pane index 4. Use its returned `%ID` for terminal operations. `list_panes` discovers targets; `create_terminal(source_pane)` creates a separate background terminal inheriting cwd when needed. Its response already reports actual cwd and startup state; use `snapshot.snapshot_id` to acquire control without running `pwd` or capturing the entire screen again. `shell_ready: null` is not a readiness assertion.

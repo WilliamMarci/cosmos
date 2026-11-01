@@ -15,6 +15,7 @@ class ActionTools(TerminalTools):
     server_name = "cosmos-actions"
 
     async def clients(self):
+        await self.panes()
         text = await self.backend.cli("show-options", "-g")
         result = {}
         for line in text.splitlines():
@@ -84,6 +85,7 @@ class ActionTools(TerminalTools):
         )
 
     async def list_actions(self, client=None, scope=None, category=None):
+        await self.panes()
         if scope not in (None, "service", "ui"):
             raise ValueError("scope must be service or ui")
         if category is not None and (not isinstance(category, str) or not category):
@@ -106,6 +108,7 @@ class ActionTools(TerminalTools):
         return result
 
     async def invoke_action(self, id, scope, client=None, params=None):
+        await self.panes()
         if (
             not isinstance(id, str)
             or scope not in ("service", "ui")

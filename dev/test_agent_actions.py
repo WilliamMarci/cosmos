@@ -34,6 +34,7 @@ class AgentActionTests(unittest.IsolatedAsyncioTestCase):
                 bridge = AgentBridge(app)
                 await bridge.start()
                 tools = ActionTools("test")
+                tools.panes = AsyncMock(return_value=[dict(pid="fixture")])
                 option = (
                     f"@cosmos_agent_actions_{app.client} {json.dumps(bridge.path)}\n"
                 )

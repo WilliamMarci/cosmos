@@ -62,6 +62,9 @@ class TerminalTools(
     ControlledInput, TerminalWatches, HistoryTools, WorkspaceGrants, TaskTools
 ):
     def __init__(self, socket):
+        from cosmos_tui.features.agent.binding import WorkspaceBinding
+
+        self.binding = WorkspaceBinding(socket)
         self.owner = uuid.uuid4().hex
         self.observation_requests = {}
         self.control_geometry = {}
@@ -89,7 +92,25 @@ class TerminalTools(
                 row["pane_current_command"] = ""
             row["display_id"] = row["session_id"][1:] + ":" + row["pane_id"][1:]
             result.append(row)
+        self.binding.validate(result)
         return result
+
+    async def workspace_info(self):
+        rows = await self.panes()
+        return dict(
+            service_id=self.binding.validate(rows),
+            scope="cosmos_workspace",
+            capabilities=[
+                "sessions",
+                "terminals",
+                "views",
+                "actions",
+                "retained_history",
+                "tasks",
+            ],
+            host_commands="separate_native_permission",
+            system_isolation=False,
+        )
 
     async def pane(self, ident):
         if not isinstance(ident, str) or not re.fullmatch(r"%\d+", ident):

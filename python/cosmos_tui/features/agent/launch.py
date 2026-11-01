@@ -84,6 +84,12 @@ def environment(socket, source_pane):
         for key, value in os.environ.items()
         if not key.startswith("OPENCODE_")
     }
+    from cosmos_tui.features.agent.binding import launch_binding
+
+    env.pop("COSMOS_WORKSPACE_BINDING", None)
+    binding = launch_binding(socket)
+    if binding:
+        env["COSMOS_WORKSPACE_BINDING"] = binding
     root = profile_root()
     from cosmos_tui.features.agent.tasks.storage import Tasks
     from cosmos_tui.features.agent.tasks.runtime import registry

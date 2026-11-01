@@ -17,6 +17,12 @@ def schema(properties, required=()):
 PANE = dict(type="string", description="Stable %ID from list_panes")
 TOOLS = [
     dict(
+        name="workspace_info",
+        description="Describe this connected Cosmos workspace and its opaque service identity, capabilities and access boundary. Never selects another service.",
+        inputSchema=schema({}),
+        annotations=dict(readOnlyHint=True),
+    ),
+    dict(
         name="observe",
         description="Observe a bounded terminal snapshot with text, styled presentation and explicitly inferred control candidates. No real image access or control authority. Coordinates are one-based application cells; private panes are denied.",
         inputSchema=schema(
@@ -301,13 +307,50 @@ for tool in TOOLS:
         )
 
 
-TOOLS.extend([
-    dict(name="schedule_task", description="Persist an automatic or manual Agent task bound to this native conversation and pane. Supports after_seconds, timezone-aware at, interval_seconds or daily HH:MM with IANA timezone. Releases own pane control before waiting; wakes via native Session API, never types into Agent. Requires explicit native permission.",
-        inputSchema=schema(dict(pane=PANE, goal=dict(type="string", maxLength=4000), schedule=dict(type="object"), mode=dict(type="string", enum=["auto","manual"]), control_token=dict(type="string")), ("pane","goal","schedule"))),
-    dict(name="list_tasks", description="List persisted tasks belonging to this authenticated conversation, including pending/manual/paused states. Read-only; a model becoming idle is not task success.", inputSchema=schema({}), annotations=dict(readOnlyHint=True)),
-    dict(name="task_history", description="Read bounded execution/trigger records for one of this conversation's tasks.", inputSchema=schema(dict(id=dict(type="string")), ("id",)), annotations=dict(readOnlyHint=True)),
-    dict(name="finish_task", description="Report a verified task outcome and evidence summary. Does not interrupt the terminal application. Cannot complete cancelled/paused tasks. Recurring successful tasks remain scheduled.", inputSchema=schema(dict(id=dict(type="string"), outcome=dict(type="string", enum=["succeeded","failed","needs_input"]), summary=dict(type="string", maxLength=2000)), ("id","outcome","summary"))),
-])
+TOOLS.extend(
+    [
+        dict(
+            name="schedule_task",
+            description="Persist an automatic or manual Agent task bound to this native conversation and pane. Supports after_seconds, timezone-aware at, interval_seconds or daily HH:MM with IANA timezone. Releases own pane control before waiting; wakes via native Session API, never types into Agent. Requires explicit native permission.",
+            inputSchema=schema(
+                dict(
+                    pane=PANE,
+                    goal=dict(type="string", maxLength=4000),
+                    schedule=dict(type="object"),
+                    mode=dict(type="string", enum=["auto", "manual"]),
+                    control_token=dict(type="string"),
+                ),
+                ("pane", "goal", "schedule"),
+            ),
+        ),
+        dict(
+            name="list_tasks",
+            description="List persisted tasks belonging to this authenticated conversation, including pending/manual/paused states. Read-only; a model becoming idle is not task success.",
+            inputSchema=schema({}),
+            annotations=dict(readOnlyHint=True),
+        ),
+        dict(
+            name="task_history",
+            description="Read bounded execution/trigger records for one of this conversation's tasks.",
+            inputSchema=schema(dict(id=dict(type="string")), ("id",)),
+            annotations=dict(readOnlyHint=True),
+        ),
+        dict(
+            name="finish_task",
+            description="Report a verified task outcome and evidence summary. Does not interrupt the terminal application. Cannot complete cancelled/paused tasks. Recurring successful tasks remain scheduled.",
+            inputSchema=schema(
+                dict(
+                    id=dict(type="string"),
+                    outcome=dict(
+                        type="string", enum=["succeeded", "failed", "needs_input"]
+                    ),
+                    summary=dict(type="string", maxLength=2000),
+                ),
+                ("id", "outcome", "summary"),
+            ),
+        ),
+    ]
+)
 
 
 ACTION_TOOLS = [
@@ -395,7 +438,7 @@ async def dispatch(tools, message, catalog=TOOLS):
             protocolVersion="2024-11-05",
             capabilities=dict(tools={}),
             serverInfo=dict(
-                name=getattr(tools, "server_name", "cosmos-terminal"), version="0.1.0"
+                name=getattr(tools, "server_name", "cosmos-workspace"), version="0.1.0"
             ),
         )
     if method == "ping":

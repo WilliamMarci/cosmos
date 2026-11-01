@@ -18,7 +18,7 @@ def configuration(socket, source_pane):
                 "mode": "primary",
                 "description": "Cosmos terminal workspace agent",
                 "system": (PROJECT_ROOT / "config/cosmos-agent-prompt.md").read_text()
-                + f"\nSource pane: {source_pane}. Cosmos Tmux service: {socket}.\n"
+                + f"\nSource terminal: {source_pane}. Workspace connection is managed by Cosmos.\n"
                 + f"Personal Cosmos skill library: {personal_skills()}.\n"
                 + f"Skill export helper Python: {sys.executable}.\n",
             }
@@ -56,6 +56,12 @@ def configuration(socket, source_pane):
             }
         },
         "permissions": [
+            {"action": "shell", "resource": "*", "effect": "ask"},
+            {
+                "action": "cosmos_terminal_workspace_info",
+                "resource": "*",
+                "effect": "allow",
+            },
             {"action": "cosmos_actions_*", "resource": "*", "effect": "ask"},
             *[
                 dict(action=name, resource="*", effect="allow")

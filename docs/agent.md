@@ -135,3 +135,5 @@ OpenCode, use OpenCode's own session export instead of reading its data through
 Cosmos's private profile.
 
 Persistent tasks and their popup, schedule API, cancellation and recovery are documented in [Agent tasks](agent-tasks.md). Restart an existing Agent frontend to load new native patches; retained ordinary terminal sessions need not stop.
+
+[Cosmos workspace interface](agent-workspace.md) defines opaque service identity, service-replacement rejection, compatibility handles, and the separate host Shell permission boundary.

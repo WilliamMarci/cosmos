@@ -28,6 +28,7 @@ def scoped_tools(tools, arguments):
     if session not in tools._conversations:
         tools._conversations[session] = type(tools)(tools.backend.argv[2])
     scoped = tools._conversations[session]
+    scoped.binding = tools.binding
     scoped.conversation = session
     scoped.runtime_id = hashlib.sha256(key.encode()).hexdigest()[:24]
     return scoped, arguments
