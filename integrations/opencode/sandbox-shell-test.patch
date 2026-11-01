@@ -1,0 +1,39 @@
+diff --git a/packages/core/test/tool-shell.test.ts b/packages/core/test/tool-shell.test.ts
+index f0fbf57..b282537 100644
+--- a/packages/core/test/tool-shell.test.ts
++++ b/packages/core/test/tool-shell.test.ts
+@@ -1862,3 +1862,34 @@ describe("ShellTool", () => {
+     ),
+   )
+ })
++
++it.live("Cosmos approved Shell tool runs arbitrary Python through the real sandbox spawn seam", () =>
++  withScanner(false, (registry, fixture) => Effect.gen(function* () {
++    reset()
++    const settings = yield* Effect.promise(() => import("../src/cosmos/approval-settings"))
++    const old = { agent: process.env.COSMOS_AGENT, profile: process.env.COSMOS_AGENT_PROFILE }
++    const profile = path.join(fixture.outside, "profile")
++    yield* Effect.promise(() => fs.mkdir(profile))
++    process.env.COSMOS_AGENT = "1"
++    process.env.COSMOS_AGENT_PROFILE = profile
++    try {
++      settings.saveApprovalSettings({ ...settings.defaults, mode: "ai", workspaces: [fixture.active] })
++      const secret = path.join(fixture.outside, "secret.txt")
++      yield* Effect.promise(() => fs.writeFile(secret, "host-only"))
++      const code = `import os,pathlib; assert not pathlib.Path(${JSON.stringify(secret)}).exists(); assert 'COSMOS_AGENT_API_KEY' not in os.environ; pathlib.Path('native-result.txt').write_text('confined'); print('SANDBOX_OK')`
++      const command = "python3 -c '" + code.replaceAll("'", "'\\''") + "'"
++      const result = yield* executeTool(registry, call({ command }))
++      expect(result).toMatchObject({ status: "completed", metadata: { exit: 0 } })
++      expect(yield* Effect.promise(() => fs.readFile(path.join(fixture.active, "native-result.txt"), "utf8"))).toBe("confined")
++      expect(assertions.some((row) => row.metadata?.cosmos_sandbox === true)).toBe(true)
++      afterPermission = () => Effect.sync(() => settings.saveApprovalSettings({ ...settings.defaults, mode: "manual" }))
++      const stopped = yield* executeTool(registry, call({ command: "touch must-not-run.txt" }, "scope-changed"))
++      expect(stopped.status).toBe("error")
++      expect(yield* Effect.promise(() => Bun.file(path.join(fixture.active, "must-not-run.txt")).exists())).toBe(false)
++    } finally {
++      reset()
++      if (old.agent === undefined) delete process.env.COSMOS_AGENT; else process.env.COSMOS_AGENT = old.agent
++      if (old.profile === undefined) delete process.env.COSMOS_AGENT_PROFILE; else process.env.COSMOS_AGENT_PROFILE = old.profile
++    }
++  })),
++)

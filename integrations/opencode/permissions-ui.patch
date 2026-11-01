@@ -27,21 +27,27 @@ index 3386b8e..08dbd4b 100644
          name: "mcp.list",
          title: "MCP servers",
 diff --git a/packages/tui/src/component/dialog-config.tsx b/packages/tui/src/component/dialog-config.tsx
-index 6c9df2b..c21990c 100644
+index 6c9df2b..e2de692 100644
 --- a/packages/tui/src/component/dialog-config.tsx
 +++ b/packages/tui/src/component/dialog-config.tsx
-@@ -4,6 +4,7 @@ import { useThemes } from "../context/theme"
+@@ -4,6 +4,8 @@ import { useThemes } from "../context/theme"
  import { useDialog, type DialogContext } from "../ui/dialog"
  import { DialogSelect, DialogSelectChoice } from "../ui/dialog-select"
  import { useToast } from "../ui/toast"
++import { DialogCosmosApproval } from "./dialog-cosmos-approval"
 +import { DialogCosmosPermissions } from "./dialog-cosmos-permissions"
  import { DialogThemeList } from "./dialog-theme-list"
  
  type Setting = {
-@@ -25,6 +26,15 @@ type Setting = {
+@@ -25,6 +27,20 @@ type Setting = {
  }
  
  export const settings: Setting[] = [
++  {
++    title: "Global Cosmos approvals", category: "Agent", path: ["cosmos_approval"],
++    description: "Global tool policies and independent AI approval mode.", default: "Configure",
++    open: (dialog) => dialog.replace(() => <DialogCosmosApproval />),
++  },
 +  {
 +    title: "Permissions",
 +    category: "Agent",
@@ -54,20 +60,20 @@ index 6c9df2b..c21990c 100644
    {
      title: "Theme",
      category: "Appearance",
-@@ -425,6 +435,7 @@ export function DialogConfig(props: { current?: string }) {
+@@ -425,6 +441,7 @@ export function DialogConfig(props: { current?: string }) {
    async function change(direction: number, index = selected()) {
      if (saving()) return
      const setting = settings[index]
-+    if (setting.path[0] === "cosmos_permissions") return setting.open?.(dialog)
++    if (["cosmos_permissions", "cosmos_approval"].includes(setting.path[0])) return setting.open?.(dialog)
      const current = value(setting)
      const choices = values(setting)
      const next = choices
-@@ -459,7 +470,7 @@ export function DialogConfig(props: { current?: string }) {
+@@ -459,7 +476,7 @@ export function DialogConfig(props: { current?: string }) {
        onMove={(option) => setSelected(option.value)}
        onSelect={(option) => {
          const open = settings[option.value].open
 -        if (newDesigns() && open) return open(dialog)
-+        if (open && (newDesigns() || settings[option.value].path[0] === "cosmos_permissions")) return open(dialog)
++        if (open && (newDesigns() || ["cosmos_permissions", "cosmos_approval"].includes(settings[option.value].path[0]))) return open(dialog)
          void change(1, option.value)
        }}
        footerHints={newDesigns() ? [] : [{ title: "change", label: "←/→" }]}

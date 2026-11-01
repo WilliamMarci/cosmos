@@ -1073,3 +1073,36 @@ it.effect("recursive directory grants share read tools and bounded read-only She
     }
   }),
 )
+
+it.effect("profile-global Cosmos policies and local approval rules use the real permission service without bypassing denies or resume", () =>
+  Effect.gen(function* () {
+    const fs = yield* Effect.promise(() => import("node:fs"))
+    const settings = yield* Effect.promise(() => import("../src/cosmos/approval-settings"))
+    const root = fs.mkdtempSync("/tmp/cosmos-global-approvals-")
+    const before = { agent: process.env.COSMOS_AGENT, profile: process.env.COSMOS_AGENT_PROFILE }
+    process.env.COSMOS_AGENT = "1"
+    process.env.COSMOS_AGENT_PROFILE = root
+    try {
+      yield* setup([{ action: "cosmos_terminal_watch_terminal", resource: "private", effect: "deny" }])
+      settings.saveApprovalSettings({ ...settings.defaults, mode: "ai", workspaces: [root], tools: { watch: "allow", tasks: "allow" } })
+      const permissions = yield* Permission.Service
+      const request = (action: string, resource: string, extra = {}) => permissions.ask({
+        action, resources: [resource], save: [], sessionID: Session.ID.make("ses_test"), ...extra,
+        source: { type: "tool", messageID: toolIdentity.messageID, id: "global-approval" },
+      })
+      expect((yield* request("cosmos_terminal_watch_terminal", "%0")).effect).toBe("allow")
+      expect((yield* request("cosmos_terminal_watch_terminal", "private")).effect).toBe("deny")
+      expect((yield* request("edit", root + "/src/result.txt")).effect).toBe("allow")
+      expect((yield* request("edit", "/outside/result.txt")).effect).toBe("ask")
+      expect((yield* request("cosmos_terminal_request_resume", "%0", { forceAsk: true })).effect).toBe("ask")
+      settings.saveApprovalSettings({ ...settings.defaults, tools: { watch: "deny" } })
+      expect((yield* request("cosmos_terminal_watch_terminal", "%0", { taskGranted: true })).effect).toBe("deny")
+      settings.saveApprovalSettings({ ...settings.defaults, tools: { watch: "ask" } })
+      expect((yield* request("cosmos_terminal_watch_terminal", "%0", { taskGranted: true })).effect).toBe("ask")
+    } finally {
+      if (before.agent === undefined) delete process.env.COSMOS_AGENT; else process.env.COSMOS_AGENT = before.agent
+      if (before.profile === undefined) delete process.env.COSMOS_AGENT_PROFILE; else process.env.COSMOS_AGENT_PROFILE = before.profile
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  }),
+)

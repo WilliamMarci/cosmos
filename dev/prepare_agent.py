@@ -42,6 +42,9 @@ def prepare():
     (component / "dialog-cosmos-permissions.tsx").write_text(
         (ROOT / "integrations/opencode/dialog-cosmos-permissions.tsx").read_text()
     )
+    (component / "dialog-cosmos-approval.tsx").write_text(
+        (ROOT / "integrations/opencode/dialog-cosmos-approval.tsx").read_text()
+    )
     (component / "cosmos-logo.tsx").write_text(
         (ROOT / "integrations/opencode/cosmos-logo.tsx").read_text()
     )

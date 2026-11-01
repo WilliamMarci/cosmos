@@ -76,16 +76,46 @@ index e13466a..f0cdc04 100644
                    root: ".",
                    path: input.path,
                    include: input.include,
+diff --git a/packages/core/src/shell.ts b/packages/core/src/shell.ts
+index 995c82b..959d282 100644
+--- a/packages/core/src/shell.ts
++++ b/packages/core/src/shell.ts
+@@ -1,3 +1,4 @@
++import { executionFor } from "./cosmos/sandbox.js"
+ export * as Shell from "./shell.js"
+ 
+ import path from "path"
+@@ -285,7 +286,8 @@ const layer = () =>
+         if (before) yield* before(invocation)
+ 
+         const id = Shell.ID.ascending()
+-        const args = ShellSelect.args(invocation.shell, invocation.command)
++        const confinement = executionFor(invocation)
++        const args = confinement?.args ?? ShellSelect.args(invocation.shell, invocation.command)
+         const file = path.join(outputDir, `${id}.out`)
+ 
+         const info: Info = {
+@@ -308,7 +310,7 @@ const layer = () =>
+             Effect.gen(function* () {
+               const handle = yield* environment.spawner
+                 .spawn(
+-                  ChildProcess.make(invocation.shell, args, {
++                  ChildProcess.make(confinement?.executable ?? invocation.shell, args, {
+                     cwd: invocation.cwd,
+                     env: invocation.env,
+                     stdin: "ignore",
 diff --git a/packages/core/src/tool/plugin/shell.ts b/packages/core/src/tool/plugin/shell.ts
-index af454a7..1b75b11 100644
+index af454a7..c6e1979 100644
 --- a/packages/core/src/tool/plugin/shell.ts
 +++ b/packages/core/src/tool/plugin/shell.ts
-@@ -1,3 +1,4 @@
+@@ -1,3 +1,6 @@
++import { Location } from "../../location.js"
++import { approvedWorkspace, confine } from "../../cosmos/sandbox.js"
 +import { shellScope, encodeShellScope } from "../../cosmos/shell-scope.js"
  export * as ShellTool from "./shell.js"
  
  import { ToolFailure } from "@opencode/ai"
-@@ -39,6 +40,11 @@ const description = (shell?: string) =>
+@@ -39,6 +42,11 @@ const description = (shell?: string) =>
      ...(shell ? [`Commands run on ${OS} using ${shell}.`] : []),
      "Quote file paths containing spaces or special characters.",
      "Prefer dedicated tools over shell commands when possible.",
@@ -97,17 +127,41 @@ index af454a7..1b75b11 100644
      "When output is large, the full result is saved to a file and a truncated preview is returned.",
      "Rely on automatic truncation unless filtering the output is more useful.",
      "Commands accept an optional timeout, background commands have no timeout by default.",
-@@ -134,11 +140,21 @@ export const Plugin = {
+@@ -47,6 +55,7 @@ const description = (shell?: string) =>
+ 
+ export const Input = Schema.Struct({
+   command: Schema.String.annotate({ description: "Shell command string to execute" }),
++  sandbox: Schema.optionalKey(Schema.Boolean).annotate({ description: "Cosmos: default true in an approved workspace. Python, edits and tests run confined without per-command approval. Set false only for an explicit boundary exception; independent review or human approval is required. Never blindly retry after partial execution." }),
+   workdir: Schema.optionalKey(Schema.String).annotate({
+     description:
+       "Working directory to execute the command in. Defaults to the current working directory. When possible, avoid changing directories in the command and set the working directory here instead.",
+@@ -113,8 +122,9 @@ export const Plugin = {
+     const compatibleShell = shellSelect.resolve({ priority: "compat" })
+     const permission = yield* Permission.Service
+     const config = yield* Config.Service
++    const location = yield* Location.Service
+ 
+-    const prepare = Effect.fn("ShellTool.prepare")(function* (invocation: ShellCreateBefore, context: Tool.Context) {
++    const prepare = Effect.fn("ShellTool.prepare")(function* (invocation: ShellCreateBefore, context: Tool.Context, sandbox = true) {
+       const source = {
+         type: "tool" as const,
+         messageID: context.messageID,
+@@ -133,12 +143,23 @@ export const Plugin = {
+           kind: "directory",
          }),
        )
-       yield* access.authorizeExternal([target, ...directories], context)
+-      yield* access.authorizeExternal([target, ...directories], context)
+-      if (parsed.commands.length > 0)
++      yield* access.authorizeExternal([target, ...directories], context,
++        process.env.COSMOS_AGENT === "1" ? { cosmos_shell_preflight: true } : undefined)
 +      const cosmosScope =
 +        process.env.COSMOS_AGENT === "1" ? shellScope(invocation.command, invocation.shell, target.absolute) : undefined
-       if (parsed.commands.length > 0)
++      if (parsed.commands.length > 0 || process.env.COSMOS_AGENT === "1")
          yield* permission.assert({
            action: name,
-           resources: parsed.commands.map((command) => command.resource),
+-          resources: parsed.commands.map((command) => command.resource),
 -          save: parsed.commands.map((command) => command.save),
++          resources: parsed.commands.length ? parsed.commands.map((command) => command.resource) : [invocation.command],
 +          save: cosmosScope
 +            ? cosmosScope.sensitive
 +              ? []
@@ -115,8 +169,22 @@ index af454a7..1b75b11 100644
 +            : parsed.commands.map((command) => command.save),
 +          forceAsk: cosmosScope?.sensitive,
 +          ...(process.env.COSMOS_AGENT === "1"
-+            ? { metadata: { workdir: target.absolute, command: invocation.command, cosmos_shell_scope: cosmosScope } }
++            ? { metadata: { workdir: target.absolute, command: invocation.command, cosmos_shell_scope: cosmosScope, cosmos_sandbox: sandbox } }
 +            : {}),
            sessionID: context.sessionID,
            agent: context.agent,
            source,
+@@ -214,7 +235,12 @@ export const Plugin = {
+                     invocation.env.OPENCODE = "1"
+                     invocation.env.AI_AGENT ||= "opencode"
+                     invocation.env.OPENCODE_SESSION_ID = context.sessionID
+-                    finalTimeout = yield* prepare(invocation, context)
++                    const shouldConfine = process.env.COSMOS_AGENT === "1" && input.sandbox !== false && approvedWorkspace(location.directory)
++                    finalTimeout = yield* prepare(invocation, context, shouldConfine)
++                    if (shouldConfine) {
++                      const confined = yield* Effect.try(() => confine(invocation, location.directory))
++                      if (!confined) return yield* Effect.fail(new Error("Sandbox unavailable; request an explicit sandbox:false boundary review"))
++                    }
+                   }),
+               )
+               yield* context.progress({ shellID: info.id })

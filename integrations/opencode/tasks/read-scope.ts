@@ -15,7 +15,7 @@ export function readScope(resource: string, directory = false) {
 export function directoryScopeAllows(grant: string, resource: string, project: string) {
   const recursive = grant.endsWith("/*")
   if (!recursive) return false
-  const resolve = (value: string) => {
+  const resolve = (value: string): string => {
     const absolute = path.resolve(project, value)
     try {
       return realpathSync(absolute)
