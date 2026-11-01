@@ -86,6 +86,21 @@ class TaskTools:
             raise PermissionError("Task belongs to a different conversation")
         return await asyncio.to_thread(store.delete, id)
 
+    async def notify(self, text):
+        """Publish a bounded Agent message; destination identity is launcher-owned."""
+        import os
+        import re
+        from cosmos_tui.core.services import NotificationEvents
+
+        if not isinstance(text, str) or not 1 <= len(text) <= 240 or not all(c.isprintable() for c in text):
+            raise ValueError("Notification must contain 1–240 printable characters")
+        pane = os.environ.get("TMUX_PANE", "")
+        if not re.fullmatch(r"%\d+", pane):
+            raise ValueError("Agent notification requires its terminal window")
+        return await NotificationEvents().publish(
+            self.redact(text), source="agent-message:" + pane, persistent=True,
+        )
+
     async def finish_task(self, id, outcome, summary):
         store = self.task_owner()
         row = store.get(id)

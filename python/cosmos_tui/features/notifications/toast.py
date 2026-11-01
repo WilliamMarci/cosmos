@@ -132,6 +132,9 @@ class NoticeToast(CellSurface):
                         palette["base"],
                     )
                 )
+            if notice.get("source", "").startswith(("agent-permission:", "agent-message:")):
+                for row in range(rows):
+                    hits.append(HitRegion(f"{notice['id']}:__open__", Rect(x + 2, y + row, text_width, 1)))
             for index, (action, label) in enumerate(actions):
                 rect = Rect(
                     x + total - button_width + index * 3,

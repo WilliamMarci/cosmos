@@ -42,6 +42,7 @@ const groups: Record<string, Record<string, string>> = {
   },
   workspace: {
     request_scope: "request_scope",
+    notify: "notify",
     list: "list_sessions",
     begin: "acquire_workspace",
     release: "release_workspace",
@@ -356,7 +357,7 @@ export class CosmosInterface {
         },
       }
     }
-    if (short === "actions") delete args.target
+    if (short === "actions" || name === "notify") delete args.target
     if (
       [
         "request_resume",

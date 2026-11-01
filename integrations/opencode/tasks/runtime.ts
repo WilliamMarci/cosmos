@@ -5,8 +5,8 @@ import { createHash, timingSafeEqual } from "node:crypto"
 import path from "node:path"
 import { paused, chatOnly } from "./lease.js"
 
-const readers = new Map<string, { list: () => Promise<any[]>; reply: (id: string, decision: "once" | "reject") => Promise<unknown> }>()
-export function bindPermissions(session: string, value: { list: () => Promise<any[]>; reply: (id: string, decision: "once" | "reject") => Promise<unknown> }) {
+const readers = new Map<string, { list: () => Promise<any[]>; reply: (id: string, decision: "once" | "always" | "reject") => Promise<unknown> }>()
+export function bindPermissions(session: string, value: { list: () => Promise<any[]>; reply: (id: string, decision: "once" | "always" | "reject") => Promise<unknown> }) {
   if (process.env.COSMOS_AGENT_TASK_DB) readers.set(session, value)
 }
 export async function startTaskRuntime(api: {
@@ -44,7 +44,12 @@ export async function startTaskRuntime(api: {
           if (typeof request.session !== "string" || !/^ses_[\w-]+$/.test(request.session)) throw new Error("Invalid conversation")
           const session = request.session
           let value: unknown
-          if (request.operation === "status") {
+          if (request.operation === "pending") {
+            value = (await Promise.all([...readers.values()].map((reader) => reader.list()))).flat().map((p) => ({
+              id: p.id, sessionID: p.sessionID, action: p.action, canAlways: p.canAlways === true,
+              resources: (p.resources ?? []).slice(0, 2).map((r: string) => r.slice(0, 240)),
+            }))
+          } else if (request.operation === "status") {
             value = { ...await api.status(session), task_state: paused(session) ? "paused" : "ready", chat_only: chatOnly(session), resume_in: "COSMOS → Agent tasks → Resume", permissions: await readers.get(session)?.list() ?? [] }
           } else if (request.operation === "wake") {
             if (typeof request.message !== "string" || !/^msg_[\w-]+$/.test(request.message) || typeof request.text !== "string" || request.text.length > 16000) throw new Error("Invalid wake request")
@@ -57,9 +62,10 @@ export async function startTaskRuntime(api: {
           } else if (request.operation === "permission") {
             const reader = readers.get(session)
             const pending = await reader?.list() ?? []
-            if (!["once", "reject"].includes(request.decision)) throw new Error("Invalid permission decision")
+            if (!["once", "always", "reject"].includes(request.decision)) throw new Error("Invalid permission decision")
             if (!reader || !pending.some((p) => p.id === request.request_id && p.sessionID === session)) value = { replied: false, stale: true, message: "Permission request expired; reopen Pending permissions" }
             else {
+              if (request.decision === "always" && !pending.find((p) => p.id === request.request_id)?.canAlways) throw new Error("Persistent approval is unavailable for this request")
               try {
                 await reader.reply(request.request_id, request.decision)
                 value = { replied: true }
@@ -76,7 +82,7 @@ export async function startTaskRuntime(api: {
   })
   await new Promise<void>((resolve, reject) => { server.once("error", reject); server.listen(socket, resolve) })
   chmodSync(socket, 0o600)
-  writeFileSync(descriptor, JSON.stringify({ id, socket, key, pid: process.pid }), { mode: 0o600, flag: "wx" })
+  writeFileSync(descriptor, JSON.stringify({ id, socket, key, pid: process.pid, pane: process.env.TMUX_PANE ?? "" }), { mode: 0o600, flag: "wx" })
   return async () => {
     for (const client of connections) client.destroy()
     await new Promise<void>((resolve) => server.close(() => resolve()))

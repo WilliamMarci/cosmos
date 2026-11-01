@@ -67,10 +67,16 @@ test("authenticated lifecycle wake, busy, interrupt and scoped permission reply"
     active=true
     expect((await request({operation:"wake",message:"msg_twice",text:"task"})).result.busy).toBe(true); expect(wakes).toBe(1)
     await request({operation:"interrupt"});expect(interruptions).toBe(1)
-    bindPermissions("ses_fixture",{list:async()=>[{id:"per_1",sessionID:"ses_fixture",action:"test"}],reply:async()=>{replies++}})
+    bindPermissions("ses_fixture",{list:async()=>[{id:"per_1",sessionID:"ses_fixture",action:"test",canAlways:false}],reply:async()=>{replies++}})
     expect((await request({operation:"status"})).result.permissions).toHaveLength(1)
     expect((await request({operation:"permission",request_id:"per_wrong",decision:"once"})).result.stale).toBe(true)
+    expect((await request({operation:"pending"})).result[0].sessionID).toBe("ses_fixture")
+    expect((await request({operation:"permission",request_id:"per_1",decision:"always"})).error).toContain("Persistent approval is unavailable")
+    expect(replies).toBe(0)
     await request({operation:"permission",request_id:"per_1",decision:"once"});expect(replies).toBe(1)
+    bindPermissions("ses_fixture",{list:async()=>[{id:"per_2",sessionID:"ses_fixture",action:"read",canAlways:true}],reply:async(_id,decision)=>{expect(decision).toBe("always");replies++}})
+    expect((await request({operation:"permission",request_id:"per_2",decision:"always"})).result.replied).toBe(true)
+    expect(replies).toBe(2)
   } finally { await close() }
 })
 

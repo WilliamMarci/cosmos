@@ -179,6 +179,7 @@ class RuntimeController(Controller):
             ):
                 app.screen.place()
             await app.assistant_ui.refresh(panes, terminal)
+            app.notifications_ui.agent_notices.poll()
             notices = await rpc.call("notifications.active", {"client": app.client})
             for host in (app._workspace_screen, app.screen):
                 if host:

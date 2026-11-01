@@ -107,11 +107,6 @@ class Engine:
                         if status.get("permissions"):
                             if row["state"] != "needs_input":
                                 self.store.change(row["id"], state="needs_input")
-                                await self.notify(
-                                    row,
-                                    "Agent task needs permission · " + row["goal"][:70],
-                                    "warning",
-                                )
                         elif row["state"] == "needs_input":
                             self.store.change(row["id"], state="running")
                         if (

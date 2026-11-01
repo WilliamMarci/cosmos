@@ -255,6 +255,19 @@ class LoadingTests(unittest.IsolatedAsyncioTestCase):
 
 
 class NotificationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_agent_notice_body_and_all_short_buttons_have_distinct_targets(self):
+        app = Probe()
+        async with app.run_test(size=(100, 24)):
+            toast = NoticeToast()
+            await app.mount(toast)
+            toast.present_notices([dict(id=5, text="Agent · shell · approval", source="agent-permission:runtime:per_1", actions=[dict(id="once", label="✓"), dict(id="always", label="∞"), dict(id="reject", label="−")])], 100, 24, app.role_colors)
+            self.assertEqual({h.action for h in toast.frame.hits}, {"5:__open__", "5:once", "5:always", "5:reject", "5:__dismiss__"})
+            body = next(h.rect for h in toast.frame.hits if h.action == "5:__open__")
+            for hit in toast.frame.hits:
+                if hit.action != "5:__open__":
+                    self.assertGreaterEqual(hit.rect.x, body.x + body.width)
+
+
     async def test_repeat_suffix_is_amber_and_fits_long_notice(self):
         app = Probe()
         async with app.run_test(size=(80, 24)):

@@ -113,6 +113,12 @@ export class CosmosPermissions {
       }
       return plan
     }
+    if (tool === "notify") {
+      plan.taskGranted = true
+      plan.transient = true
+      plan.resources = ["notification"]
+      return plan
+    }
     if (tool === "request_scope") {
       const request = scopeRequest(input.path, input.reason)
       plan.scopeRequest = request

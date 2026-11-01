@@ -17,6 +17,11 @@ def schema(properties, required=()):
 PANE = dict(type="string", description="Stable %ID from list_panes")
 TOOLS = [
     dict(
+        name="notify",
+        description="Send a short Cosmos notification when requested work completes or the user needs an update. Clicking its text returns to this Agent window. Use sparingly; never claim completion without evidence.",
+        inputSchema=schema(dict(text=dict(type="string", minLength=1, maxLength=240)), ("text",)),
+    ),
+    dict(
         name="request_resume",
         description="When the user explicitly asks to continue a paused task, request their one-time native Resume/Keep paused confirmation. First list_tasks for the task id, pane, revision and resume_challenge. Approval resumes only that task; it does not restore terminal ownership. Re-observe and acquire a fresh control token afterwards. Never invoke for ordinary chat or unsolicited automatic continuation.",
         inputSchema=schema(
