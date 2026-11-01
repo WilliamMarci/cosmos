@@ -176,8 +176,8 @@ def commands():
             template=(root / (name + ".md")).read_text(),
         )
         for name, description in (
-            ("agent-learn", "Learn, verify and save an application workflow as a Cosmos Agent skill"),
-            ("cosmos-learn", "Legacy learning prompt; use agent-learn to learn and save"),
+            ("agent-learn", "Learn or extend, verify and save a Cosmos Agent skill"),
+            ("cosmos-learn", "Learn or extend, verify and save a Cosmos Agent skill"),
             ("cosmos-export-skill", "Save the observed workflow as a reusable skill"),
         )
     }

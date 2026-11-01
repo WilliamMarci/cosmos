@@ -13,6 +13,10 @@ Choose a short lowercase hyphenated name under 64 characters, such as `vim-edit-
 
 Default destination is the personal Cosmos skill library identified in the Agent system context. Use the project's `.cosmos/skills/` if requested, or another destination the user specifies. Read an existing same-name skill before updating it; preserve still-valid content rather than replacing it with a transcript of this one run. The requested skill export authorizes creating these skill files, not unrelated changes or external publication.
 
+## Supplement an existing skill
+
+For additional learning, read the existing entrypoint and only the supporting files relevant to the requested addition. Keep its name and destination, and merge new verified operations or corrections into the relevant sections. Preserve unrelated validated content, triggers and supporting files; do not create a duplicate skill or append a transcript. Exercise only the new or changed steps, plus any directly affected checkpoint. If evidence contradicts an existing step, record the applicable version/environment and correct it; label unresolved differences as unverified. If no reusable new evidence was obtained, leave the existing skill unchanged. Report the additions, corrections and verification gaps after validation and readback.
+
 ## Distill the evidence
 
 - Record non-obvious controls, modes, prerequisites and the cues used to distinguish them. Rediscover session/window/pane IDs at runtime. Express cursor positions relative to UI elements instead of fixed coordinates.
