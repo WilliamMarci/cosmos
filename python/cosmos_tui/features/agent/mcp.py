@@ -17,6 +17,20 @@ def schema(properties, required=()):
 PANE = dict(type="string", description="Stable %ID from list_panes")
 TOOLS = [
     dict(
+        name="request_resume",
+        description="When the user explicitly asks to continue a paused task, request their one-time native Resume/Keep paused confirmation. First list_tasks for the task id, pane, revision and resume_challenge. Approval resumes only that task; it does not restore terminal ownership. Re-observe and acquire a fresh control token afterwards. Never invoke for ordinary chat or unsolicited automatic continuation.",
+        inputSchema=schema(
+            dict(
+                id=dict(type="string"),
+                pane=PANE,
+                revision=dict(type="integer", minimum=0),
+                resume_challenge=dict(type="string"),
+                reason=dict(type="string", minLength=1, maxLength=240),
+            ),
+            ("id", "pane", "revision", "resume_challenge", "reason"),
+        ),
+    ),
+    dict(
         name="workspace_info",
         description="Describe this connected Cosmos workspace and its opaque service identity, capabilities and access boundary. Never selects another service.",
         inputSchema=schema({}),
@@ -455,7 +469,11 @@ async def dispatch(tools, message, catalog=TOOLS):
         try:
             if not isinstance(args, dict) or set(args) - set(
                 spec["inputSchema"]["properties"]
-            ) - {"_cosmos_context"}:
+            ) - (
+                {"_cosmos_context", "_cosmos_resume_approval"}
+                if name == "request_resume"
+                else {"_cosmos_context"}
+            ):
                 raise ValueError("invalid tool arguments")
             from cosmos_tui.features.agent.conversation import scoped_tools
 

@@ -1,8 +1,8 @@
 diff --git a/packages/core/src/permission.ts b/packages/core/src/permission.ts
-index 37d5811..251aa41 100644
+index 37d5811..51330a2 100644
 --- a/packages/core/src/permission.ts
 +++ b/packages/core/src/permission.ts
-@@ -33,6 +33,12 @@ export type Reply = typeof Reply.Type
+@@ -33,6 +33,13 @@ export type Reply = typeof Reply.Type
  export interface AssertInput extends Omit<Request, "id" | "message"> {
    readonly id?: ID
    readonly agent?: Agent.ID
@@ -10,20 +10,22 @@ index 37d5811..251aa41 100644
 +  readonly taskGranted?: boolean
 +  /** Do not consult project-persisted permissions for a task acquisition. */
 +  readonly transient?: boolean
++  readonly forceAsk?: boolean
 +  /** Compatibility deny checks when a Cosmos search changes its approval resource to a directory. */
 +  readonly denyResources?: string[]
  }
  
  export interface ReplyInput {
-@@ -100,6 +106,7 @@ export interface Interface {
+@@ -100,6 +107,8 @@ export interface Interface {
  export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
  
  interface Pending {
 +  readonly transient?: boolean
++  readonly forceAsk?: boolean
    readonly request: Request
    readonly agent?: Agent.ID
    readonly deferred: Deferred.Deferred<void, DeclinedError | CorrectedError>
-@@ -159,10 +166,10 @@ const layer = Layer.effect(
+@@ -159,10 +168,10 @@ const layer = Layer.effect(
  
      const evaluateInput = Effect.fnUntraced(function* (input: AssertInput) {
        const rules = yield* configured(input.sessionID, input.agent)
@@ -33,48 +35,57 @@ index 37d5811..251aa41 100644
 +      const all = [...rules, ...(input.transient ? [] : yield* savedRules())]
        const effects = input.resources.map((resource) => evaluate(input.action, resource, all).effect)
 -      const effect: Permission.Effect = effects.includes("ask") ? "ask" : "allow"
-+      const effect: Permission.Effect = effects.includes("ask") && !input.taskGranted ? "ask" : "allow"
++      const effect: Permission.Effect = input.forceAsk || (effects.includes("ask") && !input.taskGranted) ? "ask" : "allow"
        const event = yield* hooks.trigger("permission", "evaluate", {
          sessionID: input.sessionID,
          agent: input.agent,
-@@ -192,11 +199,11 @@ const layer = Layer.effect(
+@@ -172,7 +181,7 @@ const layer = Layer.effect(
+         source: input.source,
+         effect,
+       })
+-      return { effect: event.effect, message: event.message, rules: all }
++      return { effect: input.forceAsk && event.effect !== "deny" ? "ask" as const : event.effect, message: event.message, rules: all }
+     })
+ 
+     function request(input: AssertInput, message?: string): Request {
+@@ -192,11 +201,11 @@ const layer = Layer.effect(
        }
      }
  
 -    const create = (request: Request, agent?: Agent.ID) =>
-+    const create = (request: Request, agent?: Agent.ID, transient = false) =>
++    const create = (request: Request, agent?: Agent.ID, transient = false, forceAsk = false) =>
        Effect.uninterruptible(
          Effect.gen(function* () {
            const deferred = yield* Deferred.make<void, DeclinedError | CorrectedError>()
 -          const item = { request, agent, deferred }
-+          const item = { request, agent, deferred, transient }
++          const item = { request, agent, deferred, transient, forceAsk }
            if (closed) {
              yield* Deferred.fail(deferred, new DeclinedError())
              return item
-@@ -215,7 +222,7 @@ const layer = Layer.effect(
+@@ -215,7 +224,7 @@ const layer = Layer.effect(
        if (closed) return { id: input.id ?? ID.create(), effect: "deny" as const }
        const result = yield* evaluateInput(input)
        const value = request(input, result.message)
 -      if (result.effect === "ask") yield* create(value, input.agent)
-+      if (result.effect === "ask") yield* create(value, input.agent, input.transient)
++      if (result.effect === "ask") yield* create(value, input.agent, input.transient, input.forceAsk)
        return { id: value.id, effect: result.effect }
      })
  
-@@ -234,7 +241,7 @@ const layer = Layer.effect(
+@@ -234,7 +243,7 @@ const layer = Layer.effect(
                })
              }
              if (result.effect === "allow") return
 -            const item = yield* create(request(input, result.message), input.agent)
-+            const item = yield* create(request(input, result.message), input.agent, input.transient)
++            const item = yield* create(request(input, result.message), input.agent, input.transient, input.forceAsk)
              return yield* restore(Deferred.await(item.deferred)).pipe(
                // Deliberate defect tunnel: leaves wrap execution in blanket `mapError`, which
                // must not convert a user's decline into model-facing tool output. The decline
-@@ -299,7 +306,7 @@ const layer = Layer.effect(
+@@ -299,7 +308,7 @@ const layer = Layer.effect(
            if (input.reply !== "always" || !existing.request.save?.length) return
  
            for (const [id, item] of pending) {
 -            const result = yield* evaluateInput({ ...item.request, agent: item.agent }).pipe(
-+            const result = yield* evaluateInput({ ...item.request, agent: item.agent, transient: item.transient }).pipe(
++            const result = yield* evaluateInput({ ...item.request, agent: item.agent, transient: item.transient, forceAsk: item.forceAsk }).pipe(
                Effect.catchTag("Session.NotFoundError", () => Effect.undefined),
              )
              if (result?.effect !== "allow") continue
@@ -152,7 +163,7 @@ index fb7a9d3..2b0b7ef 100644
        settled: (sessionID, exit, reason) =>
          reportLifecycle(
 diff --git a/packages/core/src/tool/mcp.ts b/packages/core/src/tool/mcp.ts
-index 6d1b8cc..9d02518 100644
+index 6d1b8cc..4694182 100644
 --- a/packages/core/src/tool/mcp.ts
 +++ b/packages/core/src/tool/mcp.ts
 @@ -1,5 +1,9 @@
@@ -174,7 +185,7 @@ index 6d1b8cc..9d02518 100644
  
      // Register once after initial discovery; only subsequent updates need a debounced reload.
      const initial = yield* lock
-@@ -55,11 +61,21 @@ export const layer = Layer.effect(
+@@ -55,11 +61,22 @@ export const layer = Layer.effect(
                  output: (tool.outputSchema ?? {}) as JsonSchema.JsonSchema,
                  execute: (input, context) =>
                    Effect.gen(function* () {
@@ -194,12 +205,13 @@ index 6d1b8cc..9d02518 100644
 +                      resources: plan.resources,
 +                      save: plan.save,
 +                      transient: plan.transient,
++                      forceAsk: plan.forceAsk,
 +                      taskGranted: plan.taskGranted,
 +                      metadata: plan.metadata,
                        sessionID: context.sessionID,
                        agent: context.agent,
                        source: {
-@@ -72,16 +88,18 @@ export const layer = Layer.effect(
+@@ -72,16 +89,18 @@ export const layer = Layer.effect(
                        .callTool({
                          server: tool.server,
                          name: tool.name,

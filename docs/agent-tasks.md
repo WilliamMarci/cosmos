@@ -47,3 +47,15 @@ There is no built-in crash supervisor; UI reconnect or a new task registration r
 A manual pause is an operational state, not an HTTP failure. An explicit user prompt can continue the same model conversation while its terminal task stays paused. Each such admission grants one chat-only primary turn through the normal concurrency limit; it does not restore input tokens, permission grants or task schedules. The scheduler recovery path distinguishes chat-only runs and leaves them alone. A new manual pause still cancels the active turn and clears queued chat permits. An automatic Unix wake while paused returns `accepted:false`, `paused:true`, `task_state:"paused"`, and `resume_in:"COSMOS → Agent tasks → Resume"`. Task Resume remains the explicit operational recovery path, followed by fresh observation/acquisition.
 
 An expired Tasks permission request returns a stale result and a warning to reopen Pending permissions. If expiry races with reply, the bridge refreshes pending requests and reports stale when that request has disappeared; unrelated transport/native failures remain errors.
+
+## Agent-requested resume confirmation
+
+When the user explicitly asks to continue paused work, the Agent calls `list_tasks()` to get the paused task's `id`, `pane`, `revision` and opaque `resume_challenge`, then calls `request_resume(id, pane, revision, resume_challenge, reason)`. The native Agent presents a blue/information-colored **Task resume confirmation**, with **Keep paused** (default) and **Resume task**. There is no Always choice. Ordinary chat and automatic wakeups must not request it. The Tasks menu remains an alternative recovery route.
+
+Resume always requires a fresh native user decision, even with configured or project-saved tool allows; configured denies still apply. A private signed approval binds the native conversation, task, terminal, revision, challenge and reason. It is not an argument a model can mint. Additional human input, a changed task, a replaced service, a private target, a forged decision or replay rejects the resume. A different task/conversation cannot reuse approval.
+
+Approval resumes only the chosen task and reassigns its ready record to the authenticated current tool connection when reconnecting. It invalidates old input tokens and does not enqueue another model turn; the current explicit chat proceeds. The response is `resumed:true`, `state:ready`, `input_ownership:false`. The Agent must observe again and acquire a new token under the existing terminal task permission policy. Other paused tasks remain paused. Declining makes no task/input changes.
+
+The native integration uses `resume-ui.patch` and `CosmosPermissions` rather than another independent UI writer. The signed approval and pause marker checks live in `features/agent/tasks/resume.py`.
+
+Human-only Resume Actions remain available in the Cosmos UI but are excluded from the Agent action catalog. The Agent Action proxy rejects `workspace.resume_control` and `tasks.resume`; Agents must use the dedicated confirmation tool rather than bypass it through a generic Action grant.

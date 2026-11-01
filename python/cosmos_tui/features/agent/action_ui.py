@@ -2,6 +2,7 @@
 
 from cosmos_tui.input import keymap
 from cosmos_tui.core import rpc
+from cosmos_tui.features.agent.tasks.resume import USER_RESUME_ACTIONS
 
 
 def catalog(app, category=None):
@@ -16,7 +17,8 @@ def catalog(app, category=None):
         actions=[
             dict(id=c.id, label=c.label, scope="ui", context=c.context)
             for c in commands
-            if category is None or c.id.startswith(category)
+            if c.id not in USER_RESUME_ACTIONS
+            and (category is None or c.id.startswith(category))
         ],
     )
 

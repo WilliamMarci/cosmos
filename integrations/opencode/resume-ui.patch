@@ -1,0 +1,89 @@
+diff --git a/packages/tui/src/routes/session/permission.tsx b/packages/tui/src/routes/session/permission.tsx
+index 07338ab..52b8858 100644
+--- a/packages/tui/src/routes/session/permission.tsx
++++ b/packages/tui/src/routes/session/permission.tsx
+@@ -200,8 +200,8 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+           const header = () => (
+             <box flexDirection="column" gap={0}>
+               <box flexDirection="row" gap={1} flexShrink={0}>
+-                <text fg={theme.text.feedback.warning.base}>{"△"}</text>
+-                <text fg={theme.text.base}>Permission required</text>
++                <text fg={current.variant === "resume" ? theme.text.feedback.info.base : theme.text.feedback.warning.base}>{current.variant === "resume" ? "▶" : "△"}</text>
++                <text fg={theme.text.base}>{current.variant === "resume" ? "Task resume confirmation" : "Permission required"}</text>
+               </box>
+               <Show when={props.request.action !== "shell" && current.title}>
+                 <box flexDirection="row" gap={1} paddingLeft={2} flexShrink={0}>
+@@ -216,7 +216,8 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+ 
+           const body = (
+             <SessionQuestion
+-              title="Permission required"
++              title={current.variant === "resume" ? "Task resume confirmation" : "Permission required"}
++              variant={current.variant}
+               semanticLabel={permissionSemanticLabel(props.request.action, current.title)}
+               instance={props.request.id}
+               header={header()}
+@@ -230,7 +231,9 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+                 </Show>
+               )}
+               options={
+-                props.request.save?.length
++                current.variant === "resume"
++                  ? { reject: "Keep paused", once: "Resume task" }
++                  : props.request.save?.length
+                   ? {
+                       once: permissionOptionLabel("once"),
+                       always: permissionOptionLabel("always"),
+@@ -246,7 +249,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+                   return
+                 }
+                 if (option === "reject") {
+-                  if (session()?.parentID) {
++                  if (current.variant !== "resume" && session()?.parentID) {
+                     setStore("stage", "reject")
+                     return
+                   }
+@@ -406,6 +409,7 @@ function RejectPrompt(props: {
+ 
+ export function SessionQuestion<const T extends Record<string, string>>(props: {
+   title: string
++  variant?: "resume"
+   semanticLabel?: string
+   instance: string
+   id?: string
+@@ -509,7 +513,7 @@ export function SessionQuestion<const T extends Record<string, string>>(props: {
+       }))}
+       backgroundColor={theme.background.raised.base}
+       border={["left"]}
+-      borderColor={theme.background.action.primary.focused}
++      borderColor={props.variant === "resume" ? theme.text.feedback.info.base : theme.background.action.primary.focused}
+       customBorderChars={SplitBorder.customBorderChars}
+       {...(store.expanded
+         ? { top: dimensions().height * -1 + 1, bottom: 1, left: 2, right: 2, position: "absolute" }
+diff --git a/packages/tui/src/util/permission.ts b/packages/tui/src/util/permission.ts
+index 09d607f..7bac824 100644
+--- a/packages/tui/src/util/permission.ts
++++ b/packages/tui/src/util/permission.ts
+@@ -5,6 +5,7 @@ type Dict = Record<string, unknown>
+ 
+ export type PermissionPresentation = {
+   icon: string
++  variant?: "resume"
+   title: string
+   lines: string[]
+   diff?: string
+@@ -29,6 +30,14 @@ export function permissionPresentation(
+   const metadata = { ...dict(source.toolMetadata), ...dict(source.metadata) }
+   const resources = source.resources.filter((item): item is string => typeof item === "string")
+ 
++  if (source.action === "cosmos_terminal_request_resume" && metadata.cosmos_resume === true) {
++    return { variant:"resume", icon:"▶", title:"Resume paused task", lines:[
++      `Terminal: ${text(metadata.pane)}`, text(metadata.reason),
++      "Resume this task once. Fresh observation and terminal control permission are still required.",
++      "Keep paused leaves the terminal and task unchanged.",
++    ].filter(Boolean) }
++  }
++
+   if (action === "edit") {
+     const file = text(input.path) || resources[0] || ""
+     const first = dict(Array.isArray(metadata.files) ? metadata.files[0] : undefined)

@@ -108,6 +108,12 @@ class ActionTools(TerminalTools):
         return result
 
     async def invoke_action(self, id, scope, client=None, params=None):
+        from cosmos_tui.features.agent.tasks.resume import USER_RESUME_ACTIONS
+
+        if isinstance(id, str) and id in USER_RESUME_ACTIONS:
+            raise PermissionError(
+                "Use cosmos_terminal.request_resume for the one-time user confirmation"
+            )
         await self.panes()
         if (
             not isinstance(id, str)

@@ -329,3 +329,23 @@ class Tasks:
                 (state, json.dumps(result), time.time(), identity),
             )
         return self.get(identity)
+
+    def resume_selected(self, identity, conversation, revision):
+        """Resume only the confirmed task; never queue a second model turn."""
+        with self.db() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute("SELECT * FROM tasks WHERE id=?", (identity,)).fetchone()
+            if (
+                not row
+                or row["conversation"] != conversation
+                or row["revision"] != revision
+                or row["state"] != "paused"
+            ):
+                raise ValueError("Task changed; request a fresh resume confirmation")
+            db.execute(
+                "DELETE FROM conversation_pauses WHERE conversation=?", (conversation,)
+            )
+            db.execute(
+                "UPDATE tasks SET state='running',pending=NULL,run_id=NULL,result=NULL,revision=revision+1,updated=? WHERE id=?",
+                (time.time(), identity),
+            )

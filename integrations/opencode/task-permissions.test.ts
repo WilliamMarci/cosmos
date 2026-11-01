@@ -209,6 +209,32 @@ describe("Cosmos task adapter", () => {
   })
 })
 describe("Real Cosmos task permission service", () => {
+  it.effect("another Always decision cannot auto-approve a pending resume confirmation", () =>
+    Effect.gen(function* () {
+      yield* setup([{action:"cosmos_terminal_*",resource:"*",effect:"ask"}])
+      const service=yield* Permission.Service
+      const action="cosmos_terminal_request_resume"
+      const resume=yield* service.ask(assertion({id:Permission.ID.create("per_resume_pending"),action,resources:["resume/task"],transient:true,forceAsk:true,save:[]}))
+      const other=yield* service.ask(assertion({id:Permission.ID.create("per_regular_allow"),action,resources:["other"],save:["*"]}))
+      yield* service.reply({requestID:other.id,reply:"always"})
+      expect((yield* service.get(resume.id))?.id).toBe(resume.id)
+    }),
+  )
+  it.effect("resume always asks even under explicit allow and cannot persist approval", () =>
+    Effect.gen(function* () {
+      yield* setup([{action:"cosmos_terminal_*",resource:"*",effect:"allow"}])
+      const service=yield* Permission.Service
+      const saved=yield* PermissionSaved.Service
+      const before=yield* saved.list({projectID:Project.ID.global})
+      const input=assertion({action:"cosmos_terminal_request_resume",resources:["resume/task/pane"],save:[],transient:true,forceAsk:true})
+      const asked=yield* service.ask(input)
+      expect(asked.effect).toBe("ask")
+      yield* service.reply({requestID:asked.id,reply:"always"})
+      expect(yield* saved.list({projectID:Project.ID.global})).toEqual(before)
+      expect((yield* service.ask(input)).effect).toBe("ask")
+    }),
+  )
+
   it.effect("directory-scoped search approvals preserve legacy pattern denies", () =>
     Effect.gen(function* () {
       yield* setup([{action:"grep",resource:"*",effect:"allow"},{action:"grep",resource:"SECRET",effect:"deny"}])
@@ -375,3 +401,14 @@ testEffect(Layer.empty).effect(
     )
   },
 )
+
+test("resume plan signs one task and state, with no input capability or remembered grant", () => {
+  const permissions=new CosmosPermissions(key)
+  const input={id:"task_fixture",pane:"%4",revision:3,resume_challenge:"state",reason:"Continue user task"}
+  const plan=permissions.plan("cosmos_terminal","request_resume",input,"ses_a")
+  expect(plan.forceAsk).toBe(true);expect(plan.transient).toBe(true);expect(plan.save).toEqual([])
+  expect(plan.taskGranted).toBeUndefined()
+  const payload="cosmos-resume-v1\nses_a\ntask_fixture\n%4\n3\nstate\nContinue user task"
+  expect(plan.args._cosmos_resume_approval).toBe(createHmac("sha256",key).update(payload).digest("hex"))
+  expect(plan.metadata.cosmos_resume).toBe(true)
+})

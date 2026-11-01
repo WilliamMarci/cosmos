@@ -14,6 +14,7 @@ type Plan = {
   resources: string[]
   save: string[]
   transient?: boolean
+  forceAsk?: boolean
   taskGranted?: boolean
   metadata: Record<string, unknown>
   session: string
@@ -48,6 +49,20 @@ export class CosmosPermissions {
       },
     }
     if (server !== "cosmos_terminal") return plan
+    if (tool === "request_resume") {
+      const { id, pane, revision, resume_challenge, reason } = input
+      if (typeof id !== "string" || typeof pane !== "string" || !Number.isSafeInteger(revision) || typeof resume_challenge !== "string" || typeof reason !== "string" || !reason.length || reason.length > 240)
+        throw new Error("list_tasks and provide a paused task with its current resume challenge")
+      const payload = `cosmos-resume-v1\n${session}\n${id}\n${pane}\n${revision}\n${resume_challenge}\n${reason}`
+      plan.args = {...plan.args, _cosmos_resume_approval: createHmac("sha256",this.key).update(payload).digest("hex")}
+      plan.transient = true
+      plan.forceAsk = true
+      plan.save = []
+      plan.pane = pane
+      plan.resources = [JSON.stringify({conversation:session,task_id:id,pane,revision})]
+      plan.metadata = { cosmos_resume: true, conversation: session, task_id:id, pane, reason, operation:"request_resume" }
+      return plan
+    }
     const management = ["create_terminal", "create_session", "rename_target", "focus_pane"].includes(tool)
     plan.workspace =
       tool === "acquire_workspace" ||
@@ -121,6 +136,10 @@ export class CosmosPermissions {
       )
     } catch {
       value = undefined
+    }
+    if (plan.tool === "request_resume" && !result.isError && value?.resumed) {
+      for (const [token, grant] of this.grants)
+        if (grant.session === plan.session && grant.pane === plan.pane) this.grants.delete(token)
     }
     const grant = plan.token ? this.grants.get(plan.token) : undefined
     if (

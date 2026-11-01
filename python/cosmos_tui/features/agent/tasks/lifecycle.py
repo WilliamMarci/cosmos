@@ -141,9 +141,14 @@ def pause_target(socket, pane):
     store = Tasks(socket)
     if not store.path.exists():
         return False
+    rows = store.list()
+    # Further human input invalidates an already open resume dialog as well.
+    for row in rows:
+        if row["pane"] == pane and row["state"] == "paused":
+            store.change(row["id"], state="paused")
     conversations = {
         r["conversation"]
-        for r in store.list()
+        for r in rows
         if r["pane"] == pane
         and r["state"] not in ("paused", "cancelled", "succeeded", "failed")
     }

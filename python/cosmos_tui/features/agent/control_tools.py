@@ -105,7 +105,9 @@ class ControlledInput:
             from cosmos_tui.features.agent.tasks.storage import Tasks
 
             if Tasks(self.backend.argv[2]).paused(self.conversation):
-                raise ValueError("Conversation paused; user resume required")
+                raise ValueError(
+                    "Conversation paused; for an explicit user continuation request, list_tasks then request_resume for confirmation"
+                )
         logical_task = await asyncio.to_thread(
             control_task, self.backend.argv[2], self, row, task
         )

@@ -118,6 +118,7 @@ class ControlStore:
                 self.marker(pane), os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600
             )
             os.close(descriptor)
+            os.utime(self.marker(pane), None)
         with self.locked() as state:
             current = state.get(pane)
             if current is None:

@@ -47,9 +47,21 @@ class TaskTools:
             for r in await asyncio.to_thread(store.list)
             if r["conversation"] == self.conversation
         ]
+        from cosmos_tui.features.agent.tasks.resume import describe
+
         for row in rows:
             row.pop("runtime", None)
+            describe(row, self.backend.argv[2])
         return rows
+
+    async def request_resume(
+        self, id, pane, revision, resume_challenge, reason, _cosmos_resume_approval=None
+    ):
+        from cosmos_tui.features.agent.tasks.resume import confirmed_resume
+
+        return await confirmed_resume(
+            self, id, pane, revision, resume_challenge, reason, _cosmos_resume_approval
+        )
 
     async def task_history(self, id):
         store = self.task_owner()
