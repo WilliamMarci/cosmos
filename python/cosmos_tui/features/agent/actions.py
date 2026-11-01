@@ -68,6 +68,15 @@ class ActionTools(TerminalTools):
     async def client_context(self, client=None):
         return await self.ui_call(client, dict(operation="context"))
 
+    async def reader_events(self, request_id, client=None, wait_ms=0):
+        event = await self.ui_call(
+            client,
+            dict(operation="reader_events", request_id=request_id, wait_ms=wait_ms),
+        )
+        if event.get("data", {}).get("error"):
+            event["data"]["error"] = self.redact(event["data"]["error"])
+        return event
+
     async def open_file(self, path, target, client=None):
         row = await self.resolve_target(target)
         return await self.ui_call(

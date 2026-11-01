@@ -5,6 +5,7 @@ type Grant = {
   session: string
   agent: string
   pane: string
+  scope: "terminal" | "workspace"
   task: string
   taskID: string
 }
@@ -19,6 +20,7 @@ type Plan = {
   agent: string
   tool: string
   pane?: string
+  workspace?: boolean
   token?: string
 }
 
@@ -46,14 +48,29 @@ export class CosmosPermissions {
       },
     }
     if (server !== "cosmos_terminal") return plan
-    plan.pane = typeof input.pane === "string" ? input.pane : undefined
-    plan.token = typeof input.token === "string" ? input.token : undefined
+    const management = ["create_terminal", "create_session", "rename_target", "focus_pane"].includes(tool)
+    plan.workspace =
+      tool === "acquire_workspace" ||
+      tool === "release_workspace" ||
+      (management && typeof input.workspace_token === "string")
+    plan.pane = plan.workspace ? "workspace" : typeof input.pane === "string" ? input.pane : undefined
+    const token = plan.workspace && management ? input.workspace_token : input.token
+    plan.token = typeof token === "string" ? token : undefined
     const grant = plan.token ? this.grants.get(plan.token) : undefined
-    const owned = !!grant && grant.session === session && grant.agent === agent && grant.pane === plan.pane
-    const controlled = ["control_input", "terminal_step"].includes(tool)
+    const owned =
+      !!grant &&
+      grant.session === session &&
+      grant.agent === agent &&
+      grant.pane === plan.pane &&
+      grant.scope === (plan.workspace ? "workspace" : "terminal")
+    const controlled = ["control_input", "terminal_step"].includes(tool) || (management && plan.workspace)
     if (controlled && !owned)
-      throw new Error("No task grant for this conversation and pane; observe and acquire_control first")
-    if (tool === "acquire_control" || controlled || tool === "release_control") {
+      throw new Error(
+        plan.workspace
+          ? "No workspace task grant for this conversation; acquire_workspace first"
+          : "No task grant for this conversation and pane; observe and acquire_control first",
+      )
+    if (["acquire_control", "acquire_workspace", "release_control", "release_workspace"].includes(tool) || controlled) {
       plan.transient = true
       plan.save = []
       const task = owned ? grant!.task : typeof input.task === "string" ? input.task : "release own task"
@@ -67,7 +84,9 @@ export class CosmosPermissions {
         }),
       ]
       plan.metadata = {
-        capability: "terminal task: acquire, ordinary input, release",
+        capability: plan.workspace
+          ? "workspace task: create terminal/session, rename, focus; excludes close/input/privacy"
+          : "terminal task: acquire, ordinary input, release",
         conversation: session,
         pane: plan.pane,
         task,
@@ -80,7 +99,7 @@ export class CosmosPermissions {
         args.keys.some((key) => /(?:^|-)C-.*[czd]$/i.test(String(key)))
       plan.metadata.operation = tool
       plan.metadata.interrupt = interrupt
-      plan.taskGranted = tool === "release_control" || (controlled && owned && !interrupt)
+      plan.taskGranted = ["release_control", "release_workspace"].includes(tool) || (controlled && owned && !interrupt)
     }
     return plan
   }
@@ -109,23 +128,25 @@ export class CosmosPermissions {
       grant?.session === plan.session &&
       grant?.agent === plan.agent &&
       grant?.pane === plan.pane &&
-      (result.isError || value?.delivery === "partial" || plan.tool === "release_control")
+      (result.isError || value?.delivery === "partial" || ["release_control", "release_workspace"].includes(plan.tool))
     )
       this.grants.delete(plan.token)
-    if (plan.tool !== "acquire_control" || !plan.transient || result.isError) return
+    if (!["acquire_control", "acquire_workspace"].includes(plan.tool) || !plan.transient || result.isError) return
     if (
-      value?.pane !== plan.pane ||
+      (plan.workspace ? value?.scope !== "workspace" : value?.pane !== plan.pane) ||
       value?.state !== "active" ||
       typeof value?.token !== "string" ||
       typeof value?.task_id !== "string"
     )
       return
     // An acquisition rotates the pane capability, including grants from older tasks.
-    for (const [token, grant] of this.grants) if (grant.pane === plan.pane) this.grants.delete(token)
+    for (const [token, grant] of this.grants)
+      if (grant.pane === plan.pane && (!plan.workspace || grant.session === plan.session)) this.grants.delete(token)
     this.grants.set(value.token, {
       session: plan.session,
       agent: plan.agent,
-      pane: value.pane,
+      pane: plan.pane!,
+      scope: plan.workspace ? "workspace" : "terminal",
       task: value.task,
       taskID: value.task_id,
     })

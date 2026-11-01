@@ -4,7 +4,7 @@ Upstream: https://github.com/anomalyco/opencode
 Pinned base: `c93aaae37157d785f76a8e9a9243a6560e286468` (2.1.2).
 License: MIT, preserved in `LICENSE-OpenCode`.
 
-`isolation.patch` disables upstream global configuration discovery for Cosmos launches; the launcher provides only Cosmos-owned configuration and explicit skill roots. Stock OpenCode compatibility additionally uses its discovery-home override without changing shell HOME.
+`isolation.patch` disables upstream global configuration discovery for Cosmos launches; the launcher provides only Cosmos-owned configuration and explicit skill roots. Plain system OpenCode is launched directly, without these patches, Cosmos tools or profile overrides.
 
 `branding.patch` is the small opt-in modification of upstream Logo and session epilogue. `cosmos-logo.tsx` is Cosmos-owned presentation using OpenCode semantic text roles. The generated glyph data comes from Cosmos's canonical `python/cosmos_tui/assets/cosmos-logo.ansi`; no independent logo copy is maintained. Ordinary OpenCode rendering is unchanged unless `COSMOS_AGENT=1`.
 
@@ -19,8 +19,8 @@ The terminal tools and launcher live in `python/cosmos_tui/features/agent/`, out
 conversation/task/pane grants for terminal acquisition, ordinary controlled input
 and own release. They ignore project-saved task approvals, preserve explicit
 denies and retain separate interruption checks. The signed runtime context also
-partitions Python MCP ownership and observations by conversation. Stock system
-OpenCode keeps per-call permissions. `task-permissions.test.ts` exercises the
+partitions Python MCP ownership and observations by conversation. Plain system
+OpenCode has no Cosmos tool integration. `task-permissions.test.ts` exercises the
 adapter, the actual permission service/database and the real MCP tool registry;
 copy it to `packages/core/test/cosmos-task-permissions.test.ts` before running Bun.
 No provider/API calls are required. See `docs/agent-control.md` for lifecycle limits.

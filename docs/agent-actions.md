@@ -62,8 +62,9 @@ Reader/Files formats, selects that pane and uses the Reader controller to open i
 Relative paths resolve against target cwd. Directories open Files. Unsupported
 formats fail instead of launching a desktop application. Multiple clients require
 explicit selection. The result contains actual pane, display ID, path and view
-kind, with `loading: pending` and `complete: false`: it acknowledges routing,
-not successful decoding. This operation can move focus and remains permission-gated.
+kind and `request_id`, with `loading: pending` and `complete: false`: it acknowledges routing,
+not successful decoding. `reader_events(request_id, client?, wait_ms=0)` returns actual
+internal Reader lifecycle events, including success/failure; see [Reader events](reader-events.md). This operation can move focus and remains permission-gated.
 
 Terminal task permissions are grouped in the patched runtime; see
 [Agent control](agent-control.md). These Action APIs retain their existing

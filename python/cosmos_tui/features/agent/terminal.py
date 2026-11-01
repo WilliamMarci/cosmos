@@ -7,6 +7,8 @@ from types import SimpleNamespace
 
 from cosmos_tui.input.mouse_protocol import encode
 from cosmos_tui.terminal.tmux import Tmux
+from cosmos_tui.features.agent.history import HistoryTools
+from cosmos_tui.features.agent.workspace_grants import WorkspaceGrants
 from cosmos_tui.features.agent.control_tools import ControlledInput
 from cosmos_tui.features.agent.monitor.tools import TerminalWatches
 
@@ -55,7 +57,7 @@ FLAGS = {
 }
 
 
-class TerminalTools(ControlledInput, TerminalWatches):
+class TerminalTools(ControlledInput, TerminalWatches, HistoryTools, WorkspaceGrants):
     def __init__(self, socket):
         self.owner = uuid.uuid4().hex
         self.observation_requests = {}
@@ -266,7 +268,8 @@ class TerminalTools(ControlledInput, TerminalWatches):
         )
         return {"pane": pane, "x": x, "y": y, "button": button, "action": action}
 
-    async def create_terminal(self, source_pane):
+    async def create_terminal(self, source_pane, workspace_token=None):
+        self.check_workspace(workspace_token)
         row = await self.pane(source_pane)
         ident = await self.backend.cli(
             "new-window",

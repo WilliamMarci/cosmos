@@ -42,6 +42,13 @@ class LoadingFrames:
             self.controller.revisions.get(pane.id, 0),
         )
 
+    def current(self, pane, key):
+        try:
+            live = next((p for p in self.controller.app.panes if p.id == pane.id), None)
+            return live is not None and bool(live.viewer) and self.key(live) == key
+        except (ValueError, KeyError, TypeError):
+            return False
+
     def frame(self, pane):
         key = self.key(pane)
         ready = self.ready.get(pane.id)
@@ -131,12 +138,13 @@ class LoadingFrames:
                 if identity == self.error_versions.get(pane.id):
                     return
             frame = await self.controller.prepare(pane)
-            if frame is not None:
+            if frame is not None and self.current(pane, key):
                 self.ready[pane.id] = key, self.controller.media.revision, frame
                 self.errors.pop(pane.id, None)
                 self.missing.pop(pane.id, None)
+                self.controller.events.finish(pane.id, key[0], "loaded")
         except Exception as error:
-            if self.key(pane) != key:
+            if not self.current(pane, key):
                 return
             detail = str(error)
             try:
@@ -148,6 +156,7 @@ class LoadingFrames:
                 pass
             previous = self.errors.get(pane.id)
             self.errors[pane.id] = key, detail
+            self.controller.events.finish(pane.id, key[0], "failed", detail)
             self.error_versions[pane.id] = identity
             self.missing[pane.id] = key
             state = json.loads(base64.b64decode(pane.viewer))

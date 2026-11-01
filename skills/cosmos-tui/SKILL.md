@@ -9,7 +9,7 @@ Use the designated existing terminal for interactive tasks. Do not start by expl
 
 Resolve a user target with `resolve_target`: `1:4` means stable session `$1`, pane `%4`, **not** pane index 4. Use its returned `%ID` for terminal operations. `list_panes` discovers targets; `create_terminal(source_pane)` creates a separate background terminal inheriting cwd when needed. Its response already reports actual cwd and startup state; use `snapshot.snapshot_id` to acquire control without running `pwd` or capturing the entire screen again. `shell_ready: null` is not a readiness assertion.
 
-For files or directories, use `cosmos_actions.open_file(path, target, client)` to route through Reader/Files. Do not set internal Tmux options. Its `loading: pending` response acknowledges opening, not successful rendering. `list_clients` discovers clients without an action catalog; `client_context` reports current context and pane. Choose a client explicitly if several are connected.
+For files or directories, use `cosmos_actions.open_file(path, target, client)` to route through Reader/Files. Do not set internal Tmux options. Its `loading: pending` response acknowledges opening, not successful rendering. Consume `reader_events` with the returned request_id/client for actual loaded/failed/superseded events. `list_clients` discovers clients without an action catalog; `client_context` reports current context and pane. Choose a client explicitly if several are connected.
 
 Load an application/task skill if one already matches. Treat its steps as guidance and its verification scope as evidence limits; inspect the current application and adapt to its version and state. Never reuse saved pane IDs, cursor coordinates, or assumptions about which pane is active.
 
@@ -21,7 +21,7 @@ Load an application/task skill if one already matches. Treat its steps as guidan
 4. Use application help when uncertain. In an unfamiliar program, discover its own bindings before experimenting on user data. Test changes in a temporary file or a dedicated terminal when the task permits.
 5. Use mouse events only if tracking is enabled. Coordinates are one-based cells relative to the target pane, and can change after resize. Keyboard navigation is the fallback. Wheel buttons can scroll applications that request mouse reporting.
 
-In the patched runtime, acquisition confirms one task for this conversation and pane. Ordinary token input and own release share it; changing tasks or resuming after manual pause requires fresh acquisition/confirmation. Ctrl+C/Ctrl+Z/Ctrl+D and unrelated mutations remain separate. System OpenCode retains per-call permissions. End your own control task with `release_control` when finished. Releasing does not interrupt the application. Background watches return immediately and do not yet wake the model; report a pending watch rather than polling indefinitely.
+In the patched runtime, acquisition confirms one task for this conversation and pane. Ordinary token input and own release share it; changing tasks or resuming after manual pause requires fresh acquisition/confirmation. Ctrl+C/Ctrl+Z/Ctrl+D and unrelated mutations remain separate. Plain system OpenCode is launched without Cosmos tools or profile injection. End your own control task with `release_control` when finished. Releasing does not interrupt the application. Background watches return immediately and do not yet wake the model; report a pending watch rather than polling indefinitely.
 
 ## Operational boundaries
 
@@ -34,3 +34,13 @@ Preserve the user's editor buffers and ongoing commands. Escape, control keys, R
 For Cosmos-owned interfaces (Reader, Files, settings and Mod entries), use `cosmos_actions.list_actions(scope="ui", category="...")` and `invoke_action` rather than guessing terminal key injection. Select a client explicitly if several are connected, and refresh its live context after an action. A dispatched result acknowledges routing, not completion of a dialog or task. UI-dependent actions need a connected Cosmos UI; service actions use the coordinator registry.
 
 When the user asks to save what worked, load `cosmos-skill-export` or use `/cosmos-export-skill`. Preserve the method and observable checkpoints, not a raw transcript. Do not automatically save every interaction as a new skill.
+
+
+For retained text above the visible grid, use `read_history(pane, query?, limit?, cursor?)`.
+Follow its immutable snapshot cursor for older pages; do not repeatedly capture full
+history or assume current screen text is all the available output. A history row
+index is not an input coordinate. Private-pane restrictions apply on every page.
+
+For a workspace-management task, `acquire_workspace(task)` once, pass its token as
+`workspace_token` to the listed create/rename/focus tools, then `release_workspace`.
+The grant does not include terminal input, closing, interruption or unrelated Actions.

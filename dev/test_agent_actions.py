@@ -92,6 +92,16 @@ class AgentActionTests(unittest.IsolatedAsyncioTestCase):
                             self.assertEqual(result["view"], "files")
                             self.assertEqual(result["loading"], "pending")
                             self.assertFalse(result["complete"])
+                            app.reader_ui.events.finish(
+                                target.id, target.viewer, "loaded"
+                            )
+                            event = await tools.reader_events(
+                                result["request_id"], client=app.client
+                            )
+                            self.assertEqual(event["topic"], "reader.loaded")
+                            self.assertEqual(
+                                event["data"]["request_id"], result["request_id"]
+                            )
                             self.assertEqual(
                                 opened.await_args.args[1]["path"], directory
                             )
@@ -168,5 +178,6 @@ class AgentActionTests(unittest.IsolatedAsyncioTestCase):
                 "list_clients",
                 "client_context",
                 "open_file",
+                "reader_events",
             },
         )

@@ -16,12 +16,16 @@ from cosmos_tui.features.agent.profile import (
 def export_conversation(session, output=None):
     if not re.fullmatch(r"ses_[A-Za-z0-9_-]+", session):
         raise ValueError("expected an Agent conversation ID beginning ses_")
-    from cosmos_tui.features.agent.launch import environment, runtime
+    from cosmos_tui.features.agent.launch import environment, runtime, native_runtime
 
+    command, cwd = runtime()
+    if not native_runtime(command, cwd):
+        raise RuntimeError(
+            "Cosmos Agent is not installed; use OpenCode's own session export"
+        )
     os.umask(0o077)
     root = initialize_profile()
     (root / "tmp").mkdir(exist_ok=True, mode=0o700)
-    command, cwd = runtime()
     env = environment(os.getenv("COSMOS_TMUX_SOCKET", "cosmos"), "")
     try:
         result = subprocess.run(

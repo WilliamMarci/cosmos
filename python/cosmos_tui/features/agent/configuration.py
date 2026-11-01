@@ -62,6 +62,7 @@ def configuration(socket, source_pane):
                 for name in (
                     "cosmos_actions_list_clients",
                     "cosmos_actions_client_context",
+                    "cosmos_actions_reader_events",
                 )
             ],
             {
@@ -70,6 +71,11 @@ def configuration(socket, source_pane):
                 "effect": "allow",
             },
             {"action": "cosmos_terminal_*", "resource": "*", "effect": "ask"},
+            {
+                "action": "cosmos_terminal_read_history",
+                "resource": "*",
+                "effect": "allow",
+            },
             {
                 "action": "cosmos_terminal_resolve_target",
                 "resource": "*",

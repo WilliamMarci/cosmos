@@ -184,6 +184,54 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
             sum(len(row["text"].encode()) for row in result["text"]), 4096
         )
 
+    async def test_retained_history_pages_survive_live_output_and_obey_privacy(self):
+        self.tools.backend.shell_command = lambda: "bash --noprofile --norc"
+        created = await self.tools.create_terminal(self.pane)
+        pane = created["pane_id"]
+        await self.tools.send_text(
+            pane, "for i in $(seq 1 120); do printf 'LOG_%03d\\n' \"$i\"; done"
+        )
+        await self.tools.send_keys(pane, ["Enter"])
+        await self.tools.read_screen(pane, wait_ms=100)
+        history = await self.tools.read_history(pane, limit=7, query="LOG_")
+        self.assertEqual(len(history["rows"]), 7)
+        self.assertTrue(all(row["line"] < 0 for row in history["rows"]))
+        cursor = history["next_cursor"]
+        self.assertIsNotNone(cursor)
+        expected = await self.tools.read_history(pane, cursor=cursor, limit=7)
+        await self.tools.send_text(pane, "echo AFTER_SNAPSHOT")
+        await self.tools.send_keys(pane, ["Enter"])
+        await self.tools.read_screen(pane, wait_ms=100)
+        self.assertEqual(
+            expected, await self.tools.read_history(pane, cursor=cursor, limit=7)
+        )
+        rival = TerminalTools(self.socket)
+        with self.assertRaises(ValueError):
+            await rival.read_history(pane, cursor=cursor)
+        await self.tools.backend.cli(
+            "set-option", "-p", "-t", pane, "@cosmos_private", "1"
+        )
+        with self.assertRaises(PermissionError):
+            await self.tools.read_history(pane, cursor=cursor)
+
+    async def test_workspace_token_is_connection_scoped_and_released(self):
+        self.tools.backend.shell_command = lambda: "bash --noprofile --norc"
+        grant = await self.tools.acquire_workspace("Workspace task")
+        rival = TerminalTools(self.socket)
+        with self.assertRaises(ValueError):
+            await rival.create_terminal(self.pane, workspace_token=grant["token"])
+        created = await self.tools.create_session(
+            "workspace-test", self.pane, workspace_token=grant["token"]
+        )
+        await self.tools.rename_target(
+            created["session_id"], "workspace-renamed", workspace_token=grant["token"]
+        )
+        await self.tools.release_workspace(grant["token"])
+        with self.assertRaises(ValueError):
+            await self.tools.rename_target(
+                created["session_id"], "must-not-rename", workspace_token=grant["token"]
+            )
+
     async def test_display_target_resolution(self):
         row = (await self.tools.panes())[0]
         resolved = await self.tools.resolve_target(row["display_id"])
@@ -456,7 +504,13 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(process.returncode, 0, err)
         replies = [json.loads(line) for line in out.splitlines()]
         self.assertEqual(len(replies), 4)
-        self.assertEqual(len(replies[1]["result"]["tools"]), 21)
+        tools = replies[1]["result"]["tools"]
+        names = {tool["name"] for tool in tools}
+        self.assertEqual(len(names), len(tools))
+        self.assertTrue(
+            {"read_history", "acquire_workspace", "release_workspace", "terminal_step"}
+            <= names
+        )
         self.assertIn("row 000", replies[2]["result"]["content"][0]["text"])
         self.assertTrue(replies[3]["result"]["isError"])
 

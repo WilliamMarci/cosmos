@@ -26,6 +26,23 @@ async def handle(app, request):
         raise ValueError("request targets a different UI client")
     if request.get("operation") == "list":
         return catalog(app, request.get("category"))
+    if request.get("operation") == "reader_events":
+        from cosmos_tui.features.agent.terminal import TerminalTools
+
+        identity = request.get("request_id")
+        if not isinstance(identity, str):
+            raise ValueError("request_id must be a string")
+        record = app.reader_ui.events.requests.get(identity)
+        if record is None:
+            raise ValueError("Reader request is unknown or expired")
+        await TerminalTools(app.backend.argv[2]).pane(record["pane"])
+        current = next((p for p in app.panes if p.id == record["pane"]), None)
+        app.reader_ui.events.replaced(
+            record["pane"], current.viewer if current else None
+        )
+        event = await app.reader_ui.events.result(identity, request.get("wait_ms", 0))
+        await TerminalTools(app.backend.argv[2]).pane(record["pane"])
+        return event
     if request.get("operation") == "context":
         return dict(
             client=app.client,
@@ -79,7 +96,9 @@ async def handle(app, request):
             if pane is None:
                 raise ValueError("target pane disappeared before opening")
             await app.reader_ui.update_viewer(pane, state)
+            request_id = app.reader_ui.events.begin(pane, state["path"])
             return dict(
+                request_id=request_id,
                 client=app.client,
                 pane=row["pane_id"],
                 display_id=row.get("display_id"),

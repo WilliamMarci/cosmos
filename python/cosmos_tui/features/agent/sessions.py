@@ -26,7 +26,8 @@ class WorkspaceTools(TerminalTools):
             )
         return list(sessions.values())
 
-    async def create_session(self, name, source_pane):
+    async def create_session(self, name, source_pane, workspace_token=None):
+        self.check_workspace(workspace_token)
         self.backend.validate_name(name)
         source = await self.pane(source_pane)
         ident = await self.backend.cli(
@@ -43,7 +44,8 @@ class WorkspaceTools(TerminalTools):
         )
         return await self.created_terminal(ident.strip())
 
-    async def rename_target(self, target, name):
+    async def rename_target(self, target, name, workspace_token=None):
+        self.check_workspace(workspace_token)
         if not isinstance(target, str) or not re.fullmatch(r"[$@%]\d+", target):
             raise ValueError("target must be a stable $session, @window or %pane ID")
         if (
@@ -66,7 +68,8 @@ class WorkspaceTools(TerminalTools):
             )
         return dict(target=target, name=name)
 
-    async def focus_pane(self, pane, client=None):
+    async def focus_pane(self, pane, client=None, workspace_token=None):
+        self.check_workspace(workspace_token)
         await self.pane(pane)
         from cosmos_tui.features.agent.actions import ActionTools
 

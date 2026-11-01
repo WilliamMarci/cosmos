@@ -2,7 +2,7 @@
 
 Cosmos Agent is the full OpenCode-backed workspace agent. It is separate from the compact Bash command assistant. `Leader g` opens it in a split beside the current pane; Files → Open agent here opens a dedicated window in the browsed directory. Both paths use the same launcher. Existing keybinding overrides still apply. The pane is marked as `@cosmos_agent=1` so the status button displays **AGENT** even when the development process name is `bun`.
 
-Development runs the pinned OpenCode source with Bun. Run `bash dev/setup_agent.sh` once after cloning the reference tree. The script installs a project-local Bun if none is available, installs upstream dependencies, and applies the tracked branding patch. It creates no distribution package and changes no system OpenCode executable. If no supported runtime is available, the launcher reports an error before Cosmos opens the split/window.
+Development runs the pinned OpenCode source with Bun. Run `bash dev/setup_agent.sh` once after cloning the reference tree. The script installs a project-local Bun if none is available, installs upstream dependencies, and applies the tracked Cosmos patches. It creates no distribution package and changes no system OpenCode executable. If no supported runtime is available, the launcher reports an error before Cosmos opens the split/window.
 
 ## Build and runtime selection
 
@@ -15,11 +15,11 @@ The release recipe defaults to bundling the patched CLI as `bin/cosmos-agent`: `
 - `source`: require the prepared source runtime.
 - `system`: use installed OpenCode from PATH, or the executable set by `COSMOS_OPENCODE`.
 
-For example, `COSMOS_AGENT_RUNTIME=system cosmos` uses an existing installation. The system route still injects the Cosmos agent prompt and terminal MCP server; it requires OpenCode supporting `--standalone` and the current configuration schema (verified with 2.1.2). Its logo remains upstream unless that executable includes the Cosmos patch. Arbitrary non-OpenCode agent CLIs are not currently interchangeable with this adapter.
+For example, `COSMOS_AGENT_RUNTIME=system cosmos` uses an existing installation. The system route simply executes OpenCode in the pane current directory, preserving the user environment and its own configuration. It does not initialize the Cosmos Agent profile, inject tools/skills/prompts/API credentials/theme, or add `--standalone`. An explicitly supplied prompt is forwarded with `--prompt`.
 
 ## Runtime and presentation
 
-The launcher runs `python -m cosmos_tui.features.agent launch --socket SOCKET --source-pane %ID`, then executes the patched frontend with `--standalone`. Each frontend owns a private OpenCode server. SSH or Cosmos UI detachment leaves its Tmux process running; reconnecting redraws the retained pane. Closing the Agent frontend ends that private server. OpenCode owns conversation persistence; databases are stored below Cosmos's own data directory. The source runtime uses `opencode-local.db`, the bundled build uses `opencode-cosmos.db`, and the system route follows its installed channel within that same private data root. Cosmos owns provider configuration and credentials; the frontend retains its provider picker and native permission UI. The initial default is a direct DeepSeek API model, without OpenCode Console/free-model fallback or automatic updates.
+The launcher runs `python -m cosmos_tui.features.agent launch --socket SOCKET --source-pane %ID`, then executes the patched frontend with `--standalone`. Each frontend owns a private OpenCode server. SSH or Cosmos UI detachment leaves its Tmux process running; reconnecting redraws the retained pane. Closing the Agent frontend ends that private server. OpenCode owns conversation persistence; databases are stored below Cosmos's own data directory. The source runtime uses `opencode-local.db`, the bundled build uses `opencode-cosmos.db`, while plain system OpenCode uses its own existing data/configuration. Cosmos owns provider configuration and credentials; the frontend retains its provider picker and native permission UI. The initial default is a direct DeepSeek API model, without OpenCode Console/free-model fallback or automatic updates.
 
 Cosmos injects an in-memory `OPENCODE_CONFIG_CONTENT` configuration for the `cosmos` primary agent and `cosmos_terminal` / `cosmos_actions` MCP servers. It does **not** merge inherited OpenCode configuration content, plugin configuration or credentials. Additional Agent configuration belongs in `${XDG_CONFIG_HOME:-~/.config}/cosmos/agent/opencode.json`. Standard OpenCode/Claude/.agents configuration and project `.opencode`/`opencode.json` discovery are disabled. A shared ordinary OpenCode server is not reused.
 
@@ -33,11 +33,11 @@ cosmos agent configure --provider deepseek --model deepseek-flash --base-url htt
 
 The key is prompted without echo. `profile.json` stores provider/model/base URL, `credentials.json` maps provider IDs to keys; keys are injected into the Agent process environment, never argv or generated configuration. Other OpenAI-compatible APIs use their provider ID/model/base URL; `anthropic` uses the Anthropic adapter and `deepseek` the DeepSeek adapter. No existing ordinary OpenCode credentials are imported. An unconfigured key must be supplied before using the API. Model availability and billing belong to the chosen provider.
 
-OpenCode's XDG config/data/cache/state bases are redirected to this profile's `config/`, `data/`, `cache/`, `state/` subdirectories; native databases retain their channel-specific names under `data/opencode/`. `COSMOS_AGENT_PROFILE` carries the original root into child tools despite those redirected XDG variables. `HOME` remains unchanged for terminal applications. Additional native configuration and optional MCP declarations belong in `opencode.json` here. The patched runtime disables its OpenCode Console provider registration; the system runtime receives the direct default, free-model disable flag and hosted-provider deny policy.
+OpenCode's XDG config/data/cache/state bases are redirected to this profile's `config/`, `data/`, `cache/`, `state/` subdirectories; native databases retain their channel-specific names under `data/opencode/`. `COSMOS_AGENT_PROFILE` carries the original root into child tools despite those redirected XDG variables. `HOME` remains unchanged for terminal applications. Additional native configuration and optional MCP declarations belong in `opencode.json` here. The patched runtime disables its OpenCode Console provider registration. None of these profile/provider overrides apply to plain system OpenCode.
 
 For installations using the older split Cosmos directories, close Agent frontends and run `cosmos agent migrate` **before starting the new Agent**. It moves only old Cosmos personal skills and `cosmos/agent/opencode` data/cache/state directories into this profile, refuses existing destinations or legacy symlinks, and does not touch ordinary OpenCode data. Existing conversations in different runtime channels are not converted between database names.
 
-The initial default theme is **cosmos**, installed in `themes/cosmos.json` and selected in `cli.json`. It uses the Cosmos dark surface, blue/teal accents, amber highlights and semantic red/green. Later user theme selections are preserved. The source/bundled runtime includes it as a built-in theme; the system runtime uses the installed custom theme file.
+The initial default theme is **cosmos**, installed in `themes/cosmos.json` and selected in `cli.json`. It uses the Cosmos dark surface, blue/teal accents, amber highlights and semantic red/green. Later user theme selections are preserved. The source/bundled runtime includes it as a built-in theme; plain system OpenCode keeps its own theme.
 
 Cosmos's built-in tools are injected separately from optional MCPs declared in the Cosmos-owned configuration file. Configured instructions, skills, commands or plugins can be explicitly added there; there is no automatic import of the corresponding ordinary Agent directories. See [Agent skills](agent-skills.md) for the permitted default skill roots.
 
@@ -115,3 +115,21 @@ omitted nonblank content. The ID still identifies the full observation and can
 be passed directly to `acquire_control` in the same conversation. As usual, a
 changing startup screen can invalidate that ID; observe again if acquisition
 reports a change. This is an initial observation, not proof of task completion.
+
+
+### Retained output, Reader events and workspace tasks
+
+`read_history` provides bounded immutable pages of retained scrollback, including
+text above the visible screen; see [Agent history](agent-history.md). `read_screen`
+remains the live grid API. These are not Bash command history or model transcripts.
+
+`open_file` returns a request ID. Actual Reader loading emits lifecycle events;
+`cosmos_actions.reader_events` consumes them, rather than guessing success from a
+captured terminal grid. See [Reader events](reader-events.md).
+
+`acquire_workspace(task)` confirms a separate workspace task; pass its token as
+`workspace_token` to create/rename/focus tools and end it with `release_workspace`.
+See [Agent control](agent-control.md). It does not confer terminal input authority.
+Cosmos conversation export requires an installed native Agent; when using plain
+OpenCode, use OpenCode's own session export instead of reading its data through
+Cosmos's private profile.

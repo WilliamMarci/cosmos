@@ -5,8 +5,8 @@ This increment implements cross-process input ownership and user revocation. The
 ## Tools
 
 - `control_status()` returns controlled panes, task labels and states (`active`, `paused`, `ready`), without ownership tokens.
-- `acquire_control(pane, snapshot_id, task)` requires a snapshot observed by the same runtime conversation (or MCP connection in system fallback), re-observes the same region, and rejects changed snapshots. It returns a cryptographically random token and a fresh `task_id`. Another owner cannot replace it, and a manually paused task cannot reacquire until a user resumes it.
-- `control_input(pane, token, kind, arguments, snapshot_id=None)` accepts `send_text`, `send_keys` or `mouse` using the existing terminal input argument names. In the patched runtime, tokens belong to one conversation, task and stable pane; system fallback retains connection ownership. Mouse requires a fresh observation ID covering its target cell. Tmux server PID, pane window and dimensions are checked against acquisition; layout changes require a fresh acquisition. Mouse additionally revalidates its observation before input. These are sampled checks, not atomic application transactions.
+- `acquire_control(pane, snapshot_id, task)` requires a snapshot observed by the same authenticated runtime conversation, re-observes the same region, and rejects changed snapshots. It returns a cryptographically random token and a fresh `task_id`. Another owner cannot replace it, and a manually paused task cannot reacquire until a user resumes it.
+- `control_input(pane, token, kind, arguments, snapshot_id=None)` accepts `send_text`, `send_keys` or `mouse` using the existing terminal input argument names. Tokens belong to one authenticated conversation, task and stable pane. Mouse requires a fresh observation ID covering its target cell. Tmux server PID, pane window and dimensions are checked against acquisition; layout changes require a fresh acquisition. Mouse additionally revalidates its observation before input. These are sampled checks, not atomic application transactions.
 - `release_control(pane, token)` ends the owner's task, including one paused with that token. It does not send Ctrl+C, close a pane or stop a terminal program.
 
 The patched runtime groups task acquisition, ordinary controlled input and own release under one scoped confirmation, as described below. Other mutations retain their native permission checks. Ownership alone does not grant unrelated permissions. `control_input` returns `delivery=delivered`, `action_complete=false`, `task_complete=false`: downstream evidence is still required.
@@ -53,7 +53,7 @@ check so manual input can stop submission after paste. Newlines and NUL are
 rejected before any delivery. On failure after delivery, the response reports
 `delivery: partial` and the delivered stages; never blindly repeat that input.
 Successful delivery still sets `action_complete` and `task_complete` to false.
-In the patched runtime this tool uses the acquired task capability; system fallback retains per-call confirmation.
+In the patched runtime this tool uses the acquired task capability; plain system OpenCode has no Cosmos tools.
 
 
 ## Conversation/task/pane permission scope
@@ -66,7 +66,7 @@ acquisition, the returned token and `task_id` identify the grant. Ordinary
 conversation's own token and does not ask again, including after manual pause.
 Explicit configured denies and permission hooks still apply. Control-key input
 containing Ctrl+C, Ctrl+Z or Ctrl+D keeps a separate transient confirmation;
-workspace management and other Actions keep their existing permissions.
+workspace management has its own explicit task capability below; other Actions keep their existing permissions.
 
 These task checks ignore project-saved approvals, including old wildcard rules.
 Requests carry `save: []`; choosing Always has only one-request effect and cannot
@@ -92,8 +92,8 @@ override it. Resume invalidates the old token. Fresh observation and acquisition
 then require a new task confirmation under default policy. No model request is
 cancelled automatically by this mechanism.
 
-System OpenCode without the Cosmos adapter uses the original per-call permission
-path and connection-scoped ownership; it does not claim conversation grouping.
+Plain system OpenCode is launched without a Cosmos profile, tools or skills;
+these APIs and grants apply only to Cosmos Agent.
 Restart the Agent frontend after updating this patch. Ordinary Cosmos clients and
 retained terminal applications do not need to be stopped.
 
@@ -101,3 +101,23 @@ Implementation: `integrations/opencode/task-permissions.patch` patches MCP and
 permission evaluation; `cosmos-permissions.ts` holds transient grants;
 `conversation.py` authenticates context and partitions the Python tool state.
 `dev/prepare_agent.py` installs the tracked integration idempotently.
+
+
+## Workspace-management task
+
+`acquire_workspace(task)` confirms one named task for this authenticated
+conversation and Cosmos Tmux service. It returns `token`, `task_id`, `task`,
+`state: active`, `scope: workspace`, and the exact capability list:
+`create_terminal`, `create_session`, `rename_target`, `focus_pane`. Pass the token
+as optional `workspace_token` to those tools. Without it they retain independent
+native tool permission checks. `release_workspace(token)` ends only the owner's
+grant, without another confirmation or any terminal changes.
+
+This scope intentionally covers workspace management across sessions in the
+service, rather than permission to type in any pane. It does not cover closing,
+interrupting, changing privacy, exporting files, opening Reader, invoking other
+Actions or terminal input. It cannot be substituted for a pane control token.
+The same explicit-deny rules, signed conversation identity and nonpersistent
+permission behavior apply. A new workspace acquisition rotates the conversation's
+previous workspace token; release/restart/management-tool errors invalidate reuse.
+Workspace grants do not cancel a running model or implement the future scheduler.

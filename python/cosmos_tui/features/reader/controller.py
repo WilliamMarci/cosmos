@@ -27,6 +27,9 @@ class ReaderController(Controller):
 
         self.files = FileManager(self)
         self.media = Media()
+        from cosmos_tui.features.reader.events import ReaderEvents
+
+        self.events = ReaderEvents(app)
         self.loading = LoadingFrames(self)
         self.reader = Reader(self.media)
         self.documents = Documents(self.media, self.reader)
@@ -254,6 +257,8 @@ class ReaderController(Controller):
         self.searches.clear()
 
     async def close(self):
+        for record in list(self.events.requests.values()):
+            self.events.replaced(record["pane"], None)
         self.preview.close()
         await self.loading.close()
         self.clear_cache()
@@ -385,6 +390,7 @@ class ReaderController(Controller):
         self.revisions[pane.id] = self.revisions.get(pane.id, 0) + 1
         await app.backend.request(f"set-option -p -t {pane.id} @cosmos_viewer {wire}")
         pane.viewer = wire
+        self.events.replaced(pane.id, wire)
 
     def viewer_at(self, event):
         app = self.app
@@ -685,6 +691,7 @@ class ReaderController(Controller):
             self.searches.pop(pane.id, None)
             self.clear_cache()
             pane.viewer = ""
+            self.events.replaced(pane.id, None)
             await app.backend.request(f"set-option -pu -t {pane.id} @cosmos_viewer")
             return
         elif event.character == "?":

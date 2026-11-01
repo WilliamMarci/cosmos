@@ -255,6 +255,51 @@ TOOLS.append(
 )
 
 
+TOOLS.append(
+    dict(
+        name="read_history",
+        description="Read retained Tmux scrollback outside the visible viewport as a bounded immutable snapshot. Optional literal case-insensitive query. Follow next_cursor for more rows; private panes denied on every page. At most 20000 retained rows / 2 MiB sampled, four snapshots for five minutes. Not shell command history or model history.",
+        inputSchema=schema(
+            dict(
+                pane=PANE,
+                limit=dict(type="integer", minimum=1, maximum=200),
+                query=dict(type="string", maxLength=256),
+                cursor=dict(type="string"),
+            ),
+            ("pane",),
+        ),
+        annotations=dict(readOnlyHint=True),
+    )
+)
+
+
+TOOLS.extend(
+    [
+        dict(
+            name="acquire_workspace",
+            description="Confirm a named workspace-management task in this Cosmos service and conversation. Covers creating sessions/terminals, renaming and focus, not closing, interruption, privacy or terminal input. Patched Cosmos runtime only; use returned workspace_token with management tools.",
+            inputSchema=schema(dict(task=dict(type="string")), ("task",)),
+        ),
+        dict(
+            name="release_workspace",
+            description="Release your own workspace-management task without closing terminals.",
+            inputSchema=schema(dict(token=dict(type="string")), ("token",)),
+        ),
+    ]
+)
+for tool in TOOLS:
+    if tool["name"] in {
+        "create_terminal",
+        "create_session",
+        "rename_target",
+        "focus_pane",
+    }:
+        tool["inputSchema"]["properties"]["workspace_token"] = dict(
+            type="string",
+            description="Optional acquired workspace task capability; absent uses per-call confirmation",
+        )
+
+
 ACTION_TOOLS = [
     dict(
         name="list_actions",
@@ -313,6 +358,23 @@ ACTION_TOOLS.extend(
             ),
         ),
     ]
+)
+
+
+ACTION_TOOLS.append(
+    dict(
+        name="reader_events",
+        description="Read actual Cosmos Reader loading lifecycle events for an open_file request_id: loading, loaded, failed or superseded. Optional bounded wait; no screen guessing or model polling loop. Loading completion is the initial reading frame, not completion of all lazy inline images. Requires original connected client.",
+        inputSchema=schema(
+            dict(
+                request_id=dict(type="string"),
+                client=dict(type="string"),
+                wait_ms=dict(type="integer", minimum=0, maximum=2000),
+            ),
+            ("request_id",),
+        ),
+        annotations=dict(readOnlyHint=True),
+    )
 )
 
 

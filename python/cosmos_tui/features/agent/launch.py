@@ -1,4 +1,4 @@
-"""Launch the Cosmos-branded OpenCode frontend with a private terminal bridge."""
+"""Launch native Cosmos Agent or an unmodified system OpenCode process."""
 
 import asyncio
 import json
@@ -19,7 +19,9 @@ from cosmos_tui.features.agent.profile import (
 
 
 def arguments(backend, source_pane, prompt=""):
-    runtime()
+    executable, workdir = runtime()
+    if not native_runtime(executable, workdir):
+        return executable + (["--prompt", prompt] if prompt else [])
     args = [
         sys.executable,
         "-m",
@@ -59,12 +61,19 @@ def runtime():
         if not source_ready:
             raise RuntimeError(unavailable("Cosmos Agent source runtime"))
         return [bun, "run", "src/index.ts"], root / "packages/cli"
-    executable = shutil.which(os.getenv("COSMOS_OPENCODE", "opencode"))
+    executable = shutil.which(os.getenv("COSMOS_OPENCODE") or "opencode")
     if not executable:
         raise RuntimeError(
             unavailable("Cosmos Agent runtime (bundled, source or system OpenCode)")
         )
     return [executable], None
+
+
+def native_runtime(command, workdir):
+    mode = os.getenv("COSMOS_AGENT_RUNTIME", "auto")
+    if mode == "system" or (mode == "auto" and os.getenv("COSMOS_OPENCODE")):
+        return False
+    return workdir is not None or Path(command[0]) == PROJECT_ROOT / "bin/cosmos-agent"
 
 
 def environment(socket, source_pane):
@@ -108,6 +117,10 @@ def environment(socket, source_pane):
 
 def launch(socket, source_pane, prompt=""):
     executable, workdir = runtime()
+    if not native_runtime(executable, workdir):
+        command = executable + (["--prompt", prompt] if prompt else [])
+        os.execvp(executable[0], command)
+        return
     os.umask(0o077)
     root = initialize_profile()
     from cosmos_tui.features.agent.profile import private_directory

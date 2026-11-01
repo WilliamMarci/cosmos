@@ -110,6 +110,42 @@ const acquire = (p: CosmosPermissions) => {
 }
 const input = { pane: "%4", token: lease.token }
 describe("Cosmos task adapter", () => {
+  test("workspace capability groups only management and cannot cross conversations or grant terminal input", () => {
+    const policy = new CosmosPermissions(key)
+    const acquisition = policy.plan("cosmos_terminal", "acquire_workspace", { task: "Organize workspace" }, "ses_a")
+    expect(acquisition.taskGranted).toBe(false)
+    expect(acquisition.save).toEqual([])
+    policy.finish(
+      acquisition,
+      reply({
+        scope: "workspace",
+        task: "Organize workspace",
+        task_id: "workspace-one",
+        token: "workspace-token",
+        state: "active",
+      }),
+    )
+    for (const tool of ["create_terminal", "create_session", "rename_target", "focus_pane"]) {
+      expect(policy.plan("cosmos_terminal", tool, { workspace_token: "workspace-token" }, "ses_a").taskGranted).toBe(
+        true,
+      )
+      expect(() => policy.plan("cosmos_terminal", tool, { workspace_token: "workspace-token" }, "ses_b")).toThrow()
+      expect(policy.plan("cosmos_terminal", tool, {}, "ses_a").taskGranted).toBeUndefined()
+    }
+    expect(() =>
+      policy.plan("cosmos_terminal", "terminal_step", { pane: "%4", token: "workspace-token" }, "ses_a"),
+    ).toThrow()
+    expect(
+      policy.plan("cosmos_actions", "invoke_action", { workspace_token: "workspace-token" }, "ses_a").taskGranted,
+    ).toBeUndefined()
+    const released = policy.plan("cosmos_terminal", "release_workspace", { token: "workspace-token" }, "ses_a")
+    expect(released.taskGranted).toBe(true)
+    policy.finish(released, reply({ state: "ended" }))
+    expect(() =>
+      policy.plan("cosmos_terminal", "focus_pane", { workspace_token: "workspace-token" }, "ses_a"),
+    ).toThrow()
+  })
+
   test("one transient task grant binds conversation, task, pane and agent", () => {
     const p = new CosmosPermissions(key)
     const plan = acquire(p)
