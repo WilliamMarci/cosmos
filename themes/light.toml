@@ -1,0 +1,19 @@
+kind = "cosmos"
+name = "Cosmos Light"
+order = 10
+light = true
+
+[colors]
+bg = "#F2F4F9"
+base = "#E6EAF2"
+fg = "#232B3A"
+mute = "#5F6B80"
+acc = "#2E6BB4"
+accl = "#195295"
+on = "#FAFCFF"
+
+[logo]
+foreground = ["#B45309", "#0F766E"]
+background = ["#F5E7C8", "#D7E8D0"]
+mode = "diagonal"
+steps = 8

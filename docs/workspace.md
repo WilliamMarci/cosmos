@@ -12,6 +12,10 @@ Cosmos 管理 UI；Tmux 管理 PTY、终端解析、会话和应用。普通 SSH
 
 终端捕获按整个 pane 保留 SGR 状态解析，不能逐行重置 ANSI 解码器。硬件光标遵循应用 cursor_flag、形状和闪烁状态；请求浮岛使用自己的编辑光标。
 
+## 子应用图片
+
+Cosmos 的 Tmux control-mode 连接持续读取异步 `%output`，反转 Tmux 的八进制转义，并从直接 Kitty APC 或 `ESC P tmux; ...` passthrough 中提取 `ESC_G` 命令。`render/graphics.py` 按 pane 把子应用 image id 映射为 Cosmos 自己的 24 位 id，同时改写 U+10EEEE 占位符的真彩色前景，使图片跟随 Cosmos 重绘后的字符网格移动；不需要重新计算 pane 坐标。transmit、virtual placement、frame 和 delete 命令随 compositor 批次提交到外层终端，删除只作用于桥接图像，`d=A` 不会清掉阅读器或其它客户端的图片。Cosmos 自己运行在外层 Tmux 时，APC 会在最终输出层重新包装 passthrough，并尽力打开外层 pane 的 `allow-passthrough`。`COSMOS_GRAPHICS=text` 或非图形终端不启用该桥接。
+
 ## 按键与鼠标
 
 默认 Leader 为 Ctrl-B，可在设置中选 Ctrl-A。按住并释放 Leader 后，再按操作键。默认分屏为 `%`（左右）、`"`（上下），也支持 `|` / `-`；方向键切焦点，H/J/K/L 调整大小，z 放大，s 打开会话/窗口切换器。
@@ -26,7 +30,7 @@ Cosmos 操作统一注册于 keymap.COMMANDS，由设置、分发和上下文帮
 
 操作面板和 Switch 是紧凑 pop window；浮岛属于 cover line。辅助 UI 显隐不 resize 下方 PTY。底栏默认只显示当前窗口编号/名称，可注册状态小组件。通知不抢焦点，普通关闭仅影响当前客户端，动作处理服务级同步。接口见 ui-api.md。
 
-`Leader p` 的主菜单包含 About，可输入 about 筛选并按 Enter 打开。About 使用共享 Frame 边框，显示运行资源中的 ANSI Logo、Python UI 版本和作者署名；Esc 返回原菜单。关闭键使用统一键位设置中的 about.close。
+`Leader p` 的主菜单包含 About，可输入 about 筛选并按 Enter 打开。About 使用共享 Frame 边框，显示按当前 Cosmos 主题的前景渐变、mode 和 steps 重绘的 COSMOS 字标、Python UI 版本和作者署名；Esc 返回原菜单。关闭键使用统一键位设置中的 about.close。
 
 ## 配置和诊断
 
@@ -40,7 +44,7 @@ Python UI 启动时检查 ui-components-v1 和 keybindings 能力。如果旧协
 
 终端驱动恢复后显示 Cosmos ANSI Logo 与退出原因。`Leader d` 显示 detach；后端会话结束显示 exit。随后独立查询目标 Tmux 会话：存在时显示 Session retained 和绝对路径重连命令；不存在时显示 Session ended；查询失败时只显示状态未知，不承诺保留。输出重定向时移除 Logo 的 ANSI 颜色。
 
-运行 Logo 位于 python/cosmos_tui/assets/cosmos-logo.ansi，与 design/cosmos-logo.ansi 保持一致，随构建包分发。启动帮助、启动失败和 UI 异常不显示成功分离提示。
+运行字标的冻结字形取自 python/cosmos_tui/assets/cosmos-logo.ansi，与 design/cosmos-logo.ansi 保持一致，随构建包分发；显示颜色改由当前主题的 logo 渐变参数在 ui/logo.py 中生成。启动帮助、启动失败和 UI 异常不显示成功分离提示。
 
 ## Tmux 操作菜单与历史模式
 

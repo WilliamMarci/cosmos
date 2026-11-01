@@ -68,7 +68,7 @@ fn real_socket_handshake_settings_and_notifications() {
         .is_some());
     let before = call("settings.get", json!({}))["result"].clone();
     let mut invalid = before.clone();
-    invalid["theme"] = json!("broken");
+    invalid["theme"] = json!("../broken");
     assert!(call("settings.replace", invalid).get("error").is_some());
     assert_eq!(call("settings.get", json!({}))["result"], before);
     let mut valid = before;

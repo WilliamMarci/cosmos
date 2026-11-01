@@ -7,4 +7,4 @@ def load(path=None):
     path = Path(path) if path else Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'terminal-agent/config.toml'
     data = tomllib.loads(path.read_text()) if path.exists() else {}
     return {'executable': 'opencode', 'inherit_opencode': True, 'model': '',
-            'timeout': 120, **data}
+            'timeout': 120, 'file_access': 'read_only', **data}

@@ -93,18 +93,26 @@ class ControlStore:
         conversation=None,
         runtime_id=None,
         logical_task=None,
+        takeover=False,
     ):
         with self.locked() as state:
+            current = state.get(pane)
+            if takeover and current and current["state"] == "paused":
+                # The caller already obtained the user's takeover confirmation.
+                self.marker(pane).unlink(missing_ok=True)
             self.check(pane)
             current = state.get(pane)
-            if current and (current["owner"] != owner or current["state"] == "paused"):
-                raise ControlUnavailable(
-                    "paused" if current["state"] == "paused" else "owned_by_other",
-                    "Pane already controlled or manually paused",
-                    "request_resume"
-                    if current["state"] == "paused"
-                    else "wait_or_choose_another_target",
-                )
+            if current and not (takeover and current["state"] == "paused"):
+                if current["owner"] != owner or current["state"] == "paused":
+                    raise ControlUnavailable(
+                        "paused"
+                        if current["state"] == "paused"
+                        else "owned_by_other",
+                        "Pane already controlled or manually paused",
+                        "request_resume"
+                        if current["state"] == "paused"
+                        else "wait_or_choose_another_target",
+                    )
             token = secrets.token_urlsafe(32)
             state[pane] = dict(
                 owner=owner,
@@ -158,13 +166,6 @@ class ControlStore:
                 state=current["state"] if action != "cancel" else "ended",
                 changed=changed,
             )
-            conversation = current.get("conversation")
-        if conversation and (
-            action == "resume" or changed and action in ("pause", "cancel")
-        ):
-            from cosmos_tui.features.agent.tasks.lifecycle import control_changed
-
-            control_changed(self.socket, conversation, action)
         return result
 
     def status(self):
@@ -208,7 +209,7 @@ class ControlStore:
             self.check(pane)
             if pane in state:
                 raise ValueError(
-                    "Pane has a control task; use control_input with its active token"
+                    "Pane has a control lease; use control_input with its active token"
                 )
             return operation()
 

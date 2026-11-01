@@ -82,7 +82,7 @@ register("global.ime_disable", "global", "Disable IME", [], "ime_disable")
 register("workspace.quit", "workspace", "Quit / Exit Cosmos", [], "quit")
 for target, label in (
     ("resume_control", "Resume pane Agent control"),
-    ("end_control", "End pane Agent control task"),
+    ("end_control", "End pane Agent control"),
 ):
     register("workspace." + target, "workspace", label, [], target)
 for target, label, keys in (
@@ -90,6 +90,7 @@ for target, label, keys in (
     ("resume", "Resume task", ["r"]),
     ("check", "Check task now", ["c"]),
     ("more", "Task options", ["enter"]),
+    ("controls", "Pane controls", []),
     ("history", "Task run history", []),
     ("reschedule", "Reschedule task", []),
     ("mode", "Toggle task wake mode", []),

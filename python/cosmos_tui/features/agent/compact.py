@@ -25,6 +25,9 @@ def compact_snapshot(observation, max_bytes=4096, max_rows=24):
         cursor=observation["cursor"],
         region=observation["region"],
         coordinate_space=observation["coordinate_space"],
+        pane_in_mode=observation.get("pane_in_mode", False),
+        alternate_screen=observation.get("alternate_screen", False),
+        screen=observation.get("screen", "normal"),
         text=selected,
         blank_rows_omitted=True,
         truncated=observation["truncated"]
@@ -46,7 +49,13 @@ def step_observation(cache, observation, *, full=False):
         previous is not None
         and all(
             previous.get(key) == observation.get(key)
-            for key in ("dimensions", "region", "program")
+            for key in (
+                "dimensions",
+                "region",
+                "program",
+                "pane_in_mode",
+                "alternate_screen",
+            )
         )
         and not previous.get("_delivery_truncated")
         and not previous.get("truncated")

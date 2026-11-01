@@ -367,7 +367,23 @@ class Palette(CosmosModal):
                     "dividers",
                 ),
             ]
+        if self.menu == "assistant_settings":
+            rows = [
+                choice(
+                    "File access",
+                    "assistant_file_access",
+                    [
+                        ("none", "No access"),
+                        ("read_only", "Read only"),
+                        ("read_write", "Read & write"),
+                    ],
+                    "read_only",
+                )
+            ]
         if self.menu == "settings":
+            rows.append(
+                dict(label="Command assistant", kind="menu", menu="assistant_settings")
+            )
             rows.append(dict(label="Theme", kind="theme"))
             rows.append(dict(label="Agent tasks", kind="menu", menu="task_settings"))
             rows.append(dict(label="Reader", kind="menu", menu="reader_settings"))

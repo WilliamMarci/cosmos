@@ -1,4 +1,4 @@
-/** Cosmos-only task grants. Never persisted, never inferred from model context fields. */
+/** Cosmos-only control grants and explicit time-limited pane allowances. */
 import { createHmac, randomUUID } from "node:crypto"
 
 type Grant = {
@@ -9,6 +9,13 @@ type Grant = {
   task: string
   taskID: string
 }
+type Allowance = {
+  session: string
+  agent: string
+  pane: string
+  operations: string[]
+  expires: number
+}
 type Plan = {
   args: Record<string, unknown>
   resources: string[]
@@ -16,6 +23,7 @@ type Plan = {
   transient?: boolean
   forceAsk?: boolean
   taskGranted?: boolean
+  inputAttempted?: boolean
   metadata: Record<string, unknown>
   session: string
   agent: string
@@ -27,11 +35,37 @@ type Plan = {
 
 export class CosmosPermissions {
   private grants = new Map<string, Grant>()
+  private allowances = new Map<string, Allowance>()
   constructor(
     private key = process.env.COSMOS_AGENT === "1"
       ? process.env.COSMOS_AGENT_CONTEXT_KEY
       : undefined,
   ) {}
+
+  private allowanceKey(session: string, agent: string, pane: string) {
+    return `${session}\u0000${agent}\u0000${pane}`
+  }
+
+  private allowance(session: string, agent: string, pane: string) {
+    const key = this.allowanceKey(session, agent, pane)
+    const value = this.allowances.get(key)
+    if (!value) return undefined
+    if (value.expires <= Date.now()) {
+      this.allowances.delete(key)
+      return undefined
+    }
+    return value
+  }
+
+  private revokeAllowance(session: string, agent: string, pane?: string) {
+    if (pane) {
+      this.allowances.delete(this.allowanceKey(session, agent, pane))
+      return
+    }
+    for (const [key, value] of this.allowances)
+      if (value.session === session && value.agent === agent)
+        this.allowances.delete(key)
+  }
 
   plan(
     server: string,
@@ -115,6 +149,49 @@ export class CosmosPermissions {
       }
       return plan
     }
+    if (tool === "authorize_control") {
+      const operations = input.operations
+      const seconds = input.seconds === undefined ? 600 : input.seconds
+      if (
+        !Array.isArray(operations) ||
+        operations.length < 1 ||
+        operations.length > 20 ||
+        operations.some(
+          (operation) =>
+            typeof operation !== "string" ||
+            operation.length < 1 ||
+            operation.length > 160,
+        ) ||
+        !Number.isSafeInteger(seconds) ||
+        (seconds as number) < 30 ||
+        (seconds as number) > 3600 ||
+        typeof input.pane !== "string"
+      )
+        throw new Error(
+          "authorize_control needs a pane, 1–20 operation labels and 30–3600 seconds",
+        )
+      plan.transient = true
+      plan.forceAsk = true
+      plan.save = []
+      plan.pane = input.pane
+      plan.resources = [
+        JSON.stringify({
+          conversation: session,
+          pane: input.pane,
+          operations,
+          seconds,
+        }),
+      ]
+      plan.metadata = {
+        cosmos_allow: true,
+        conversation: session,
+        pane: input.pane,
+        operations,
+        seconds,
+        operation: "authorize_control",
+      }
+      return plan
+    }
     const management = [
       "create_terminal",
       "create_session",
@@ -130,6 +207,11 @@ export class CosmosPermissions {
       : typeof input.pane === "string"
         ? input.pane
         : undefined
+    const batch =
+      tool === "acquire_control" &&
+      input.takeover !== true &&
+      !!plan.pane &&
+      !!this.allowance(session, agent, plan.pane)
     const token =
       plan.workspace && management ? input.workspace_token : input.token
     plan.token = typeof token === "string" ? token : undefined
@@ -154,6 +236,7 @@ export class CosmosPermissions {
         "acquire_control",
         "acquire_workspace",
         "release_control",
+        "end_control",
         "release_workspace",
       ].includes(tool) ||
       controlled
@@ -162,9 +245,11 @@ export class CosmosPermissions {
       plan.save = []
       const task = owned
         ? grant!.task
-        : typeof input.task === "string"
-          ? input.task
-          : "release own task"
+        : typeof input.label === "string"
+          ? input.label
+          : typeof input.task === "string"
+            ? input.task
+            : "release own control"
       const taskID = owned ? grant!.taskID : randomUUID()
       plan.resources = [
         JSON.stringify({
@@ -182,7 +267,18 @@ export class CosmosPermissions {
         pane: plan.pane,
         task,
       }
-      const args = input.arguments as { keys?: unknown } | undefined
+      const args = input.arguments as { keys?: unknown; text?: unknown } | undefined
+      plan.inputAttempted =
+        tool === "terminal_step"
+          ? (typeof input.text === "string" && input.text.length > 0) ||
+            input.submit === true ||
+            input.keys !== undefined ||
+            input.mouse !== undefined
+          : tool === "control_input"
+            ? ["send_text", "send_keys", "mouse"].includes(String(input.kind)) &&
+              (input.kind !== "send_text" ||
+                (typeof args?.text === "string" && args.text.length > 0))
+            : false
       const interrupt =
         tool === "control_input" &&
         input.kind === "send_keys" &&
@@ -192,8 +288,10 @@ export class CosmosPermissions {
       plan.metadata.interrupt = interrupt
       if (interrupt) plan.forceAsk = true
       plan.taskGranted =
-        ["release_control", "release_workspace"].includes(tool) ||
+        ["release_control", "end_control", "release_workspace"].includes(tool) ||
+        batch ||
         (controlled && owned && !interrupt)
+      if (batch) plan.metadata.allowance = true
     }
     return plan
   }
@@ -220,8 +318,46 @@ export class CosmosPermissions {
       for (const [token, grant] of this.grants)
         if (grant.session === plan.session && grant.pane === plan.pane)
           this.grants.delete(token)
+      if (
+        value?.state === "active" &&
+        typeof value?.token === "string" &&
+        typeof value?.pane === "string" &&
+        typeof value?.task_id === "string"
+      )
+        this.grants.set(value.token, {
+          session: plan.session,
+          agent: plan.agent,
+          pane: value.pane,
+          scope: "terminal",
+          task: typeof value.task === "string" ? value.task : "Resumed task",
+          taskID: value.task_id,
+        })
+    }
+    if (plan.tool === "authorize_control" && !result.isError) {
+      if (
+        value?.state === "allowed" &&
+        typeof value.pane === "string" &&
+        Array.isArray(value.operations) &&
+        value.operations.every((operation: unknown) => typeof operation === "string") &&
+        typeof value.expires_at === "number"
+      )
+        this.allowances.set(
+          this.allowanceKey(plan.session, plan.agent, value.pane),
+          {
+            session: plan.session,
+            agent: plan.agent,
+            pane: value.pane,
+            operations: value.operations,
+            expires: value.expires_at * 1000,
+          },
+        )
+      else this.revokeAllowance(plan.session, plan.agent, plan.pane)
+    }
+    if (plan.tool === "end_control" && !result.isError) {
+      this.revokeAllowance(plan.session, plan.agent, plan.pane)
     }
     if (plan.tool === "finish_task" && !result.isError) {
+      this.revokeAllowance(plan.session, plan.agent)
       for (const [token, grant] of this.grants)
         if (
           grant.session === plan.session &&
@@ -230,13 +366,20 @@ export class CosmosPermissions {
         )
           this.grants.delete(token)
     }
+    if (
+      value?.status === "paused" ||
+      value === "paused" ||
+      value?.delivery === "partial"
+    )
+      this.revokeAllowance(plan.session, plan.agent, plan.pane)
     const grant = plan.token ? this.grants.get(plan.token) : undefined
     if (
       plan.token &&
       grant?.session === plan.session &&
       grant?.agent === plan.agent &&
       grant?.pane === plan.pane &&
-      (result.isError ||
+      ((result.isError &&
+        (plan.inputAttempted || value === "paused" || value?.status === "paused")) ||
         value?.delivery === "partial" ||
         ["release_control", "release_workspace"].includes(plan.tool))
     )

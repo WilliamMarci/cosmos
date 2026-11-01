@@ -47,6 +47,10 @@ class GuardedBackend:
 
     async def propose(self, history):
         version = self.presenter.request_version
+        if isinstance(self.backend, ContextBackend):
+            self.backend.backend.config["file_access"] = (
+                self.presenter.app.settings.get("assistant_file_access", "read_only")
+            )
         result = await self.backend.propose(history)
         pane = self.presenter.source()
         if (
@@ -146,7 +150,9 @@ class Assistant(CosmosModal):
         yield CellEditor(id="assistant-input")
 
     def on_mount(self):
-        self.origin_session = getattr(getattr(self.app, "backend", None), "session_id", None)
+        self.origin_session = getattr(
+            getattr(self.app, "backend", None), "session_id", None
+        )
         self.registry.activate(self.owner)
         field = self.query_one(CellEditor)
         field.assign(

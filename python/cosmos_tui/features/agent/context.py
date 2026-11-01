@@ -15,6 +15,9 @@ class ContextTools:
                 display_id=r["display_id"],
                 session=r["session_name"],
                 private=r["private"],
+                pane_in_mode=r.get("pane_in_mode", False),
+                alternate_screen=r.get("alternate_on", False),
+                agent=r.get("agent", False),
             )
             for r in rows
         ]
@@ -102,13 +105,95 @@ class ContextTools:
                 )
             except (OSError, RuntimeError, ValueError) as error:
                 recent = dict(status="unavailable", message=self.redact(str(error)))
+        recent_text = " ".join(
+            str(row.get("text", "")) for row in (recent or {}).get("text", [])
+        )
+        recommended, automatic_skill = [], None
+        if selected and not selected["private"]:
+            from cosmos_tui.features.agent.skills import matching_skills, skill_body
+
+            matched = matching_skills(
+                selected.get("pane_current_command"),
+                selected.get("pane_current_path"),
+                recent_text,
+            )
+            recommended = [
+                dict(
+                    id=skill["id"],
+                    name=skill["name"],
+                    description=skill["description"],
+                    reason=skill["reason"],
+                    software=skill["software"],
+                )
+                for skill in matched
+            ]
+            if len(matched) == 1:
+                identity = (
+                    pane,
+                    selected.get("pane_current_command"),
+                    matched[0]["name"],
+                )
+                announced = getattr(self, "_announced_skills", None)
+                if announced is None:
+                    self._announced_skills = announced = set()
+                if identity not in announced:
+                    body = skill_body(matched[0])
+                    automatic_skill = dict(
+                        id=matched[0]["id"],
+                        name=matched[0]["name"],
+                        description=matched[0]["description"],
+                        reason=matched[0]["reason"],
+                        content=body["body"],
+                        base=body["base"],
+                        truncated=body["truncated"],
+                        automatic=True,
+                    )
+                    announced.add(identity)
+        target_data = (
+            None
+            if selected is None
+            else dict(
+                pane=pane,
+                display_id=selected["display_id"],
+                private=selected["private"],
+                agent=selected.get("agent", False),
+                cwd=selected["pane_current_path"],
+                program=selected["pane_current_command"],
+                pane_in_mode=selected.get("pane_in_mode", False),
+                alternate_screen=selected.get("alternate_on", False),
+                screen=(
+                    "copy"
+                    if selected.get("pane_in_mode", False)
+                    else "alternate"
+                    if selected.get("alternate_on", False)
+                    else "normal"
+                ),
+                recommended_skills=recommended or None,
+                skill=automatic_skill,
+            )
+        )
+        if target_data is not None:
+            if not recommended:
+                target_data.pop("recommended_skills")
+            if automatic_skill is None:
+                target_data.pop("skill")
         allowed = []
         if selected and not selected["private"]:
             allowed.append(dict(tool="cosmos_observe", target=pane))
             if owned and not paused:
                 allowed.append(dict(tool="cosmos_step", target=pane))
+            elif control and control["state"] == "paused":
+                allowed.append(
+                    dict(
+                        tool="cosmos_control",
+                        operation="begin",
+                        target=pane,
+                        takeover=True,
+                    )
+                )
+                allowed.append(dict(tool="cosmos_control", operation="end", target=pane))
             elif not paused and not control:
-                allowed.append(dict(tool="cosmos_task", operation="begin", target=pane))
+                allowed.append(dict(tool="cosmos_control", operation="begin", target=pane))
         resume = next(
             (
                 row
@@ -142,17 +227,7 @@ class ContextTools:
             ),
             allowed_next=allowed,
             recent=recent,
-            target=(
-                None
-                if selected is None
-                else dict(
-                    pane=pane,
-                    display_id=selected["display_id"],
-                    private=selected["private"],
-                    cwd=selected["pane_current_path"],
-                    program=selected["pane_current_command"],
-                )
-            ),
+            target=target_data,
             targets=candidates if selected is None else None,
             clients=list(clients),
             client=selected_client,
@@ -165,6 +240,8 @@ class ContextTools:
                 "select_target"
                 if selected is None
                 else "request_resume"
+                if status == "paused" and resume
+                else "takeover_or_end_control"
                 if status == "paused"
                 else "observe_then_acquire_control"
                 if status == "ready"

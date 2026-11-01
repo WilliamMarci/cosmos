@@ -2,42 +2,15 @@
 
 from rich.color import Color, ColorType
 from rich.style import Style
-from cosmos_tui.ui.styles import DARK, LIGHT
 
-TERMINALS = [
-    ("inherit", "Follow terminal"),
-    ("ubuntu", "Ubuntu · Tango"),
-    ("cosmos-dark", "Cosmos Dark"),
-    ("cosmos-light", "Cosmos Light"),
-]
-INTERFACES = [("dark", "Cosmos Dark"), ("light", "Cosmos Light")]
-TANGO = [
-    "#2e3436",
-    "#cc0000",
-    "#4e9a06",
-    "#c4a000",
-    "#3465a4",
-    "#75507b",
-    "#06989a",
-    "#d3d7cf",
-    "#555753",
-    "#ef2929",
-    "#8ae234",
-    "#fce94f",
-    "#729fcf",
-    "#ad7fa8",
-    "#34e2e2",
-    "#eeeeec",
-]
+from cosmos_tui.features.theme.catalog import terminal_theme
 
 
 def terminal_palette(name):
-    if name == "inherit":
+    theme = terminal_theme(name)
+    if theme is None or theme.ansi is None:
         return dict(fg="default", bg="default", ansi=None)
-    if name == "ubuntu":
-        return dict(fg="#eeeeec", bg="#300a24", ansi=TANGO)
-    palette = LIGHT if name == "cosmos-light" else DARK
-    return dict(fg=palette["fg"], bg=palette["bg"], ansi=TANGO)
+    return dict(fg=theme.fg, bg=theme.bg, ansi=theme.ansi)
 
 
 def terminal_style(style, palette):

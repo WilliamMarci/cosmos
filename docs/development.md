@@ -22,14 +22,27 @@ git commit -m "fix(ui): describe the behavior change"
 
 ## 本地检查
 
-```bash
-.venv/bin/python -m unittest discover -s dev -p 'test_*.py'
-TA_TEST_TMUX=1 PYTHONPATH=terminal_agent .venv/bin/python -m unittest discover -s terminal_agent/tests
-COSMOS_TEST_TMUX=1 cargo test --locked --offline
-.venv/bin/python dev/smoke_textual.py
-```
+按改动范围分层执行，默认只跑第一层；不要为证明同一件事重复运行等价检查。
 
-真实 PTY/Tmux 检查需要允许创建本地终端和 socket。依据改动选择检查；对 UI 的运行结论需实际终端验收，静态检查不能代替。
+1. 直接相关用例：
+   ```bash
+   PYTHONPATH=python:dev .venv/bin/python -m unittest dev.test_themes.ThemeTests
+   cargo test --locked --offline config::tests
+   ```
+2. 同一子系统或跨模块边界：运行相关测试文件组合，例如：
+   ```bash
+   PYTHONPATH=python:dev .venv/bin/python -m unittest dev.test_agent_control dev.test_cosmos_agent
+   COSMOS_TEST_TMUX=1 PYTHONPATH=python:dev .venv/bin/python -m unittest dev.test_mouse
+   ```
+3. 合并、发布或多子系统改动前：
+   ```bash
+   .venv/bin/python -m unittest discover -s dev -p 'test_*.py'
+   TA_TEST_TMUX=1 PYTHONPATH=terminal_agent .venv/bin/python -m unittest discover -s terminal_agent/tests
+   COSMOS_TEST_TMUX=1 cargo test --locked --offline
+   .venv/bin/python dev/smoke_textual.py
+   ```
+
+真实 PTY/Tmux 检查需要允许创建本地终端和 socket；仅在目标行为无法由单元测试证明时执行。对 UI 的运行结论需实际终端验收，静态检查不能代替。公开行为或接口变化同步正式文档；普通内部改动不要求扩张设计记录。
 
 ## 纳入和排除
 

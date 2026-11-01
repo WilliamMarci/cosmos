@@ -3,6 +3,7 @@ executable = "opencode"
 inherit_opencode = true
 model = ""
 timeout = 120
+file_access = "read_only" # none, read_only, read_write
 
 # 空模型继承 OpenCode 配置；若未设置，采用 TUI 最近使用的模型。
 # 会话、后端数据库与工作区：${XDG_STATE_HOME:-~/.local/state}/terminal-agent

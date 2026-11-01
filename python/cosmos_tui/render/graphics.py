@@ -8,9 +8,71 @@ from __future__ import annotations
 import base64
 import hashlib
 import io
+import logging
 import os
+import subprocess
 
+from rich.style import Style
+from rich.text import Span
 from textual._compositor import CompositorUpdate
+
+
+PLACEHOLDER = "\U0010eeee"
+MAX_CHILD_PENDING = 32 * 1024 * 1024
+
+
+def _truecolor_key(color):
+    if color is None:
+        return None
+    try:
+        triplet = color.get_truecolor()
+    except Exception:
+        return None
+    return f"#{triplet.red:02x}{triplet.green:02x}{triplet.blue:02x}"
+
+
+def _id_color(image_id):
+    return f"#{image_id >> 16 & 0xff:02x}{image_id >> 8 & 0xff:02x}{image_id & 0xff:02x}"
+
+
+def _parse_kitty(sequence):
+    if not sequence.startswith("\x1b_G") or not sequence.endswith("\x1b\\"):
+        return None
+    body = sequence[3:-2]
+    header, separator, payload = body.partition(";")
+    items = []
+    for item in header.split(",") if header else []:
+        key, equals, value = item.partition("=")
+        if key:
+            items.append((key, value if equals else None))
+    return items, payload, bool(separator)
+
+
+def _header(items):
+    return ",".join(
+        key if value is None else f"{key}={value}" for key, value in items
+    )
+
+
+def _parameter(items, key):
+    for item_key, value in items:
+        if item_key == key:
+            return value
+    return None
+
+
+def _replace(items, key, value):
+    replaced = False
+    result = []
+    for item_key, item_value in items:
+        if item_key == key:
+            result.append((key, value))
+            replaced = True
+        else:
+            result.append((item_key, item_value))
+    if not replaced:
+        result.append((key, value))
+    return result
 
 
 class Batch(CompositorUpdate):
@@ -32,7 +94,229 @@ class Graphics:
         self.sources = {}
         self.masks = {}
         self.pending = ""
-        self.next = (os.getpid() * 1024) & 0xFFFFFFFF
+        self.next = (os.getpid() * 1024) & 0xFFFFFF or 1
+        self.outer_tmux = bool(os.environ.get("TMUX"))
+        # Per-pane child-application images.  The original IDs are chosen by
+        # the child; Cosmos maps them to IDs owned by this outer client.
+        self.child_maps = {}
+        self.child_colors = {}
+        self.child_ids = {}
+        self.child_chunks = {}
+        if self.outer_tmux:
+            self._enable_outer_passthrough()
+
+    def _enable_outer_passthrough(self):
+        pane = os.environ.get("TMUX_PANE")
+        if not pane:
+            return
+        try:
+            subprocess.run(
+                [
+                    "tmux",
+                    "set-option",
+                    "-p",
+                    "-q",
+                    "-t",
+                    pane,
+                    "allow-passthrough",
+                    "on",
+                ],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=2,
+                check=False,
+            )
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+    def _allocate(self):
+        for _ in range(0xFFFFFF):
+            self.next = (self.next + 1) & 0xFFFFFF or 1
+            if self.next not in self.child_ids and all(
+                image_id != self.next for _, image_id in self.images.values()
+            ):
+                return self.next
+        raise RuntimeError("Kitty image id space exhausted")
+
+    def _wrap(self, sequence):
+        if not self.outer_tmux:
+            return sequence
+        return "\x1bPtmux;" + sequence.replace("\x1b", "\x1b\x1b") + "\x1b\\"
+
+    def _queue(self, sequence):
+        if len(self.pending) + len(sequence) > MAX_CHILD_PENDING:
+            logging.getLogger(__name__).warning("child graphics queue exceeded budget")
+            return
+        self.pending += self._wrap(sequence)
+
+    def _child_id(self, pane, original):
+        mapping = self.child_maps.setdefault(pane, {})
+        image_id = mapping.get(original)
+        if image_id is not None:
+            return image_id
+        image_id = self._allocate()
+        mapping[original] = image_id
+        self.child_ids[image_id] = (pane, original)
+        self.child_colors.setdefault(pane, {})[
+            _id_color(original)
+        ] = _id_color(image_id)
+        return image_id
+
+    def _drop_child(self, pane, original):
+        mapping = self.child_maps.get(pane, {})
+        image_id = mapping.pop(original, None)
+        if image_id is None:
+            return
+        self.child_ids.pop(image_id, None)
+        self.child_colors.get(pane, {}).pop(_id_color(original), None)
+        if not mapping:
+            self.child_maps.pop(pane, None)
+        if not self.child_colors.get(pane):
+            self.child_colors.pop(pane, None)
+        if self.child_chunks.get(pane) == original:
+            self.child_chunks.pop(pane, None)
+
+    def _delete_child(self, image_id, *, data=True):
+        delete = "I" if data else "i"
+        self._queue(f"\x1b_Gq=2,a=d,d={delete},i={image_id}\x1b\\")
+
+    def feed_child(self, pane, sequence):
+        """Forward one Kitty APC emitted by a program inside a pane."""
+        if not self.enabled:
+            return
+        try:
+            text = sequence.decode("ascii")
+        except (AttributeError, UnicodeDecodeError):
+            return
+        parsed = _parse_kitty(text)
+        if parsed is None:
+            return
+        items, payload, separator = parsed
+        action = _parameter(items, "a") or "t"
+        if action == "q":
+            return
+        if action == "d":
+            self._delete_action(pane, items, payload, separator)
+            return
+        image = _parameter(items, "i")
+        original = int(image) if image and image.isdigit() and int(image) else None
+        continuation = image is None
+        if continuation:
+            original = self.child_chunks.get(pane)
+            if original is None:
+                return
+            more = _parameter(items, "m")
+            if more != "1":
+                self.child_chunks.pop(pane, None)
+            self._write_child(items, payload, separator)
+            return
+        if original is None:
+            return
+        if action in ("t", "T", "f", "a"):
+            if action == "T" and _parameter(items, "U") != "1":
+                return
+            image_id = self._child_id(pane, original)
+            items = _replace(items, "i", str(image_id))
+            more = _parameter(items, "m")
+            if more == "1":
+                self.child_chunks[pane] = original
+            else:
+                self.child_chunks.pop(pane, None)
+            self._write_child(items, payload, separator)
+            return
+        if action == "p":
+            if _parameter(items, "U") != "1":
+                return
+            image_id = self._child_id(pane, original)
+            items = _replace(items, "i", str(image_id))
+            self._write_child(items, payload, separator)
+            return
+        if action not in ("c",):
+            image_id = self._child_id(pane, original)
+            items = _replace(items, "i", str(image_id))
+            self._write_child(items, payload, separator)
+
+    def _delete_action(self, pane, items, payload, separator):
+        delete = _parameter(items, "d") or "a"
+        if delete in ("a", "A"):
+            for child_id in list(self.child_ids):
+                self._delete_child(child_id, data=delete == "A")
+            if delete == "A":
+                self.child_maps.clear()
+                self.child_colors.clear()
+                self.child_ids.clear()
+                self.child_chunks.clear()
+            return
+        image = _parameter(items, "i")
+        original = int(image) if image and image.isdigit() and int(image) else None
+        if original is None:
+            return
+        if delete in ("i", "I"):
+            image_id = self._child_id(pane, original)
+            items = _replace(items, "i", str(image_id))
+            self._write_child(items, payload, separator)
+            if delete == "I":
+                self._drop_child(pane, original)
+        elif delete == "P":
+            image_id = self._child_id(pane, original)
+            items = _replace(items, "i", str(image_id))
+            self._write_child(items, payload, separator)
+
+    def _write_child(self, items, payload, separator):
+        body = _header(items)
+        if separator:
+            body += ";" + payload
+        self._queue(f"\x1b_G{body}\x1b\\")
+
+    def recolor(self, pane, lines):
+        mapping = self.child_colors.get(pane)
+        if not mapping:
+            return lines
+        result = []
+        for line in lines:
+            copy = line.copy()
+            changed = False
+            spans = []
+            for span in copy.spans:
+                style = span.style
+                if isinstance(style, str):
+                    try:
+                        style = Style.parse(style)
+                    except Exception:
+                        spans.append(span)
+                        continue
+                if style is None:
+                    style = Style()
+                if not isinstance(style, Style):
+                    spans.append(span)
+                    continue
+                segment = line.plain[span.start : span.end]
+                if PLACEHOLDER not in segment:
+                    spans.append(span)
+                    continue
+                replacement = mapping.get(_truecolor_key(style.color))
+                if replacement is None:
+                    spans.append(span)
+                    continue
+                spans.append(
+                    Span(span.start, span.end, style + Style(color=replacement))
+                )
+                changed = True
+            if changed:
+                copy.spans = spans
+                result.append(copy)
+            else:
+                result.append(line)
+        return result
+
+    def clear_children(self):
+        for image_id in list(self.child_ids):
+            self._delete_child(image_id)
+        self.child_maps.clear()
+        self.child_colors.clear()
+        self.child_ids.clear()
+        self.child_chunks.clear()
 
     def cover(self, key, source, x, y, cell, rectangles, color):
         from PIL import ImageDraw
@@ -79,9 +363,8 @@ class Graphics:
                 wanted[key] = old
                 continue
             if old:
-                self.pending += f"\x1b_Ga=d,d=I,i={old[1]},q=2\x1b\\"
-            self.next = (self.next + 1) & 0xFFFFFFFF or 1
-            image_id = self.next
+                self._queue(f"\x1b_Ga=d,d=I,i={old[1]},q=2\x1b\\")
+            image_id = self._allocate()
             encoded = base64.b64encode(data).decode()
             self.pending += f"\x1b[{y + 1};{x + 1}H"
             for i in range(0, len(encoded), 4096):
@@ -89,11 +372,11 @@ class Graphics:
                 header = (
                     f"a=T,f=100,i={image_id},q=2,C=1,z=-1,m={m}" if i == 0 else f"m={m}"
                 )
-                self.pending += f"\x1b_G{header};{encoded[i : i + 4096]}\x1b\\"
+                self._queue(f"\x1b_G{header};{encoded[i : i + 4096]}\x1b\\")
             wanted[key] = fingerprint, image_id
         for key, (_, image_id) in self.images.items():
             if key not in wanted:
-                self.pending += f"\x1b_Ga=d,d=I,i={image_id},q=2\x1b\\"
+                self._queue(f"\x1b_Ga=d,d=I,i={image_id},q=2\x1b\\")
         for key in list(self.masks):
             if key not in wanted:
                 self.masks.pop(key, None)

@@ -2,7 +2,7 @@
 
 ## Input method
 
-`Leader i` toggles Chinese/English for the current Cosmos client. It is registered as `global.ime_toggle` and can be rebound. **Input width · Half / Full** in Ctrl+P Actions toggles width (`global.ime_width`, no default key). The status bar's right edge shows `中/En` and `●/◐` (full/half width); clicking language or width toggles that setting. Hidden status bars stay hidden.
+`Leader i` toggles Chinese/English for the current Cosmos client. It is registered as `global.ime_toggle` and can be rebound. **Input width · Half / Full** in Ctrl+P Actions toggles width (`global.ime_width`, no default key). The status bar's right edge shows `中/En` and `▧/◐` (full/half width); clicking language or width toggles that setting. Hidden status bars stay hidden.
 
 The engine is real librime with the discovered Rime schema (`rime_ice` by default), not a demo dictionary or a desktop IBus connection. Enablement and width are client-local. Each pane keeps its own Rime composition when focus changes; Cosmos input fields have separate contexts. Closing the client destroys its compositions without sending them to applications. Session applications keep running.
 

@@ -31,6 +31,142 @@ def skill_paths(cwd=None):
     )
 
 
+def _frontmatter(path):
+    text = path.read_text()
+    match = re.fullmatch(r"---\r?\n(.*?)\r?\n---(?:\r?\n|$)(.*)", text, re.S)
+    if match is None:
+        return None, text
+    try:
+        metadata = yaml.safe_load(match[1])
+    except yaml.YAMLError:
+        return None, text
+    return (metadata if isinstance(metadata, dict) else None), match[2]
+
+
+def _normalize_program(value):
+    value = str(value or "").strip().lower()
+    return Path(value).name or value
+
+
+def _triggers(metadata):
+    extra = metadata.get("metadata") if isinstance(metadata.get("metadata"), dict) else {}
+    values = (
+        extra.get("cosmos/software")
+        or extra.get("software")
+        or metadata.get("software")
+        or extra.get("cosmos/triggers")
+        or extra.get("triggers")
+        or []
+    )
+    if isinstance(values, str):
+        values = [values]
+    if not isinstance(values, list):
+        return []
+    return [
+        str(value).strip().lower()
+        for value in values
+        if isinstance(value, (str, int, float)) and str(value).strip()
+    ]
+
+
+def discovered_skills(cwd=None):
+    """Read local skill metadata without importing a second skill registry."""
+    found = {}
+    for root in skill_paths(cwd):
+        path = Path(root)
+        if not path.is_dir():
+            continue
+        for skill_file in sorted(path.rglob("SKILL.md")):
+            metadata, body = _frontmatter(skill_file)
+            if not metadata:
+                continue
+            name = metadata.get("name")
+            if not isinstance(name, str) or not body.strip():
+                continue
+            found[name] = dict(
+                id=name,
+                name=name,
+                description=str(metadata.get("description") or ""),
+                path=skill_file.parent,
+                software=_triggers(metadata),
+                body=body,
+            )
+    return list(found.values())
+
+
+def matching_skills(program=None, cwd=None, text="", limit=4):
+    """Find software skills from explicit metadata or unambiguous name tokens."""
+    program = _normalize_program(program)
+    cwd_text = str(cwd or "").lower()
+    screen_text = str(text or "").lower()
+    matches = []
+    for skill in discovered_skills(cwd):
+        triggers = set(skill["software"])
+        name_tokens = {
+            token
+            for token in re.split(r"[^a-z0-9]+", skill["name"].lower())
+            if len(token) >= 3
+            and token not in {"cosmos", "agent", "skill", "terminal", "workflow"}
+        }
+        reason = None
+        if program:
+            reason = next(
+                (
+                    f"pane program {program}"
+                    for trigger in triggers
+                    if trigger == program or trigger in program
+                ),
+                None,
+            )
+        if reason is None and cwd_text:
+            reason = next(
+                ("working directory" for trigger in triggers if trigger in cwd_text),
+                None,
+            )
+        if reason is None and screen_text:
+            reason = next(
+                (
+                    "visible output"
+                    for trigger in triggers
+                    if len(trigger) >= 4 and trigger in screen_text
+                ),
+                None,
+            )
+        if reason is None and program:
+            reason = next(
+                (
+                    f"pane program {program}"
+                    for token in name_tokens
+                    if token == program or token in program
+                ),
+                None,
+            )
+        if reason is None and screen_text:
+            reason = next(
+                (
+                    "visible output"
+                    for token in name_tokens
+                    if len(token) >= 4 and token in screen_text
+                ),
+                None,
+            )
+        if reason:
+            matches.append(dict(skill, reason=reason))
+        if len(matches) >= limit:
+            break
+    return matches
+
+
+def skill_body(skill, limit=16384):
+    body = skill["body"].strip()
+    raw = body.encode("utf-8")
+    return dict(
+        body=raw[:limit].decode("utf-8", errors="ignore"),
+        truncated=len(raw) > limit,
+        base=str(skill["path"]),
+    )
+
+
 def commands():
     root = PROJECT_ROOT / "config/agent-commands"
     return {

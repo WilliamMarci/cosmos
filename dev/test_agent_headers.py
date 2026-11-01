@@ -15,6 +15,7 @@ from cosmos_tui.features.agent.terminal import TerminalTools
 from cosmos_tui.features.agent.control import ControlStore
 from cosmos_tui.features.agent.headers import synchronize
 from cosmos_tui.features.agent.header_ui import header_text, paint_headers
+from cosmos_tui.features.agent.tasks.storage import Tasks
 from cosmos_tui.ui.styles import DARK
 
 
@@ -63,7 +64,11 @@ class HeaderTmuxTests(unittest.IsolatedAsyncioTestCase):
     async def test_two_panes_share_one_reservation_and_restore_inheritance(self):
         with (
             tempfile.TemporaryDirectory() as directory,
-            patch.dict(os.environ, XDG_RUNTIME_DIR=directory),
+            patch.dict(
+                os.environ,
+                XDG_RUNTIME_DIR=directory,
+                COSMOS_TASKS_HOME=directory + "/tasks",
+            ),
         ):
             socket = "cosmos-header-" + uuid.uuid4().hex
             tool = TerminalTools(socket)
@@ -115,6 +120,24 @@ class HeaderTmuxTests(unittest.IsolatedAsyncioTestCase):
                 synchronize(tool.backend.argv)
                 self.assertEqual(
                     (await tool.pane(second["pane_id"]))["pane_height"], before
+                )
+                task_store = Tasks(socket)
+                task = task_store.create(
+                    "conversation", "runtime", first, "Task header", kind="schedule"
+                )
+                states = synchronize(tool.backend.argv)
+                self.assertEqual(
+                    next(r for r in states if r["pane"] == first["pane_id"])["state"],
+                    "active",
+                )
+                self.assertEqual(
+                    (await tool.pane(first["pane_id"]))["pane_height"], before - 1
+                )
+                task_store.change(task["id"], state="cancelled")
+                task_store.delete(task["id"])
+                synchronize(tool.backend.argv)
+                self.assertEqual(
+                    (await tool.pane(first["pane_id"]))["pane_height"], before
                 )
                 self.assertEqual(
                     await cli("show-options", "-w", "-t", window, "pane-border-status"),

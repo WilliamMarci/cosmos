@@ -186,7 +186,7 @@ index 09d607f..674be73 100644
    source: PermissionPresentationInput,
    formatPath: (value: string) => string = (value) => value,
  ): PermissionPresentation {
-@@ -29,6 +30,20 @@ export function permissionPresentation(
+@@ -29,6 +30,37 @@ export function permissionPresentation(
    const metadata = { ...dict(source.toolMetadata), ...dict(source.metadata) }
    const resources = source.resources.filter((item): item is string => typeof item === "string")
  
@@ -194,12 +194,29 @@ index 09d607f..674be73 100644
 +    return {
 +      variant: "resume",
 +      icon: "▶",
-+      title: "Resume paused task",
++      title: "Resume & take over",
 +      lines: [
 +        `Terminal: ${text(metadata.pane)}`,
 +        text(metadata.reason),
-+        "Resume this task once. Fresh observation and terminal control permission are still required.",
-+        "Keep paused leaves the terminal and task unchanged.",
++        "This confirmation resumes the task and authorizes one fresh terminal takeover.",
++        "Fresh observation is still required. Keep paused leaves the terminal and task unchanged.",
++      ].filter(Boolean),
++    }
++  }
++
++  if (source.action === "cosmos_terminal_authorize_control" && metadata.cosmos_allow === true) {
++    const operations = Array.isArray(metadata.operations)
++      ? metadata.operations.filter((item): item is string => typeof item === "string")
++      : []
++    const seconds = finiteNumber(metadata.seconds) ?? 600
++    return {
++      icon: "⚙",
++      title: "Allow Agent control session",
++      lines: [
++        `Terminal: ${text(metadata.pane)}`,
++        `Operations: ${operations.join(" · ") || "terminal control"}`,
++        `Lifetime: ${seconds} seconds; expires automatically`,
++        "Does not grant Shell, Actions, close or interruption.",
 +      ].filter(Boolean),
 +    }
 +  }
@@ -223,7 +240,7 @@ index 09d607f..674be73 100644
 +  )
 +    return "Workspace management"
 +  if (
-+    /acquire_control|release_control|control_input|terminal_step|request_resume|schedule_task|finish_task/.test(action)
++    /authorize_control|acquire_control|release_control|end_control|control_input|terminal_step|request_resume|schedule_task|finish_task|cancel_task|delete_task/.test(action)
 +  )
 +    return "Terminal task"
 +  return "Host writes / execution"

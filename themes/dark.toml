@@ -1,0 +1,19 @@
+kind = "cosmos"
+name = "Cosmos Dark"
+order = 0
+light = false
+
+[colors]
+bg = "#14161E"
+base = "#1E212C"
+fg = "#CDD2DC"
+mute = "#7A8092"
+acc = "#62A0E6"
+accl = "#A0CDFA"
+on = "#10121A"
+
+[logo]
+foreground = ["#FFE6A3", "#16966A"]
+background = ["#3A3120", "#103027"]
+mode = "diagonal"
+steps = 8

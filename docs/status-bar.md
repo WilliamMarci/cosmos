@@ -12,7 +12,7 @@ Directory/program and Git branch are refreshed on pane changes and at most once 
 
 `Leader m` and clicking the button open the same COSMOS start menu regardless of its current label. The active pane controls the label:
 
-- `COSMOS`: normal terminal, default gradient text `#FFD166` → `#168A70` over a dark gradient background `#3A3120` → `#103027`. An explicit `status_colors.cosmos` overrides it with a solid color.
+- `COSMOS`: normal terminal, default gradient text `#FFE6A3` → `#16966A` over a dark gradient background `#3A3120` → `#103027`. These four colors come from the selected Cosmos theme's `[logo]` table (foreground start/end and background start/end); the wordmark uses the same foreground pair with its `mode` and `steps`. An explicit `status_colors.cosmos` overrides the button with a solid color.
 - `IMAGE`: bitmap viewer, green background.
 - `DOC`: PDF (and future EPUB/Markdown viewer surfaces), green background.
 - `AGENT`: foreground `opencode`, `claude`, or `codex`, magenta background.

@@ -1,4 +1,4 @@
-"""One-shot native user confirmation; resuming never restores an input token."""
+"""One-shot native user confirmation; approval also grants the takeover."""
 
 import asyncio
 import hashlib
@@ -103,9 +103,33 @@ async def confirmed_resume(tools, identity, pane, revision, state, reason, appro
             pane=pane,
             state="ready",
             input_ownership=False,
-            next="Observe again, then acquire_control with a fresh task permission",
+            next="Observe again, then acquire fresh terminal control",
             task_complete=False,
         )
 
     # No scheduler wake is queued: this explicit chat turn continues the task itself.
-    return await asyncio.to_thread(resume)
+    result = await asyncio.to_thread(resume)
+    try:
+        observed = await tools.observe(pane, ["text"])
+        lease = await tools.acquire_control(
+            pane, observed["snapshot_id"], "Resume terminal control"
+        )
+    except (OSError, RuntimeError, ValueError) as error:
+        result.update(
+            input_ownership=False,
+            error=str(error),
+            next="Observe again and acquire control with a fresh observation",
+        )
+        return result
+    result.update(
+        state="active",
+        input_ownership=True,
+        token=lease["token"],
+        task=lease["task"],
+        task_id=identity,
+        control_task_id=lease["task_id"],
+        snapshot_id=lease["snapshot_id"],
+        dimensions=lease["dimensions"],
+        next="Continue with cosmos_step; this resume confirmation approved the takeover",
+    )
+    return result

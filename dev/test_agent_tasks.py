@@ -75,6 +75,16 @@ class StorageTests(Fixture, unittest.TestCase):
         with self.assertRaises(PermissionError):
             self.store.finish(row["id"], "ses_other", "failed", "wrong conversation")
 
+    def test_delete_ended_task_removes_rows_and_runs(self):
+        row = self.task()
+        self.store.finish(row["id"], "ses_fixture", "failed", "expected failure")
+        self.assertTrue(self.store.delete(row["id"])["deleted"])
+        with self.assertRaises(ValueError):
+            self.store.get(row["id"])
+        self.assertFalse(
+            any(item["id"] == row["id"] for item in self.store.list())
+        )
+
     def test_dst_and_coalesced_catchup(self):
         zone = ZoneInfo("Europe/Zurich")
         # 02:30 is absent in spring; advance to 03:00. Fall fold uses first 02:30.
@@ -169,7 +179,7 @@ class EngineTests(Fixture, unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_control_watch_wakes_and_private_or_replaced_target_blocks(self):
-        row = self.task(kind="control", watch_id="watch_missing")
+        row = self.task(kind="schedule", watch_id="watch_missing")
         engine = Engine("fixture")
         engine.tools.pane = AsyncMock(side_effect=ValueError("Private pane"))
         engine.notify = AsyncMock()

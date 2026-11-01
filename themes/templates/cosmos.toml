@@ -1,0 +1,26 @@
+# Copy this file to:
+#   ${XDG_CONFIG_HOME:-~/.config}/cosmos/themes/my-cosmos.toml
+# The file name (without .toml) is the id stored in config.toml.
+kind = "cosmos"
+name = "My Cosmos Theme"
+order = 1000
+light = false
+
+# All seven UI roles are required.
+[colors]
+bg = "#14161E"
+base = "#1E212C"
+fg = "#CDD2DC"
+mute = "#7A8092"
+acc = "#62A0E6"
+accl = "#A0CDFA"
+on = "#10121A"
+
+# The wordmark/status button uses four colors:
+# foreground start/end and background start/end.
+# mode: vertical, horizontal, diagonal or radial.
+[logo]
+foreground = ["#FFE6A3", "#16966A"]
+background = ["#3A3120", "#103027"]
+mode = "diagonal"
+steps = 8

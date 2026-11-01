@@ -59,8 +59,10 @@ and filter by action ID prefix. Focus results include the resulting UI context.
 
 `open_file(path, target, client?)` resolves the target, checks the path against
 Reader/Files formats, selects that pane and uses the Reader controller to open it.
-Relative paths resolve against target cwd. Directories open Files. Unsupported
-formats fail instead of launching a desktop application. Multiple clients require
+Supported Reader files are PNG, JPEG, WebP, PDF, EPUB, Markdown and HTML; this is
+the Agent path for documents and images, not terminal rendering. Relative paths
+resolve against target cwd. Directories open Files. Unsupported formats fail
+instead of launching a desktop application. Multiple clients require
 explicit selection. The result contains actual pane, display ID, path and view
 kind and `request_id`, with `loading: pending` and `complete: false`: it acknowledges routing,
 not successful decoding. `reader_events(request_id, client?, wait_ms=0)` returns actual

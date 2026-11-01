@@ -9,6 +9,7 @@ pub struct Config {
     pub version: u32,
     pub theme: String,
     pub terminal_theme: String,
+    pub assistant_file_access: String,
     pub files_icons: bool,
     pub files_border: String,
     pub viewer_cache_mb: usize,
@@ -47,6 +48,7 @@ impl Default for Config {
             version: 1,
             theme: "dark".into(),
             terminal_theme: "inherit".into(),
+            assistant_file_access: "read_only".into(),
             files_icons: false,
             files_border: "dividers".into(),
             viewer_cache_mb: 128,
@@ -85,6 +87,9 @@ impl Config {
     pub fn validate(&self) -> Result<(), String> {
         if !["none", "dividers", "frame"].contains(&self.files_border.as_str()) {
             return Err("invalid files_border".into());
+        }
+        if !["none", "read_only", "read_write"].contains(&self.assistant_file_access.as_str()) {
+            return Err("invalid assistant_file_access".into());
         }
         if !["auto", "1", "2", "3"].contains(&self.viewer_rich_columns.as_str())
             || !["pages", "scroll"].contains(&self.viewer_rich_mode.as_str())
@@ -130,8 +135,8 @@ impl Config {
         if self.version != 1 {
             return Err("unsupported configuration version".into());
         }
-        if !["dark", "light"].contains(&self.theme.as_str()) {
-            return Err("theme must be dark or light".into());
+        if !valid_theme_id(&self.theme) {
+            return Err("theme must be a theme id from the themes folder".into());
         }
         if !(1..=4096).contains(&self.viewer_image_max_mb) {
             return Err("viewer_image_max_mb must be between 1 and 4096".into());
@@ -139,10 +144,8 @@ impl Config {
         if !(16..=1024).contains(&self.viewer_cache_mb) {
             return Err("viewer_cache_mb must be between 16 and 1024".into());
         }
-        if !["inherit", "ubuntu", "cosmos-dark", "cosmos-light"]
-            .contains(&self.terminal_theme.as_str())
-        {
-            return Err("unsupported terminal_theme".into());
+        if !valid_theme_id(&self.terminal_theme) {
+            return Err("terminal_theme must be a theme id from the themes folder".into());
         }
         if !["C-b", "C-a"].contains(&self.leader.as_str()) {
             return Err("foundation currently supports C-b or C-a".into());
@@ -246,6 +249,14 @@ impl Config {
     }
 }
 
+fn valid_theme_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+}
+
 #[cfg(test)]
 mod tests {
     use super::Config;
@@ -258,5 +269,20 @@ mod tests {
         assert!(toml::to_string(&Config::default())
             .unwrap()
             .contains("mouse_passthrough = true"));
+    }
+
+    #[test]
+    fn theme_ids_are_safe_folder_stems() {
+        let mut config = Config {
+            theme: "midnight".into(),
+            terminal_theme: "solarized-dark".into(),
+            ..Config::default()
+        };
+        assert!(config.validate().is_ok());
+        config.theme = "../outside".into();
+        assert!(config.validate().is_err());
+        config.theme = "dark".into();
+        config.terminal_theme = "nord".into();
+        assert!(config.validate().is_ok());
     }
 }

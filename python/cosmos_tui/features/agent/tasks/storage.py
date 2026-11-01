@@ -157,6 +157,26 @@ class Tasks:
                 db.execute("SELECT * FROM tasks WHERE id=?", (identity,)).fetchone()
             )
 
+    def delete(self, identity):
+        with self.db() as db:
+            row = db.execute("SELECT * FROM tasks WHERE id=?", (identity,)).fetchone()
+            if row is None:
+                raise ValueError("Unknown task")
+            if row["state"] not in ("cancelled", "succeeded", "failed"):
+                raise ValueError("Only ended tasks can be deleted")
+            db.execute("DELETE FROM runs WHERE task=?", (identity,))
+            db.execute("DELETE FROM tasks WHERE id=?", (identity,))
+        return dict(id=identity, deleted=True)
+
+    def purge_controls(self):
+        """Remove legacy control-task rows; control leases are not tasks."""
+        with self.db() as db:
+            db.execute(
+                "DELETE FROM runs WHERE task IN (SELECT id FROM tasks WHERE kind='control')"
+            )
+            deleted = db.execute("DELETE FROM tasks WHERE kind='control'").rowcount
+        return deleted
+
     def change(self, identity, **values):
         allowed = {
             "runtime",

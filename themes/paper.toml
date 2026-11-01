@@ -1,0 +1,19 @@
+kind = "cosmos"
+name = "Cosmos Paper"
+order = 30
+light = true
+
+[colors]
+bg = "#F4EFE4"
+base = "#E7DFCF"
+fg = "#3A3328"
+mute = "#7A6E5B"
+acc = "#9A6B2F"
+accl = "#6F4A1F"
+on = "#FFFAF0"
+
+[logo]
+foreground = ["#B45309", "#4D7C0F"]
+background = ["#EFE3C8", "#DCE7C8"]
+mode = "diagonal"
+steps = 8

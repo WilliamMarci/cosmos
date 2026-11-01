@@ -38,7 +38,7 @@ class TerminalSurface(Widget):
                         glyph,
                         Style(
                             color=palette["acc"] if active else palette["mute"],
-                            bgcolor=palette["bg"],
+                            bgcolor=terminal["bg"],
                         ),
                     )
                 )

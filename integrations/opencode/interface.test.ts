@@ -17,10 +17,15 @@ test("public catalog hides raw tools and capability arguments", () => {
         "context",
         "observe",
         "terminal_step",
+        "authorize_control",
         "acquire_control",
         "release_control",
+        "end_control",
+        "control_status",
         "request_resume",
         "list_tasks",
+        "cancel_task",
+        "delete_task",
         "read_history",
       ].map((name) => ({
         server: "cosmos_terminal",
@@ -40,6 +45,7 @@ test("public catalog hides raw tools and capability arguments", () => {
     )
     expect(specs.map((s) => s.name).sort()).toEqual([
       "context",
+      "control",
       "history",
       "observe",
       "step",
@@ -71,12 +77,12 @@ test("handles bind conversation, agent and target; paused context removes input 
   expect(observed.observation).toMatch(/^o_/)
   expect(JSON.stringify(observed)).not.toContain("raw-snapshot")
   const begin = api.prepare(
-    tool("task"),
+    tool("control"),
     {
       operation: "begin",
       target: "%4",
       observation: observed.observation,
-      task: "Plot",
+      label: "Plot",
     },
     "ses_a",
     "cosmos",
@@ -84,7 +90,7 @@ test("handles bind conversation, agent and target; paused context removes input 
   expect(begin.args.snapshot_id).toBe("raw-snapshot")
   expect(() =>
     api.prepare(
-      tool("task"),
+      tool("control"),
       { operation: "begin", target: "%5", observation: observed.observation },
       "ses_a",
       "cosmos",
@@ -109,6 +115,15 @@ test("handles bind conversation, agent and target; paused context removes input 
       "cosmos",
     ).args.token,
   ).toBe("secret-token")
+  const wait = api.prepare(
+    tool("step"),
+    { target: "%4", wait_ms: 100 },
+    "ses_a",
+    "cosmos",
+  )
+  expect(wait.name).toBe("terminal_step")
+  expect(wait.args.token).toBe("secret-token")
+  expect(wait.args.text).toBeUndefined()
   expect(() =>
     api.prepare(tool("step"), { target: "%4", text: "pwd" }, "ses_b", "cosmos"),
   ).toThrow()

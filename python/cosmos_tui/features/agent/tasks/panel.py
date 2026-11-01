@@ -1,5 +1,6 @@
-"""Compact task management. Only the popup rectangle covers the workspace."""
+"""Compact task and pane-control management. Only the popup covers the workspace."""
 
+import asyncio
 import json
 from datetime import datetime
 
@@ -10,6 +11,7 @@ from textual.widgets import Button, Label, ListItem, ListView, Static
 
 from cosmos_tui.input.shortcuts import CosmosInput, CosmosModal
 from cosmos_tui.ui.chrome import Frame
+from cosmos_tui.features.agent.control import ControlStore
 from cosmos_tui.features.agent.tasks.storage import Tasks
 from cosmos_tui.features.agent.tasks.lifecycle import action
 from cosmos_tui.features.agent.tasks import runtime
@@ -43,6 +45,9 @@ class TaskPanel(TaskPopup):
 
     async def action_task_more(self):
         await self.perform("more")
+
+    async def action_task_controls(self):
+        await self.perform("controls")
 
     async def action_task_history(self):
         await self.perform("history")
@@ -89,12 +94,14 @@ class TaskPanel(TaskPopup):
                     ("pause", "⏸ Pause"),
                     ("resume", "▶ Resume"),
                     ("check", "Check"),
+                    ("controls", "Controls"),
                     ("more", "···"),
                 ):
                     yield Button(label, id="task-" + key)
 
     async def on_mount(self):
         self.store = Tasks(self.app.backend.argv[2])
+        self.store.purge_controls()
         self.rows, self.signature, self.loading = [], None, False
         palette = self.app.role_colors
         for button in self.query(Button):
@@ -185,7 +192,50 @@ class TaskPanel(TaskPopup):
         event.stop()
         await self.perform(event.button.id.removeprefix("task-"))
 
+    async def controls_menu(self):
+        from cosmos_tui.features.navigation.menus import StartMenu
+
+        socket = self.app.backend.argv[2]
+
+        async def entries():
+            rows = await asyncio.to_thread(ControlStore(socket).status)
+            return [
+                dict(
+                    label=f"{row['state']} · {row['pane']} · {row['task'][:80]}",
+                    pane=row["pane"],
+                )
+                for row in rows
+            ] or [dict(label="No pane controls", enabled=False)]
+
+        async def choose(row):
+            if not row or "pane" not in row:
+                return
+
+            async def confirm():
+                return [
+                    dict(label="Keep control", operation=None),
+                    dict(label="End control · leave program running", operation="end"),
+                ]
+
+            async def ended(value):
+                if not value:
+                    return
+                await asyncio.to_thread(ControlStore(socket).change, row["pane"], "cancel")
+                await self.app.notification_events.publish(
+                    f"Agent control ended · {row['pane']}",
+                    source="agent-tasks",
+                    level="info",
+                )
+                await self.reload()
+
+            self.app.push_screen(StartMenu(confirm), ended)
+
+        self.app.push_screen(StartMenu(entries), choose)
+
     async def perform(self, operation):
+        if operation == "controls":
+            await self.controls_menu()
+            return
         row = self.selected()
         if not row:
             return
@@ -193,7 +243,7 @@ class TaskPanel(TaskPopup):
             from cosmos_tui.features.navigation.menus import StartMenu
 
             async def entries():
-                return [
+                entries = [
                     dict(label=label, operation=op)
                     for op, label in (
                         ("history", "Run history"),
@@ -204,6 +254,9 @@ class TaskPanel(TaskPopup):
                         ("interrupt_program", "Interrupt program · sends Ctrl+C"),
                     )
                 ]
+                if row["state"] in ("cancelled", "succeeded", "failed"):
+                    entries.append(dict(label="Delete task", operation="delete"))
+                return entries
 
             async def choose(entry):
                 if entry:
@@ -248,7 +301,7 @@ class TaskPanel(TaskPopup):
                     ),
                     save,
                 )
-            elif operation in ("cancel", "interrupt_program"):
+            elif operation in ("cancel", "interrupt_program", "delete"):
                 from cosmos_tui.features.navigation.menus import StartMenu
 
                 async def confirm():
@@ -313,7 +366,12 @@ class TaskPanel(TaskPopup):
             await self.app.action_error("tasks." + operation, error)
 
     async def apply(self, row, operation):
-        await action(self.app.backend.argv[2], row["id"], operation)
+        if operation == "delete":
+            self.store.delete(row["id"])
+        else:
+            await action(self.app.backend.argv[2], row["id"], operation)
+            if operation == "cancel":
+                self.store.delete(row["id"])
         await self.reload()
 
     def action_cancel(self):

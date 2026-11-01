@@ -48,7 +48,7 @@ source <(cosmos completion bash)
 
 ## 配置与扩展
 
-配置位于 `${XDG_CONFIG_HOME:-~/.config}/cosmos/config.toml`，运行状态位于 `${XDG_STATE_HOME:-~/.local/state}/cosmos/`。配置样例在 config/。设置保存后即时读回，不需要旧界面的 Apply 操作。启动时核对实际后台服务的能力与配置字段；升级服务需分离客户端后停止并重新启动，打开新终端不会替换常驻服务。
+配置位于 `${XDG_CONFIG_HOME:-~/.config}/cosmos/config.toml`，运行状态位于 `${XDG_STATE_HOME:-~/.local/state}/cosmos/`。配置样例在 config/；内置主题在 `themes/`，用户主题放在 `${XDG_CONFIG_HOME:-~/.config}/cosmos/themes/`，模板见 `themes/templates/` 和 [主题说明](docs/themes.md)。设置保存后即时读回，不需要旧界面的 Apply 操作。启动时核对实际后台服务的能力与配置字段；升级服务需分离客户端后停止并重新启动，打开新终端不会替换常驻服务。
 
 ```bash
 cosmos mod add examples/demo.mod.toml

@@ -77,6 +77,12 @@ class ControlUITests(unittest.IsolatedAsyncioTestCase):
 
                 await app.inputs.on_paste(events.Paste("manual paste"))
                 app.backend.paste.assert_awaited_once_with("manual paste")
+                store.change("%0", "resume")
+                store.acquire("%0", "fixture-owner", "Task")
+                app.backend.send.reset_mock()
+                await pilot.press("ctrl+b")
+                self.assertEqual(store.status()[0]["state"], "active")
+                app.backend.send.assert_not_awaited()
 
     async def test_header_click_pauses_without_application_mouse_input(self):
         with (

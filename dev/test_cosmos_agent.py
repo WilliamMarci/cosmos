@@ -31,6 +31,12 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result["delivered"], ["text", "Enter"])
             self.assertIn("STEP_OK", json.dumps(result["observation"]))
             self.assertFalse(result["task_complete"])
+            waited = await self.tools.terminal_step(
+                self.pane, lease["token"], wait_ms=20
+            )
+            self.assertEqual(waited["delivery"], "none")
+            self.assertEqual(waited["delivered"], [])
+            self.assertIn("observation", waited)
             with patch.object(
                 self.tools,
                 "input_dispatch",
@@ -50,6 +56,44 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
                 send.assert_not_awaited()
         finally:
             await self.tools.release_control(self.pane, lease["token"])
+
+    async def test_copy_mode_is_visible_and_cleared_before_input(self):
+        import shlex
+
+        pane = (
+            await self.tools.backend.cli(
+                "new-window",
+                "-d",
+                "-P",
+                "-F",
+                "#{pane_id}",
+                "-t",
+                "test:",
+                shlex.join(["bash", "--noprofile", "--norc", "-i"]),
+            )
+        ).strip()
+        try:
+            await asyncio.sleep(0.2)
+            await self.tools.backend.cli("copy-mode", "-t", pane)
+            observed = await self.tools.observe(pane, ["text"])
+            self.assertTrue(observed["pane_in_mode"])
+            self.assertEqual(observed["screen"], "copy")
+            context = await self.tools.context(pane)
+            self.assertTrue(context["target"]["pane_in_mode"])
+            lease = await self.tools.acquire_control(
+                pane, observed["snapshot_id"], "copy-mode input test"
+            )
+            try:
+                result = await self.tools.terminal_step(
+                    pane, lease["token"], "echo COPY_MODE_OK", submit=True
+                )
+                self.assertTrue(result["mode_cleared"])
+                self.assertIn("COPY_MODE_OK", json.dumps(result["observation"]))
+                self.assertFalse((await self.tools.pane(pane))["pane_in_mode"])
+            finally:
+                await self.tools.release_control(pane, lease["token"])
+        finally:
+            await self.tools.backend.cli("kill-pane", "-t", pane)
 
     async def test_authenticated_conversations_cannot_share_snapshots_or_tokens(self):
         import hashlib
@@ -82,7 +126,7 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
                 "acquire_control",
                 pane=self.pane,
                 snapshot_id=observed["snapshot_id"],
-                task="Wrong conversation",
+                label="Wrong conversation",
             )
             self.assertTrue(error)
             error, lease = await call(
@@ -90,7 +134,7 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
                 "acquire_control",
                 pane=self.pane,
                 snapshot_id=observed["snapshot_id"],
-                task="Task A",
+                label="Task A",
             )
             self.assertFalse(error)
             try:
@@ -141,7 +185,7 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
                     "acquire_control",
                     pane=self.pane,
                     snapshot_id=observed["snapshot_id"],
-                    task="Task A",
+                    label="Task A",
                 )
                 self.assertFalse(error)
                 self.assertNotEqual(fresh["task_id"], lease["task_id"])
@@ -403,10 +447,14 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
                 await self.tools.acquire_control(
                     self.pane, fresh["snapshot_id"], "Vim task"
                 )
+            takeover = await self.tools.acquire_control(
+                self.pane, fresh["snapshot_id"], "Vim task", True
+            )
+            self.assertNotEqual(takeover["token"], lease["token"])
             store.change(self.pane, "resume")
             with self.assertRaises(ValueError):
                 await self.tools.control_input(
-                    self.pane, lease["token"], "send_keys", {"keys": ["Right"]}
+                    self.pane, takeover["token"], "send_keys", {"keys": ["Right"]}
                 )
             fresh = await self.tools.observe(self.pane)
             resumed = await self.tools.acquire_control(
@@ -416,10 +464,10 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
             await self.tools.backend.cli(
                 "resize-window", "-t", row["window_id"], "-x", "72", "-y", "22"
             )
-            with self.assertRaises(ValueError):
-                await self.tools.control_input(
-                    self.pane, resumed["token"], "send_keys", {"keys": ["Right"]}
-                )
+            delivered = await self.tools.control_input(
+                self.pane, resumed["token"], "send_keys", {"keys": ["Right"]}
+            )
+            self.assertEqual(delivered["delivery"], "delivered")
             await self.tools.release_control(self.pane, resumed["token"])
             self.assertEqual(await self.tools.control_status(), [])
             self.assertIn("row 000", (await self.tools.read_screen(self.pane))["text"])

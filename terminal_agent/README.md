@@ -54,6 +54,8 @@ ${XDG_RUNTIME_DIR}/terminal-agent/session-XXXXXX/
 
 没有 XDG_RUNTIME_DIR 时使用 `/tmp/terminal-agent-UID/`。运行目录检查所有者和权限，目录为 0700；持久上下文文件为 0600。工作目录内不会创建 session 文件。模型后端在专用工作区运行，提示中单独传入实际目标目录；确认执行仍发生在原 Bash 目录。
 
+命令助手文件权限分为 none（不可读写）、read_only（默认，只读）和 read_write（读写）。Cosmos 中由 Settings → Command assistant → File access 控制，保存为 cosmos config 的 assistant_file_access；每次生成读取最新设置。独立运行时由 terminal-agent config 的 file_access 控制。读取使用 read/glob/grep/list，读写档额外允许文件创建和修改，仅按明确请求修改；范围为目标目录及其子目录。V1 permission 和 V2 permissions 均显式配置，三档都禁止 Shell 执行和子 Agent。此限制是 OpenCode 工具权限，不是操作系统沙箱；用户确认后的命令仍由原 Bash 执行。
+
 OpenCode v2 从原数据库**只读**获取所选通道的 API 认证和公开模型元数据，API key 仅传给后端子进程环境，不复制原会话数据库或认证记录。旧版 auth.json 通过私有目录内的符号链接引用。已验证 DeepSeek API key 继承；其他认证方式尚未逐一验证。完整 agent 交接会打开用户原来的 OpenCode，不替换其设置。
 
 ## 配置

@@ -3,7 +3,7 @@
 from rich.text import Text
 from rich.style import Style
 from textual.widgets import Static
-from cosmos_tui.ui.blocks import transition
+from cosmos_tui.ui.blocks import gradient_block, transition
 
 
 def short_path(path, depth, maximum):
@@ -57,33 +57,15 @@ class StatusBar(Static):
         self.hits = []
         title = " " + label + " "
         if mode == "cosmos" and "cosmos" not in colors:
-            start = Text()
-            begin, end = (255, 209, 102), (22, 138, 112)
-            dark_begin, dark_end = (58, 49, 32), (16, 48, 39)
-            for i, character in enumerate(title):
-                fraction = max(0, min(1, (i - 1) / max(1, len(label) - 1)))
-                color = "#%02x%02x%02x" % tuple(
-                    round(a + (b - a) * fraction) for a, b in zip(begin, end)
-                )
-                background = "#%02x%02x%02x" % tuple(
-                    round(a + (b - a) * fraction) for a, b in zip(dark_begin, dark_end)
-                )
-                start.append(
-                    character,
-                    style=Style(
-                        color=color,
-                        bgcolor=background,
-                        bold=True,
-                    ),
-                )
-
+            logo = app.theme_logo
+            start = gradient_block(label, logo.foreground, logo.background)
         else:
             start = Text(
                 title, style=Style(color=foreground, bgcolor=button, bold=True)
             )
         self.start_width = min(width, start.cell_len)
         self.hits.append((0, self.start_width, "start"))
-        light = app.settings.get("theme", "dark") == "light"
+        light = bool(getattr(app, "theme_is_light", False))
         session_bg = "#d0d4dc" if light else "#292d38"
         path_bg = "#bfc5cf" if light else "#363c48"
         separator_style = app.settings.get("status_separator", "powerline")

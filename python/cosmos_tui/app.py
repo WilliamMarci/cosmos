@@ -34,6 +34,7 @@ from cosmos_tui.runtime.coordinator import RuntimeController
 from cosmos_tui.terminal.tmux import Tmux
 from cosmos_tui.ui.cells import UIRegistry
 from cosmos_tui.ui.help import Help as Help
+from cosmos_tui.ui.logo import DEFAULT_LOGO
 from cosmos_tui.ui.styles import DARK as DARK
 from cosmos_tui.ui.styles import LIGHT as LIGHT
 from cosmos_tui.ui.styles import WORKSPACE_CSS
@@ -67,6 +68,8 @@ class Cosmos(App, inherit_bindings=False):
             "mouse_passthrough": True,
         }
         self.role_colors = DARK
+        self.theme_is_light = False
+        self.theme_logo = DEFAULT_LOGO
         self.busy = False
         self.search = None
         self.closing = False
@@ -148,8 +151,15 @@ class Cosmos(App, inherit_bindings=False):
     async def action_error(self, command, error, *, session_id=None):
         return await self.runtime.action_error(command, error, session_id=session_id)
 
+    async def _guard_backend(self, operation):
+        """Turn a dead Tmux control connection into a clean detach, not a crash."""
+        try:
+            return await operation()
+        except EOFError:
+            return await self.runtime.detach("exit")
+
     async def on_event(self, event):
-        return await self.inputs.on_event(event)
+        return await self._guard_backend(lambda: self.inputs.on_event(event))
 
     def key_context(self):
         return self.inputs.key_context()
@@ -164,10 +174,10 @@ class Cosmos(App, inherit_bindings=False):
         return await self.workspace.action_leader_key(key)
 
     async def on_key(self, event: events.Key):
-        return await self.inputs.on_key(event)
+        return await self._guard_backend(lambda: self.inputs.on_key(event))
 
     async def on_paste(self, event: events.Paste):
-        return await self.inputs.on_paste(event)
+        return await self._guard_backend(lambda: self.inputs.on_paste(event))
 
     def cursor_mode(self):
         return self.output.cursor_mode()
@@ -206,13 +216,13 @@ class Cosmos(App, inherit_bindings=False):
         return self.reader_ui.viewer_at(event)
 
     async def on_mouse_down(self, event):
-        return await self.pointer.on_mouse_down(event)
+        return await self._guard_backend(lambda: self.pointer.on_mouse_down(event))
 
     async def on_mouse_move(self, event):
-        return await self.pointer.on_mouse_move(event)
+        return await self._guard_backend(lambda: self.pointer.on_mouse_move(event))
 
     async def on_mouse_up(self, event):
-        return await self.pointer.on_mouse_up(event)
+        return await self._guard_backend(lambda: self.pointer.on_mouse_up(event))
 
     async def scroll_viewer(self, event, direction):
         return await self.reader_ui.scroll_viewer(event, direction)
@@ -227,7 +237,11 @@ class Cosmos(App, inherit_bindings=False):
         return await self.notifications_ui.on_notice_toast_action(event)
 
     async def on_mouse_scroll_up(self, event):
-        return await self.pointer.on_mouse_scroll_up(event)
+        return await self._guard_backend(
+            lambda: self.pointer.on_mouse_scroll_up(event)
+        )
 
     async def on_mouse_scroll_down(self, event):
-        return await self.pointer.on_mouse_scroll_down(event)
+        return await self._guard_backend(
+            lambda: self.pointer.on_mouse_scroll_down(event)
+        )

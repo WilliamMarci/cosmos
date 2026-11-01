@@ -1,6 +1,8 @@
 ---
 name: application-task
 description: A specific operation and the circumstances in which this skill should be used.
+metadata:
+  cosmos/software: [application-name, executable-name]
 ---
 
 # Application task

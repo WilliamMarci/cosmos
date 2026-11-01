@@ -5,7 +5,7 @@ description: Turn an observed software-operation workflow into a reusable Cosmos
 
 # Export a learned software workflow
 
-Extract the reusable workflow from this conversation and tool results. Save a standard skill directory with `SKILL.md` YAML frontmatter (`name`, `description`), plus supporting files only when they remove real duplication. Use [the template](references/skill-template.md) to cover the relevant evidence; do not copy empty sections mechanically.
+Extract the reusable workflow from this conversation and tool results. Save a standard skill directory with `SKILL.md` YAML frontmatter (`name`, `description`, and `metadata.cosmos/software` triggers naming the application/executables), plus supporting files only when they remove real duplication. Use [the template](references/skill-template.md) to cover the relevant evidence; do not copy empty sections mechanically.
 
 ## Select the scope
 

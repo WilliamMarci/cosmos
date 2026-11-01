@@ -34,6 +34,7 @@ python/cosmos_tui/
     editor.py            # 单行 grapheme 编辑，不拥有模型/命令历史
     chrome.py            # 共用边框、折线标签、紧凑按钮
     styles.py, theme.py  # 布局与主题角色
+    logo.py              # 用主题四色重绘 COSMOS 字标
     zones.py             # 七区类型与几何
     help.py, menus.py    # 共用帮助与动作选择控件
     farewell.py          # TUI 完全退出后的 Logo/状态输出
@@ -47,6 +48,7 @@ python/cosmos_tui/
     reader/              # 解码、阅读布局、缓存、阅读输入和文件分流
     search/              # 共用底端内容搜索控件，接收功能 provider
     settings/            # 设置 Panel 与键位编辑
+    theme/               # 主题目录发现、调色板、选择面板与角色应用
     workspace/           # 已注册会话/分屏动作的执行与功能委派
   assets/                # 运行时 Logo
 ```
@@ -67,7 +69,7 @@ ui/keyboard.py 提供只读键位预览；features/ime/rime.py 管理 C API、�
 
 features/status 独立负责状态布局、命中区域和带缓存的目录/Git 元数据；runtime 只调用 refresh。features/ime/config.py 负责桌面优先的 Rime 目录与方案发现，C API 适配器不再硬编码 rime_ice。
 
-features/theme 隔离终端调色板适配、双栏主题选择和 UI 角色应用。render/surface 仅对普通终端 cell 应用终端颜色，显式真彩色和阅读画面不被预设覆盖。
+features/theme 的 catalog 动态发现 themes/ 与用户主题目录的 TOML 文件，隔离终端调色板适配、双栏主题选择和 UI 角色应用；ui/logo.py 按主题的四个渐变颜色及 mode/steps 重绘字标。render/surface 仅对普通终端 cell 应用终端颜色，显式真彩色和阅读画面不被预设覆盖。
 
 ## 阅读器资源职责
 
@@ -84,6 +86,8 @@ terminal/mouse.py owns client-local mouse policy, DEC 1016 probing and a pinned 
 Pane application mouse passthrough is separate from that client coordinate policy. terminal/tmux.py carries Tmux's per-pane mouse flags and a raw-byte `send_bytes` primitive; input/pointer.py decides between application delivery and Cosmos focus/history, and input/mouse_protocol.py rebuilds the requested SGR, UTF-8 or legacy report. The shared `mouse_passthrough` setting only gates this dispatch and does not change the outer terminal's mouse protocol.
 
 ui/settings.SettingRow 负责设置项名称/值/三角命中与灰色键位提示，feature/settings/Palette 负责配置写入、读回校验、客户端作用域和层级导航。CosmosModal 在构造时显式设置透明 background/background-tint，Frame 与其输入/列表统一语义 base 色；禁用默认 focus tint，使用 Textual 实际的 -highlight 类名。切换界面主题时同步 Frame 与列表颜色。
+
+terminal/child_graphics.py extracts Kitty APCs from tmux control-mode `%output` (octal unescape, direct APC and `tmux;` DCS passthrough). The control client must not use `-f no-output`; terminal/tmux.py runs a background control reader so `%output` is not lost behind command replies. render/graphics.py namespaces child image ids per pane, rewrites U+10EEEE placeholder foreground colors in captured Text spans, and folds graphics commands into compositor batches. When Cosmos itself is a child of another tmux, graphics APCs are re-wrapped in passthrough and the outer pane's allow-passthrough option is enabled best-effort.
 
 features/reader/loading.LoadingFrames owns non-blocking per-pane decode jobs and waiting/error surfaces; runtime always obtains reader lines from this presenter and never falls back to captured terminal text for a viewer. Background source probes preserve external-file reload behavior. Notification rectangles are masked out of Kitty images in the shared graphics owner so a white PDF cannot make overlay text unreadable.
 

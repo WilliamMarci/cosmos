@@ -148,6 +148,22 @@ test("resume confirmation renders distinct presentation, no Always, defaults to 
   expect(setup.replies).toEqual([{ decision: "reject" }])
 })
 
+test("control allowance shows its operation list and lifetime", () => {
+  const presentation = permissionPresentation({
+    action: "cosmos_terminal_authorize_control",
+    resources: [],
+    metadata: {
+      cosmos_allow: true,
+      pane: "%4",
+      operations: ["observe output", "run tests"],
+      seconds: 600,
+    },
+  })
+  expect(presentation.title).toBe("Allow Agent control session")
+  expect(presentation.lines.join(" ")).toContain("observe output · run tests")
+  expect(presentation.lines.join(" ")).toContain("600 seconds")
+})
+
 test("clicking Resume task sends only the explicit once decision", async () => {
   await using setup = await fixture()
   await setup.waitForFrame(

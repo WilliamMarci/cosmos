@@ -13,24 +13,60 @@ class OpenCode:
         self.config = config
         self.storage = Storage(config)
 
-    def environment(self):
+    def file_access(self):
+        mode = self.config.get('file_access', 'read_only')
+        if mode not in ('none', 'read_only', 'read_write'):
+            raise ValueError('Invalid command assistant file access mode')
+        return mode
+
+    def environment(self, cwd=None):
         env = os.environ.copy()
         if not self.config['inherit_opencode']:
             # Keep credentials available, but isolate provider/project settings.
             env['OPENCODE_CONFIG_DIR'] = self.config.get('opencode_config_dir', os.path.expanduser('~/.config/terminal-agent/opencode'))
             env['OPENCODE_DISABLE_PROJECT_CONFIG'] = 'true'
-        # Generation is read-only, including when a user's default agent has tools.
+        # Explicit file policy overrides inherited defaults; Shell stays disabled.
         overlay = json.loads(env.get('OPENCODE_CONFIG_CONTENT', '{}'))
+        target = str(Path(cwd or Path.cwd()).expanduser().resolve())
+        paths = {target: 'allow', target.rstrip('/') + '/*': 'allow'}
+        mode = self.file_access()
+        readable = mode != 'none'
+        writable = mode == 'read_write'
         overlay['permission'] = {'*': 'deny'}
-        overlay['tools'] = {'bash': False, 'write': False, 'edit': False, 'task': False}
+        if readable:
+            overlay['permission'].update(read={'*': 'deny', **paths}, glob='allow',
+                                         grep='allow', list='allow',
+                                         external_directory={'*': 'deny', **paths})
+        if writable:
+            overlay['permission']['edit'] = {'*': 'deny', **paths}
+        # V2 uses ordered action/resource policies; retain V1 compatibility above.
+        overlay['permissions'] = [{'action': '*', 'resource': '*', 'effect': 'deny'}]
+        for action in (('read', 'external_directory', 'edit') if writable else
+                       ('read', 'external_directory') if readable else ()):
+            overlay['permissions'].extend(
+                {'action': action, 'resource': path, 'effect': 'allow'} for path in paths)
+        overlay['permissions'].extend(
+            {'action': action, 'resource': '*', 'effect': 'allow'}
+            for action in (('glob', 'grep', 'list') if readable else ()))
+        overlay['tools'] = {'read': readable, 'glob': readable, 'grep': readable, 'list': readable,
+                            'bash': False, 'shell': False, 'write': writable, 'edit': writable,
+                            'patch': writable, 'task': False, 'subagent': False}
         env['OPENCODE_CONFIG_CONTENT'] = json.dumps(overlay)
         env.update(self.storage.environment())
         env['OPENCODE_DISABLE_FILEWATCHER'] = 'true'
         return env
 
     def prompt(self, history, cwd=None):
+        mode = self.file_access()
+        access = ('Do not inspect or modify files or use tools. ' if mode == 'none' else
+                  'You may browse, read and search the target directory using file tools. '
+                  + ('You may also create or edit files there when explicitly requested. '
+                     if mode == 'read_write' else 'Do not modify files. '))
         prompt = ('Translate the request into one shell command for the current working directory. '
-                  'Do not execute commands or use tools. Return ONLY a JSON object with one string key "command". '
+                  + access +
+                  'Use absolute paths rooted in that directory, since your process runs in a separate workspace. '
+                  'Never execute commands. Do not emit progress commentary. '
+                  'Return ONLY a JSON object with one string key "command". '
                   'Use the previous command and follow-up requests as context. Do not invent filenames; use globs or discovery. '
                   'Actual target working directory (the generated command will run here): '
                   + json.dumps(str(Path(cwd) if cwd else Path.cwd())) + '. Request history: ' + json.dumps(history, ensure_ascii=False))
@@ -45,7 +81,7 @@ class OpenCode:
         if model:
             argv += ['--model', model]
         self.storage.prepare(inherit_auth=self.config.get('inherit_opencode', True))
-        environment = self.environment()
+        environment = self.environment(cwd)
         environment['PWD'] = str(self.storage.workspace)
         if self.config.get('inherit_opencode', True) and model:
             for name, value in self.storage.inherited_environment(model.split('/', 1)[0]).items():

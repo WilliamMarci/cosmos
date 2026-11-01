@@ -9,11 +9,11 @@ from textual.widgets import Static
 from cosmos_tui.core import rpc
 from cosmos_tui.core.controller import Controller
 from cosmos_tui.features.notifications.toast import NoticeToast
+from cosmos_tui.features.theme.catalog import cosmos_theme, reload_themes
 from cosmos_tui.render.ansi import decode_grid
 from cosmos_tui.render.graphics import Batch
 from cosmos_tui.render.surface import TerminalSurface
 from cosmos_tui.ui.chrome import Frame
-from cosmos_tui.ui.styles import DARK, LIGHT
 from cosmos_tui.features.theme.controller import apply_interface
 
 
@@ -36,6 +36,7 @@ class RuntimeController(Controller):
     async def on_mount(self):
         app = self.app
         app._workspace_screen = app.screen
+        reload_themes()
         created = await app.backend.connect()
         await app.assistant_ui.start()
         await rpc.call(
@@ -54,6 +55,9 @@ class RuntimeController(Controller):
 
     async def on_unmount(self):
         app = self.app
+        app.graphics.clear_children()
+        app.graphics.commit([])
+        app.flush_graphics()
         app.ui_mods.close()
         await app.reader_ui.close()
         app.ime.close()
@@ -73,7 +77,10 @@ class RuntimeController(Controller):
             await rpc.call("ui.heartbeat", {"client": app.client})
             app.settings = await rpc.call("settings.get")
             app.ui_mods.refresh()
-            app.role_colors = LIGHT if app.settings["theme"] == "light" else DARK
+            theme = cosmos_theme(app.settings.get("theme", "dark"))
+            app.role_colors = theme.palette
+            app.theme_logo = theme.logo
+            app.theme_is_light = theme.light
             apply_interface(app)
             for frame in app.screen.query(Frame):
                 frame.apply_theme(app.role_colors)
@@ -99,6 +106,15 @@ class RuntimeController(Controller):
             await self.headers.layout()
             panes = await app.backend.snapshot()
             self.headers.refresh(panes, terminal)
+            drain_graphics = getattr(app.backend, "take_child_graphics", None)
+            if drain_graphics is not None:
+                for pane, sequence in drain_graphics():
+                    try:
+                        app.graphics.feed_child(pane, sequence)
+                    except Exception:
+                        logging.getLogger(__name__).warning(
+                            "could not forward pane graphics", exc_info=True
+                        )
             lines = {}
             images = []
             snapshot = await rpc.call("ui.snapshot", {"client": app.client})
@@ -134,7 +150,9 @@ class RuntimeController(Controller):
             )
             app.reader_ui.sync_visible(panes)
             for pane in panes:
-                lines[pane.id] = list(decode_grid(tuple(pane.lines)))
+                lines[pane.id] = app.graphics.recolor(
+                    pane.id, list(decode_grid(tuple(pane.lines)))
+                )
                 if pane.viewer:
                     try:
                         frame = app.reader_ui.loading.frame(pane)
@@ -245,6 +263,7 @@ class RuntimeController(Controller):
     async def detach(self, reason="detach"):
         app = self.app
         app.closing = True
+        app.graphics.clear_children()
         app.graphics.commit([])
         app.flush_graphics()
         await app.backend.close()

@@ -22,6 +22,9 @@ class WorkspaceTools(TerminalTools):
                     pane=row["pane_id"],
                     window=row["window_id"],
                     program=row["pane_current_command"],
+                    pane_in_mode=row.get("pane_in_mode", False),
+                    alternate_screen=row.get("alternate_on", False),
+                    agent=row.get("agent", False),
                 )
             )
         return list(sessions.values())

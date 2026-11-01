@@ -155,7 +155,7 @@ Actions、开始菜单和设置 Panel 的列表筛选输入框位于各自容器
 
 进程内 CellRun 新增可选 underline 与 reverse（默认 false），用于共享渲染层绘制输入法分段下划线和编辑光标；既有字段和位置参数保持兼容。输入法的两行布局位于 features/ime/layout.py，以 Rime context、可用 Rect、源 cursor 和主题生成 UIFrame；编号与分页命中区域同帧提交。
 
-终端颜色与 Cosmos UI 主题独立：`terminal_theme` 控制默认颜色和 ANSI 16 色，`theme` 控制语义角色。Mod presentation 的 role 色仍取 Cosmos UI 主题，不跟随终端预设。Theme 面板及配置见 [themes.md](themes.md)。
+终端颜色与 Cosmos UI 主题独立：`terminal_theme` 控制默认颜色和 ANSI 16 色，`theme` 控制语义角色。两者都是 themes/ 或用户主题目录中 TOML 文件的 stem；当前界面主题还提供 `[logo]` 的前景/背景四个渐变色和 mode/steps，用于状态栏按钮及 About/farewell 字标。Mod presentation 的 role 色仍取 Cosmos UI 主题，不跟随终端预设。Theme 面板及配置见 [themes.md](themes.md)。
 
 ### 内置阅读搜索与资源设置
 

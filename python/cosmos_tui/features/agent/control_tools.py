@@ -1,6 +1,7 @@
 """MCP-facing control lifecycle; terminal transport remains in TerminalTools."""
 
 import asyncio
+import time
 
 
 class ControlledInput:
@@ -21,12 +22,15 @@ class ControlledInput:
             if token is not None:
                 row = await self.pane(pane)
                 expected = self.control_geometry.get(token)
-                actual = tuple(
-                    row[k] for k in ("pid", "window_id", "pane_width", "pane_height")
+                keys = (
+                    ("pid", "window_id", "pane_width", "pane_height")
+                    if method == "mouse"
+                    else ("pid", "window_id")
                 )
-                if expected != actual:
+                actual = tuple(row[k] for k in keys)
+                if expected is None or expected[: len(keys)] != actual:
                     raise ValueError(
-                        "Pane layout changed; observe and acquire a fresh token"
+                        "Pane identity changed; observe and acquire a fresh token"
                     )
                 if method == "mouse":
                     request = self.observation_requests.get(snapshot_id)
@@ -81,15 +85,41 @@ class ControlledInput:
 
         return await asyncio.to_thread(ControlStore(self.backend.argv[2]).status)
 
-    async def acquire_control(self, pane, snapshot_id, task):
-        from cosmos_tui.features.agent.control import ControlStore, ControlUnavailable
+    async def authorize_control(self, pane, operations, seconds=600):
+        if (
+            not isinstance(operations, list)
+            or not 1 <= len(operations) <= 20
+            or any(
+                not isinstance(operation, str)
+                or not 1 <= len(operation) <= 160
+                or not operation.isprintable()
+                for operation in operations
+            )
+        ):
+            raise ValueError("operations must be 1–20 printable strings")
+        if type(seconds) is not int or not 30 <= seconds <= 3600:
+            raise ValueError("seconds must be an integer between 30 and 3600")
+        await self.pane(pane)
+        return dict(
+            pane=pane,
+            scope="terminal",
+            operations=list(operations),
+            seconds=seconds,
+            expires_at=time.time() + seconds,
+            state="allowed",
+        )
+
+    async def acquire_control(self, pane, snapshot_id, label, takeover=False):
+        from cosmos_tui.features.agent.control import ControlStore
 
         if (
-            not isinstance(task, str)
-            or not 1 <= len(task) <= 120
-            or not task.isprintable()
+            not isinstance(label, str)
+            or not 1 <= len(label) <= 120
+            or not label.isprintable()
         ):
-            raise ValueError("task must be printable text, 1–120 characters")
+            raise ValueError("label must be printable text, 1–120 characters")
+        if type(takeover) is not bool:
+            raise ValueError("takeover must be boolean")
         request = self.observation_requests.get(snapshot_id)
         if not request or request[0] != pane:
             raise ValueError(
@@ -99,27 +129,16 @@ class ControlledInput:
         if current["snapshot_id"] != snapshot_id:
             raise ValueError("Snapshot changed; observe again before acquiring control")
         row = await self.pane(pane)
-        from cosmos_tui.features.agent.tasks.lifecycle import control_task
-
-        if getattr(self, "conversation", None):
-            from cosmos_tui.features.agent.tasks.storage import Tasks
-
-            if Tasks(self.backend.argv[2]).paused(self.conversation):
-                raise ControlUnavailable(
-                    "paused",
-                    "Conversation paused; request explicit user resume confirmation",
-                    "context_then_request_resume",
-                )
-        logical_task = None
         lease = await asyncio.to_thread(
             ControlStore(self.backend.argv[2]).acquire,
             pane,
             self.owner,
-            task,
+            label,
             row["pid"],
             getattr(self, "conversation", None),
             getattr(self, "runtime_id", None),
-            logical_task,
+            None,
+            bool(takeover),
         )
         from cosmos_tui.features.agent.headers import synchronize
 
@@ -127,21 +146,6 @@ class ControlledInput:
             await asyncio.to_thread(synchronize, self.backend.argv)
             observed = await self.observe(pane, ["text"])
             row = await self.pane(pane)
-
-            # Only create/reuse a logical task after ownership and observation
-            # succeeded. Serialize association against manual revocation.
-            def associate():
-                store = ControlStore(self.backend.argv[2])
-                with store.locked() as state:
-                    store.check(pane)
-                    current = state.get(pane)
-                    if not current or current["token"] != lease["token"]:
-                        raise ValueError("Control revoked before task association")
-                    identity = control_task(self.backend.argv[2], self, row, task)
-                    current["logical_task"] = identity
-                    return identity
-
-            logical_task = await asyncio.to_thread(associate)
         except Exception:
             await asyncio.to_thread(
                 ControlStore(self.backend.argv[2]).release,
@@ -159,11 +163,6 @@ class ControlledInput:
         self.control_geometry[lease["token"]] = tuple(
             row[k] for k in ("pid", "window_id", "pane_width", "pane_height")
         )
-        if logical_task:
-            lease["logical_task"] = logical_task
-            from cosmos_tui.features.agent.tasks.service import start
-
-            await asyncio.to_thread(start, self.backend.argv[2])
         return lease
 
     async def release_control(self, pane, token):
@@ -190,6 +189,28 @@ class ControlledInput:
             self.control_tokens.pop(pane, None)
         return result
 
+    async def end_control(self, pane):
+        from cosmos_tui.features.agent.control import ControlStore
+
+        await self.pane(pane)
+        store = ControlStore(self.backend.argv[2])
+        with store.locked(write=False) as state:
+            current = state.get(pane)
+            if current and current.get("conversation") not in (
+                None,
+                getattr(self, "conversation", None),
+            ):
+                raise PermissionError(
+                    "Pane control belongs to another conversation; ask the user to end it"
+                )
+        result = await asyncio.to_thread(store.change, pane, "cancel")
+        from cosmos_tui.features.agent.headers import synchronize
+
+        await asyncio.to_thread(synchronize, self.backend.argv)
+        self.control_tokens.pop(pane, None)
+        self.control_geometry.pop(pane, None)
+        return result or dict(pane=pane, state="ended")
+
     async def control_input(self, pane, token, kind, arguments, snapshot_id=None):
         allowed = {
             "send_text": {"text"},
@@ -215,7 +236,7 @@ class ControlledInput:
         )
 
     async def terminal_step(
-        self, pane, token, text, submit=False, wait_ms=100, full=False
+        self, pane, token, text="", submit=False, wait_ms=100, full=False
     ):
         """One literal paste, optional Enter, then a bounded fresh observation."""
         if (
@@ -233,14 +254,23 @@ class ControlledInput:
         if type(full) is not bool:
             raise ValueError("full must be boolean")
         delivered = []
+        mode_cleared = False
         try:
             if text:
-                await self.input_dispatch(pane, "send_text", dict(text=text), token)
+                result = await self.input_dispatch(
+                    pane, "send_text", dict(text=text), token
+                )
+                mode_cleared = mode_cleared or bool(
+                    (result or {}).get("mode_cleared")
+                )
                 delivered.append("text")
             if submit:
                 # Separate guarded delivery lets manual input revoke between stages.
-                await self.input_dispatch(
+                result = await self.input_dispatch(
                     pane, "send_keys", dict(keys=["Enter"]), token
+                )
+                mode_cleared = mode_cleared or bool(
+                    (result or {}).get("mode_cleared")
                 )
                 delivered.append("Enter")
             await asyncio.sleep(wait_ms / 1000)
@@ -251,18 +281,23 @@ class ControlledInput:
             return dict(
                 delivery="partial",
                 delivered=delivered,
+                mode_cleared=mode_cleared,
                 error=str(error),
                 action_complete=False,
                 task_complete=False,
                 retry="Observe before retrying; do not repeat delivered input",
             )
-        return dict(
-            delivery="delivered",
+        result = dict(
+            delivery="delivered" if delivered else "none",
             delivered=delivered,
+            mode_cleared=mode_cleared,
             observation=self.step_observation(observation, full=full),
             action_complete=False,
             task_complete=False,
         )
+        if not delivered:
+            result["wait_ms"] = wait_ms
+        return result
 
     def step_observation(self, observation, *, full=False):
         from cosmos_tui.features.agent.compact import step_observation

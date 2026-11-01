@@ -1,6 +1,11 @@
 version = 1
+# Theme ids are TOML file stems in themes/ or ~/.config/cosmos/themes.
+# Cosmos: dark, light, midnight, paper. Terminal: inherit, ubuntu,
+# cosmos-dark, cosmos-light, solarized-dark, solarized-light,
+# gruvbox-dark, nord.
 theme = "dark"
 terminal_theme = "inherit"
+assistant_file_access = "read_only" # none, read_only, read_write; Shell execution stays disabled
 files_icons = false # Requires a Nerd Font when enabled
 files_border = "dividers" # none, dividers, frame
 status_visible = true

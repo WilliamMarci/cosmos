@@ -1,0 +1,19 @@
+kind = "cosmos"
+name = "Cosmos Midnight"
+order = 20
+light = false
+
+[colors]
+bg = "#0B1020"
+base = "#141B31"
+fg = "#D7E0F5"
+mute = "#7F8BAB"
+acc = "#7AA2F7"
+accl = "#A9C1FF"
+on = "#080B14"
+
+[logo]
+foreground = ["#C4A7E7", "#7AA2F7"]
+background = ["#241B3A", "#101A33"]
+mode = "diagonal"
+steps = 10

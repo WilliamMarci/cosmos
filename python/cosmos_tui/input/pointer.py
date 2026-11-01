@@ -88,10 +88,6 @@ class PointerRouter(Controller):
                     await human_input(app, header)
                     event.stop()
                     return
-            if target and event.button in (1, 2, 3):
-                from cosmos_tui.features.agent.control import human_input
-
-                await human_input(app, target)
             if target and event.button == 1 and not target.active:
                 await app.backend.request(f"select-pane -t {target.id}")
                 app.panes = await app.backend.snapshot()

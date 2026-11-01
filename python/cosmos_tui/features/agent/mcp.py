@@ -38,7 +38,7 @@ TOOLS = [
     ),
     dict(
         name="observe",
-        description="Observe a bounded terminal snapshot with text, styled presentation and explicitly inferred control candidates. No real image access or control authority. Coordinates are one-based application cells; private panes are denied.",
+        description="Observe a bounded terminal snapshot with text, styled presentation and explicitly inferred control candidates. view=screen returns the current screen; view=delta returns positioned changes from the previous delta observation for this tool connection. No real image access or control authority. Coordinates are one-based application cells; private panes are denied.",
         inputSchema=schema(
             dict(
                 pane=PANE,
@@ -58,6 +58,7 @@ TOOLS = [
                     ("x", "y", "width", "height"),
                 ),
                 since=dict(type="string"),
+                view=dict(type="string", enum=["screen", "delta"]),
             ),
             ("pane",),
         ),
@@ -172,13 +173,33 @@ TOOLS.extend(
             annotations=dict(readOnlyHint=True),
         ),
         dict(
-            name="acquire_control",
-            description="Confirm one task capability scoped to the current conversation, task and stable pane, then acquire exclusive input after a fresh observation. The patched Cosmos runtime groups ordinary token input and own release; pauses revoke control, and reacquisition requires fresh confirmation. System runtimes retain per-call permissions.",
+            name="authorize_control",
+            description="Ask once for a time-limited terminal-control allowance on a pane. List the intended operations and lifetime; this does not itself acquire input, create a task or grant Shell/Actions. While unexpired and no manual pause/end occurred, later cosmos_control begin calls do not ask again.",
             inputSchema=schema(
                 dict(
-                    pane=PANE, snapshot_id=dict(type="string"), task=dict(type="string")
+                    pane=PANE,
+                    operations=dict(
+                        type="array",
+                        items=dict(type="string"),
+                        minItems=1,
+                        maxItems=20,
+                    ),
+                    seconds=dict(type="integer", minimum=30, maximum=3600),
                 ),
-                ("pane", "snapshot_id", "task"),
+                ("pane", "operations"),
+            ),
+        ),
+        dict(
+            name="acquire_control",
+            description="Acquire a temporary pane control lease after a fresh observation. The label is only a display label; it does not create a persistent task. The lease is scoped to this conversation, agent and stable pane. Pauses revoke input; takeover of a paused lease requires explicit approval. System runtimes retain per-call permissions.",
+            inputSchema=schema(
+                dict(
+                    pane=PANE,
+                    snapshot_id=dict(type="string"),
+                    label=dict(type="string"),
+                    takeover=dict(type="boolean"),
+                ),
+                ("pane", "snapshot_id", "label"),
             ),
         ),
         dict(
@@ -200,10 +221,15 @@ TOOLS.extend(
         ),
         dict(
             name="release_control",
-            description="End this pane control task and revoke its token; does not interrupt the terminal program. Also allowed for this task's manually paused token.",
+            description="End this pane control lease and revoke its token; does not interrupt the terminal program. Also allowed for this lease's manually paused token.",
             inputSchema=schema(
                 dict(pane=PANE, token=dict(type="string")), ("pane", "token")
             ),
+        ),
+        dict(
+            name="end_control",
+            description="End this conversation's own or legacy pane control without a token. Does not stop the terminal program. Controls owned by another conversation require the user's End pane Agent control action.",
+            inputSchema=schema(dict(pane=PANE), ("pane",)),
         ),
     ]
 )
@@ -261,7 +287,7 @@ TOOLS.append(
 TOOLS.append(
     dict(
         name="terminal_step",
-        description="One token-validated literal single-line paste, optional explicit Enter, then changed rows (first result is a compact snapshot; full=true requests the complete observation). Checks revocation before each input. Partial results identify delivered stages: never blindly repeat them. Delivery is not task completion.",
+        description="One token-validated literal single-line paste, optional explicit Enter, or a wait-only observation. Tmux copy/view mode is cleared before input and reported as mode_cleared. Returns changed rows (first result is a compact snapshot; full=true requests the complete observation). Checks revocation before each input. Partial results identify delivered stages: never blindly repeat them. Delivery is not task completion.",
         inputSchema=schema(
             dict(
                 pane=PANE,
@@ -271,7 +297,7 @@ TOOLS.append(
                 wait_ms=dict(type="integer", minimum=0, maximum=2000),
                 full=dict(type="boolean"),
             ),
-            ("pane", "token", "text"),
+            ("pane", "token"),
         ),
     )
 )
@@ -364,6 +390,16 @@ TOOLS.extend(
                 ("id", "outcome", "summary"),
             ),
         ),
+        dict(
+            name="cancel_task",
+            description="Cancel this conversation's task and revoke its pane control; the terminal program continues. Does not send Ctrl+C.",
+            inputSchema=schema(dict(id=dict(type="string")), ("id",)),
+        ),
+        dict(
+            name="delete_task",
+            description="Delete an ended task and its run history from the task manager.",
+            inputSchema=schema(dict(id=dict(type="string")), ("id",)),
+        ),
     ]
 )
 
@@ -415,7 +451,7 @@ ACTION_TOOLS.extend(
         ),
         dict(
             name="open_file",
-            description="Open a supported local file in Reader or directory in Files at %pane or session:pane. Relative paths resolve against target cwd. Selects target client focus. Returns actual target and pending loading acknowledgement, not proof loading completed. Requires a connected client.",
+            description="Open a supported local document or image (PNG, JPEG, WebP, PDF, EPUB, Markdown, HTML) in Reader, or a directory in Files, at %pane or session:pane. Use this instead of terminal rendering for files. Relative paths resolve against target cwd. Selects target client focus. Returns actual target and pending loading acknowledgement, not proof loading completed. Requires a connected client.",
             inputSchema=schema(
                 dict(
                     path=dict(type="string"),

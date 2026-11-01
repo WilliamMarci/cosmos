@@ -38,6 +38,7 @@ FIELDS = (
     "mouse_sgr_flag",
     "pane_dead",
     "@cosmos_private",
+    "@cosmos_agent",
 )
 NUMBERS = {
     "window_index",
@@ -88,6 +89,7 @@ class TerminalTools(
             for key in FLAGS:
                 row[key] = row[key] == "1"
             row["private"] = row.pop("@cosmos_private") in ("1", "on", "true")
+            row["agent"] = row.pop("@cosmos_agent") in ("1", "on", "true")
             if row["private"]:
                 row["pane_current_path"] = ""
                 row["pane_current_command"] = ""
@@ -157,6 +159,8 @@ class TerminalTools(
         await asyncio.sleep(wait_ms / 1000)
         row = await self.pane(pane)
         args = ["capture-pane", "-p", "-t", pane]
+        if row["pane_in_mode"]:
+            args.insert(3, "-M")
         if history:
             args += ["-S", str(-history)]
         text = await self.backend.cli(*args)
@@ -180,7 +184,7 @@ class TerminalTools(
                 text = text.replace(value, "*" * cell_len(value))
         return text
 
-    async def observe(self, pane, layers=None, region=None, since=None):
+    async def observe(self, pane, layers=None, region=None, since=None, view="screen"):
         from cosmos_tui.features.agent.observation.snapshot import (
             LAYERS,
             Observations,
@@ -196,12 +200,22 @@ class TerminalTools(
             raise ValueError(
                 "layers must be a nonempty list of text, presentation, controls"
             )
+        if view not in ("screen", "delta"):
+            raise ValueError("view must be screen or delta")
         row = await self.pane(pane)
-        raw = await self.backend.cli("capture-pane", "-p", "-e", "-t", pane)
+        args = ["capture-pane", "-p", "-e", "-t", pane]
+        if row["pane_in_mode"]:
+            args.insert(3, "-M")
+        raw = await self.backend.cli(*args)
         current = await self.pane(pane)
         if any(
             row[k] != current[k]
-            for k in ("pane_width", "pane_height", "pane_current_command")
+            for k in (
+                "pane_width",
+                "pane_height",
+                "pane_current_command",
+                "pane_in_mode",
+            )
         ):
             raise ValueError("Pane changed during capture; observe again")
         if len(raw.encode()) > 65536:
@@ -212,14 +226,36 @@ class TerminalTools(
         self.observation_requests[result["snapshot_id"]] = (pane, region)
         while len(self.observation_requests) > 32:
             del self.observation_requests[next(iter(self.observation_requests))]
-        return self.observations.finish(result, since)
+        result = self.observations.finish(result, since)
+        if view == "delta":
+            from cosmos_tui.features.agent.compact import step_observation
+
+            cache = getattr(self, "_observe_cache", None)
+            if cache is None:
+                self._observe_cache = cache = {}
+            return step_observation(cache, result)
+        return result
+
+    async def _prepare_input(self, pane):
+        """Leave a Tmux view/copy mode before writing to the application PTY."""
+        row = await self.pane(pane)
+        if not row["pane_in_mode"]:
+            return False
+        await self.backend.cli("copy-mode", "-q", "-t", pane)
+        await asyncio.sleep(0.03)
+        row = await self.pane(pane)
+        if row["pane_in_mode"]:
+            raise ValueError(
+                "Pane is in a Tmux mode; copy mode could not be cleared, so input was not sent"
+            )
+        return True
 
     async def _send_text(self, pane, text):
-        await self.pane(pane)
         if not isinstance(text, str) or len(text.encode()) > 32768:
             raise ValueError("text must be at most 32 KiB")
         if any(ord(c) < 32 and c not in "\n\t" for c in text):
             raise ValueError("control characters are not text; use send_keys")
+        mode_cleared = await self._prepare_input(pane)
         name = "cosmos-agent-" + uuid.uuid4().hex
         try:
             await self.backend.cli("set-buffer", "-b", name, "--", text)
@@ -232,10 +268,14 @@ class TerminalTools(
                 await self.backend.cli("delete-buffer", "-b", name)
             except RuntimeError:
                 pass
-        return {"pane": pane, "pasted": len(text), "return_sent": False}
+        return {
+            "pane": pane,
+            "pasted": len(text),
+            "return_sent": False,
+            "mode_cleared": mode_cleared,
+        }
 
     async def _send_keys(self, pane, keys):
-        await self.pane(pane)
         if not isinstance(keys, list) or not 1 <= len(keys) <= 64:
             raise ValueError("keys must contain 1–64 Tmux key names")
         allowed = r"(?:(?:C-|M-|S-)*(?:[!-~]|Left|Right|Up|Down|Home|End|PageUp|PageDown|Enter|Escape|Tab|BSpace|Delete|Space|F(?:[1-9]|1[0-2])))"
@@ -243,11 +283,12 @@ class TerminalTools(
             raise ValueError(
                 "use named Tmux keys (Enter, C-c, Escape, Down…); send text with send_text"
             )
+        mode_cleared = await self._prepare_input(pane)
         from cosmos_tui.features.agent.control import ControlStore
 
         ControlStore(self.backend.argv[2]).check(pane)
         await self.backend.cli("send-keys", "-t", pane, "--", *keys)
-        return {"pane": pane, "keys": keys}
+        return {"pane": pane, "keys": keys, "mode_cleared": mode_cleared}
 
     async def _mouse(self, pane, x, y, button="left", action="click"):
         row = await self.pane(pane)
@@ -266,6 +307,7 @@ class TerminalTools(
             raise ValueError(
                 "application has not enabled mouse tracking; use keyboard navigation"
             )
+        mode_cleared = await self._prepare_input(pane)
         flags = SimpleNamespace(
             **{
                 key.removesuffix("_flag"): row[key]
@@ -291,7 +333,14 @@ class TerminalTools(
         await self.backend.cli(
             "send-keys", "-H", "-t", pane, *(f"{b:02x}" for b in sequence)
         )
-        return {"pane": pane, "x": x, "y": y, "button": button, "action": action}
+        return {
+            "pane": pane,
+            "x": x,
+            "y": y,
+            "button": button,
+            "action": action,
+            "mode_cleared": mode_cleared,
+        }
 
     async def create_terminal(self, source_pane, workspace_token=None):
         self.check_workspace(workspace_token)

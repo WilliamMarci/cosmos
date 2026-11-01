@@ -14,6 +14,8 @@ Ordinary OpenCode, Claude and `.agents` skill sources are not imported. Inherite
 
 Skills are listed by metadata and loaded on demand through the existing tool. OpenCode watches the configured directories and refreshes the registry after files change; when file watching is disabled, reopen the Agent to rescan. Skills are injected only into the bundled/source Cosmos Agent. Plain system OpenCode uses its own configuration and skill discovery without Cosmos injection.
 
+Cosmos also performs deterministic application matching. A skill can declare `metadata: cosmos/software: [madgraph, mg5_aMC, vim, nvim]`; Cosmos matches those triggers and the skill-name tokens against the selected pane's program, cwd and recent visible output. When exactly one skill matches, `cosmos_context.target.skill` contains its body, so the Agent can follow it immediately without another discovery call. Multiple matches return `target.recommended_skills`, and the Agent loads the best match with the existing `skill` tool. This is selection guidance, not authorization or proof that the screen matches a previous run.
+
 Two skills ship initially:
 
 - `cosmos-tui`: observe/act/verify with terminal tools, distinguish command keys from text paste, discover current targets and modes, and reuse application workflows.
@@ -29,7 +31,7 @@ Inside Cosmos Agent, type a slash command:
 /cosmos-export-skill Export vim-search-replace to the current project's skill library and create a ZIP
 ```
 
-`agent-learn` explicitly requests discovery, scoped experimentation, result verification and saving a reusable `SKILL.md` in the isolated Cosmos Agent personal library. It validates and reads back the saved skill, parameterizes transient targets and removes secrets. Failed or unverified procedures must not be described as tested. This does not override manual pauses or tool permissions. The older `cosmos-learn` discovery-only prompt remains available for compatibility. `cosmos-export-skill` loads the export guidance and asks the model to create or update a skill, defaulting to the personal library. The command includes the current conversation as context; if no operation has actually been observed, the prompt requires identifying missing evidence rather than inventing a tested procedure.
+`agent-learn` explicitly requests discovery, scoped experimentation, result verification and saving a reusable `SKILL.md` in the isolated Cosmos Agent personal library, including `metadata.cosmos/software` triggers for later automatic matching. It validates and reads back the saved skill, parameterizes transient targets and removes secrets. Failed or unverified procedures must not be described as tested. This does not override manual pauses or tool permissions. The older `cosmos-learn` discovery-only prompt remains available for compatibility. `cosmos-export-skill` loads the export guidance and asks the model to create or update a skill, defaulting to the personal library. The command includes the current conversation as context; if no operation has actually been observed, the prompt requires identifying missing evidence rather than inventing a tested procedure.
 
 The model uses OpenCode's existing file tools to write skills. There is no automatic extraction daemon, and a stored skill is not a replay macro. It must rediscover live pane IDs and adapt to the current screen. Skills do not bypass tool permissions. Exporting a skill alone does not execute its scripts or authorize another run of the recorded workflow.
 

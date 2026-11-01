@@ -123,13 +123,22 @@ class HeaderController:
                 terminal.refresh(Region(*point, 1, 1))
 
     async def layout(self):
-        if not self.store.path.exists():
+        from cosmos_tui.features.agent.tasks.storage import Tasks
+
+        task_path = Tasks(self.app.backend.argv[2]).path
+
+        def mtime(path):
+            return path.stat().st_mtime_ns if path.exists() else 0
+
+        if not self.store.path.exists() and not task_path.exists() and not self.records:
+            self.signature = (0, 0)
+            self.app._agent_headers = {}
             return
-        signature = self.store.path.stat().st_mtime_ns
+        signature = (mtime(self.store.path), mtime(task_path))
         now = time.monotonic()
         if signature != self.signature or now - self.last_sync > 2:
             self.records = await asyncio.to_thread(synchronize, self.app.backend.argv)
-            self.signature = self.store.path.stat().st_mtime_ns
+            self.signature = signature
             self.last_sync = now
 
     def refresh(self, panes, terminal):

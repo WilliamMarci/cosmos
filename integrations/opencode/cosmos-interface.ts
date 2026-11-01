@@ -24,14 +24,21 @@ const target = {
 }
 const str = { type: "string" }
 const groups: Record<string, Record<string, string>> = {
-  task: {
+  control: {
+    allow: "authorize_control",
     begin: "acquire_control",
     release: "release_control",
+    end: "end_control",
+    status: "control_status",
+  },
+  task: {
     resume: "request_resume",
     finish: "finish_task",
     list: "list_tasks",
     schedule: "schedule_task",
     history: "task_history",
+    cancel: "cancel_task",
+    delete: "delete_task",
   },
   workspace: {
     list: "list_sessions",
@@ -158,7 +165,7 @@ export class CosmosInterface {
         outputSchema: undefined,
         description:
           short === "step"
-            ? "One bounded task-authorized terminal input: literal text with optional submit, OR keys. Uses adapter-held control. Returns changed output and refreshed context; delivery is not completion."
+            ? "One bounded task-authorized terminal input: literal text with optional submit, OR keys, OR mouse, OR a wait-only observation. Tmux copy/view mode is cleared before input and reported as mode_cleared. Uses adapter-held control. Returns changed output and refreshed context; delivery is not completion."
             : short === "context"
               ? "Current Cosmos target, view, connected clients, task/control state, paused status, allowed next steps, recovery handles and recent output. Prefer this to separate discovery calls."
               : remote.description,
@@ -201,7 +208,13 @@ export class CosmosInterface {
         server: short === "actions" ? "cosmos_actions" : "cosmos_terminal",
         name: short,
         cosmos: short,
-        description: `Cosmos ${short} operations: ${entries.map(([op]) => op).join(", ")}. Internal control tokens and resume credentials are held by the adapter. Resume always asks the user; begin requires an observed target. ${short === "task" ? "Use handle for resume/finish/history. Release only ends own control, never the program." : ""}`,
+        description: `Cosmos ${short} operations: ${entries.map(([op]) => op).join(", ")}. Internal control tokens and resume credentials are held by the adapter. ${
+          short === "control"
+            ? "Allow grants an explicit time-limited control allowance after showing operations; begin acquires only a temporary lease and does not add a Tasks row. End/release never stops the program."
+            : short === "task"
+              ? "Use handle for resume/finish/history/cancel/delete. Tasks are persistent only; immediate takeover belongs to cosmos_control."
+              : ""
+        }`,
         inputSchema: {
           type: "object",
           properties: props,
@@ -264,8 +277,10 @@ export class CosmosInterface {
     if (
       ["observe", "step", "history"].includes(short) ||
       [
+        "authorize_control",
         "acquire_control",
         "release_control",
+        "end_control",
         "schedule_task",
         "watch_terminal",
       ].includes(name)
@@ -336,7 +351,15 @@ export class CosmosInterface {
       }
     }
     if (short === "actions") delete args.target
-    if (["request_resume", "finish_task", "task_history"].includes(name)) {
+    if (
+      [
+        "request_resume",
+        "finish_task",
+        "task_history",
+        "cancel_task",
+        "delete_task",
+      ].includes(name)
+    ) {
       if (!row)
         throw new Error(
           "Select the task handle from cosmos_context or cosmos_task list",
@@ -401,22 +424,32 @@ export class CosmosInterface {
         state.controls.set(value.pane, value.token)
       if (call.name === "acquire_workspace") state.workspace = value.token
     }
-    if (call.name === "release_control" && !failed)
+    if (["release_control", "end_control"].includes(call.name) && !failed)
       state.controls.delete(call.args.pane)
     if (call.name === "release_workspace" && !failed)
       state.workspace = undefined
     if (call.name === "finish_task" && !failed) state.controls.clear()
+    if (["finish_task", "cancel_task", "delete_task"].includes(call.name) && !failed) {
+      if (call.name !== "finish_task" || value?.state !== "waiting")
+        for (const [handle, task] of state.tasks)
+          if (task.id === call.args.id) {
+            if (task.pane) state.controls.delete(task.pane)
+            state.tasks.delete(handle)
+          }
+    }
     if (["watch_terminal", "schedule_task"].includes(call.name) && !failed)
       state.controls.delete(call.args.pane)
     if (typeof value?.pane_id === "string") state.target = value.pane_id
-    if (
-      value?.status === "paused" ||
-      value?.delivery === "partial" ||
-      (call.name === "request_resume" && value?.resumed)
-    )
+    if (value?.status === "paused" || value?.delivery === "partial")
       state.controls.delete(
         value?.target?.pane ?? call.args.pane ?? state.target!,
       )
+    if (call.name === "request_resume" && value?.resumed) {
+      const target = value?.pane ?? call.args.pane ?? state.target!
+      if (value?.state === "active" && typeof value?.token === "string")
+        state.controls.set(target, value.token)
+      else state.controls.delete(target)
+    }
     const remember = (
       map: Map<string, Dict>,
       record: Dict,

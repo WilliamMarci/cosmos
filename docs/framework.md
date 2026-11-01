@@ -91,7 +91,7 @@ stdout/stderr 各有独立日志，单次启动各保留前 1 MiB，超过后继
 
 `cosmos panel` 已停用；Python 工作区的 Leader p 在自己的 UI 层打开紧凑设置面板，动作使用 Ctrl+P。箭头/Ctrl-N/P 选择，文字过滤，Enter 执行，Esc 返回，? 调出帮助；无常驻快捷键提示。深浅主题共用角色表，中文宽度按显示列裁切。
 
-`settings.get/replace` 读写完整 TOML 配置。新增 notifications_enabled、notification_timeout_ms、mouse_passthrough；通知页面提供显示开关，鼠标透传由 Settings → Input 与 workspace.mouse_passthrough 动作共享。主题改变立即作用于面板。设置控件写入并读回确认；Python 客户端动态读取配置，快捷键编辑器支持三组 Leader 预设与动作绑定。`settings.apply` 仍可更新已有 Tmux 服务的基础设置。
+`settings.get/replace` 读写完整 TOML 配置。新增 notifications_enabled、notification_timeout_ms、mouse_passthrough；通知页面提供显示开关，鼠标透传由 Settings → Input 与 workspace.mouse_passthrough 动作共享。`theme` 与 `terminal_theme` 保存主题目录中的安全文件 stem；`themes-v1` 能力表示协调服务接受任意合法主题 id。主题改变立即作用于面板。设置控件写入并读回确认；Python 客户端动态读取配置，快捷键编辑器支持三组 Leader 预设与动作绑定。`settings.apply` 仍可更新已有 Tmux 服务的基础设置。
 
 Guard 在正常退出、错误返回和 SIGTERM/SIGINT 时恢复终端模式与光标，并释放客户端。无法捕获的 SIGKILL 不在终端模式恢复保证内。
 

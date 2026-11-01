@@ -15,6 +15,7 @@ REQUIRED_CAPABILITIES = {
     "keybindings",
     "notification-stack-v1",
     "leader-presets-v1",
+    "themes-v1",
 }
 REQUIRED_SETTINGS = {
     "assistant_file_access",
@@ -115,4 +116,4 @@ def run(args):
     app = Cosmos(args.session, mouse_mode=getattr(args, "mouse_mode", "auto"))
     result = app.run()
     if not app._exception:
-        show_farewell(result, app.backend)
+        show_farewell(result, app.backend, logo_style=app.theme_logo)

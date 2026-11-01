@@ -8,7 +8,13 @@ from unittest.mock import patch
 import zipfile
 
 from cosmos_tui.features.agent.launch import configuration, environment
-from cosmos_tui.features.agent.skills import pack_skill, skill_paths, validate_skill
+from cosmos_tui.features.agent.skills import (
+    matching_skills,
+    pack_skill,
+    skill_body,
+    skill_paths,
+    validate_skill,
+)
 from cosmos_tui.core.paths import PROJECT_ROOT
 
 
@@ -68,6 +74,30 @@ class SkillTests(unittest.TestCase):
                 config["agents"]["cosmos"]["system"],
             )
             self.assertFalse((Path(root) / "cosmos/agent/skills").exists())
+
+    def test_learned_skill_matches_software_without_a_model_call(self):
+        with (
+            tempfile.TemporaryDirectory() as root,
+            patch.dict(os.environ, XDG_CONFIG_HOME=root),
+        ):
+            source = Path(root) / "cosmos/agent/skills/mg5-workflow"
+            source.mkdir(parents=True)
+            (source / "SKILL.md").write_text(
+                "---\n"
+                "name: mg5-workflow\n"
+                "description: Run a MadGraph process and verify the output.\n"
+                "metadata:\n"
+                "  cosmos/software: [madgraph, mg5_aMC]\n"
+                "---\n\n"
+                "# Workflow\n\nUse the process card.\n"
+            )
+            matched = matching_skills(
+                "mg5_aMC", "/work/MG5", "MadGraph5_aMC@NLO banner"
+            )
+            self.assertEqual([s["name"] for s in matched], ["mg5-workflow"])
+            self.assertEqual(matched[0]["reason"], "pane program mg5_amc")
+            self.assertEqual(skill_body(matched[0])["body"], "# Workflow\n\nUse the process card.")
+            self.assertEqual(matching_skills("bash", "/work"), [])
 
     def test_builtin_skill_export_roundtrip(self):
         with tempfile.TemporaryDirectory() as root:

@@ -10,8 +10,6 @@ OPTION = "@cosmos_control_header"
 
 def synchronize(argv):
     store = ControlStore(argv[2])
-    if not store.path.exists():
-        return []
 
     def cli(*arguments):
         result = subprocess.run(
@@ -33,7 +31,40 @@ def synchronize(argv):
             for pane, value in state.items()
             if pane in panes and value.get("server_pid") == panes[pane][1]
         }
-        wanted = {panes[pane][0] for pane in visible}
+        from cosmos_tui.features.agent.tasks.storage import Tasks
+
+        task_store = Tasks(argv[2])
+        task_rows = task_store.list() if task_store.path.exists() else []
+        visible_tasks = [
+            row
+            for row in task_rows
+            if row["pane"] in panes
+            and str(row["server_pid"]) == panes[row["pane"]][1]
+            and row["state"] not in ("cancelled", "succeeded", "failed")
+        ]
+        records = {
+            pane: dict(
+                pane=pane,
+                state=value["state"],
+                task=value["task"],
+                pointer=value.get("pointer"),
+            )
+            for pane, value in visible.items()
+        }
+        for row in visible_tasks:
+            if row["pane"] in records:
+                continue
+            records[row["pane"]] = dict(
+                pane=row["pane"],
+                state=(
+                    "paused"
+                    if row["state"] in ("paused", "needs_review", "blocked")
+                    else "active"
+                ),
+                task=row["goal"],
+                pointer=None,
+            )
+        wanted = {panes[pane][0] for pane in records}
         windows = {}
         for line in cli(
             "list-windows", "-a", "-F", "#{window_id}\t#{" + OPTION + "}"
@@ -72,12 +103,4 @@ def synchronize(argv):
                         "set-option", "-w", "-t", window, "pane-border-status", previous
                     )
                 cli("set-option", "-wu", "-t", window, OPTION)
-        return [
-            dict(
-                pane=pane,
-                state=value["state"],
-                task=value["task"],
-                pointer=value.get("pointer"),
-            )
-            for pane, value in visible.items()
-        ]
+        return list(records.values())

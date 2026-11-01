@@ -12,6 +12,7 @@ from cosmos_tui.features.agent.tasks.storage import Tasks
 
 def start(socket, *, resume=False):
     store = Tasks(socket)
+    store.purge_controls()
     store.settings()
     if resume:
         store.path.with_suffix(".suspended").unlink(missing_ok=True)

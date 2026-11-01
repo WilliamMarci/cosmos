@@ -7,7 +7,7 @@ This increment supplies an independent deterministic terminal monitor. It makes 
 ## Tools
 
 - `watch_terminal(pane, condition, text="", timeout_seconds=300, control_token=None)` registers a watch and returns immediately. Conditions: `text_present`, `text_absent`, `changed`, `program_changed`, `bash_prompt`. Text predicates use literal, case-sensitive substrings (maximum 256 characters), never regular expressions. Timeouts range from 1 second to 24 hours. At most 32 watches may wait in one managed Tmux service.
-- If `control_token` is supplied, the owner releases control/header reservation before establishing the baseline. Registration failure does not reacquire ownership. A later continuation must observe and acquire a new token. Without a token, monitoring itself does not release someone else's control task.
+- If `control_token` is supplied, the owner releases control/header reservation before establishing the baseline. Registration failure does not reacquire ownership. A later continuation must observe and acquire a new token. Without a token, monitoring itself does not release someone else's control lease.
 - `terminal_watches()` returns bounded watch states and compact results, without baseline hashes or literal search needles. It is read-only and allowed by default.
 - `cancel_terminal_watch(id)` cancels detection without interrupting the terminal program. Cancelling an already finished watch returns `cancelled=false`; it does not overwrite evidence.
 

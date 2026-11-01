@@ -267,6 +267,97 @@ describe("Cosmos task adapter", () => {
       ).session,
     ).toBe("ses_real")
   })
+  test("explicit control allowance covers later acquisitions until expiry", () => {
+    const p = new CosmosPermissions(key)
+    const allowance = p.plan(
+      "cosmos_terminal",
+      "authorize_control",
+      {
+        pane: "%4",
+        operations: ["observe output", "run tests"],
+        seconds: 600,
+      },
+      "ses_a",
+    )
+    expect(allowance.forceAsk).toBe(true)
+    expect(allowance.metadata.cosmos_allow).toBe(true)
+    p.finish(
+      allowance,
+      reply({
+        state: "allowed",
+        pane: "%4",
+        operations: ["observe output", "run tests"],
+        expires_at: Date.now() / 1000 + 600,
+      }),
+    )
+    const automatic = p.plan(
+      "cosmos_terminal",
+      "acquire_control",
+      { pane: "%4", label: "Plot" },
+      "ses_a",
+    )
+    expect(automatic.taskGranted).toBe(true)
+    expect(
+      p.plan(
+        "cosmos_terminal",
+        "acquire_control",
+        { pane: "%4", label: "Plot", takeover: true },
+        "ses_a",
+      ).taskGranted,
+    ).toBe(false)
+    const ended = p.plan("cosmos_terminal", "end_control", { pane: "%4" }, "ses_a")
+    p.finish(ended, reply({ state: "ended" }))
+    expect(
+      p.plan(
+        "cosmos_terminal",
+        "acquire_control",
+        { pane: "%4", label: "Plot" },
+        "ses_a",
+      ).taskGranted,
+    ).toBe(false)
+
+    const expired = new CosmosPermissions(key)
+    const stale = expired.plan(
+      "cosmos_terminal",
+      "authorize_control",
+      { pane: "%4", operations: ["run tests"], seconds: 30 },
+      "ses_a",
+    )
+    expired.finish(
+      stale,
+      reply({
+        state: "allowed",
+        pane: "%4",
+        operations: ["run tests"],
+        expires_at: Date.now() / 1000 - 1,
+      }),
+    )
+    expect(
+      expired.plan(
+        "cosmos_terminal",
+        "acquire_control",
+        { pane: "%4", label: "Plot" },
+        "ses_a",
+      ).taskGranted,
+    ).toBe(false)
+  })
+
+  test("release and end control are allowed without a second control request", () => {
+    const p = new CosmosPermissions(key)
+    acquire(p)
+    expect(
+      p.plan("cosmos_terminal", "release_control", input, "ses_a").taskGranted,
+    ).toBe(true)
+    expect(
+      p.plan("cosmos_terminal", "end_control", { pane: "%4" }, "ses_a")
+        .taskGranted,
+    ).toBe(true)
+    expect(
+      p.plan("cosmos_terminal", "end_control", { pane: "%5" }, "ses_b")
+        .taskGranted,
+    ).toBe(true)
+  })
+
   test("pause/partial delivery/release discard grant; same task reacquisition cannot reuse confirmation", () => {
     for (const failure of [
       reply("paused", true),
@@ -321,6 +412,43 @@ describe("Cosmos task adapter", () => {
     )
     expect(() =>
       p.plan("cosmos_terminal", "terminal_step", input, "ses_a"),
+    ).toThrow()
+  })
+  test("non-input step errors retain the grant; failed input does not", () => {
+    const p = new CosmosPermissions(key)
+    acquire(p)
+    const wait = p.plan(
+      "cosmos_terminal",
+      "terminal_step",
+      { ...input, wait_ms: 100 },
+      "ses_a",
+    )
+    expect(wait.inputAttempted).toBe(false)
+    p.finish(wait, reply("temporary validation error", true))
+    expect(
+      p.plan(
+        "cosmos_terminal",
+        "terminal_step",
+        { ...input, text: "pwd" },
+        "ses_a",
+      ).taskGranted,
+    ).toBe(true)
+
+    const typed = p.plan(
+      "cosmos_terminal",
+      "terminal_step",
+      { ...input, text: "pwd" },
+      "ses_a",
+    )
+    expect(typed.inputAttempted).toBe(true)
+    p.finish(typed, reply("send failed", true))
+    expect(() =>
+      p.plan(
+        "cosmos_terminal",
+        "terminal_step",
+        { ...input, text: "pwd" },
+        "ses_a",
+      ),
     ).toThrow()
   })
 })
@@ -537,11 +665,11 @@ testEffect(Layer.empty).effect(
           }
           const handle = findHandle(observed)
           expect(handle).toBeDefined()
-          const begun = yield* run("task", {
+          const begun = yield* run("control", {
             operation: "begin",
             target: "%4",
             observation: handle,
-            task: "Plot",
+            label: "Plot",
           })
           expect(begun.status).toBe("completed")
           expect(JSON.stringify(begun)).not.toContain(lease.token)
@@ -553,7 +681,7 @@ testEffect(Layer.empty).effect(
             (yield* run("step", { target: "%4", text: "pwd" }, "ses_b")).status,
           ).toBe("error")
           expect(
-            (yield* run("task", { operation: "release", target: "%4" })).status,
+            (yield* run("control", { operation: "release", target: "%4" })).status,
           ).toBe("completed")
           expect(
             (yield* run("step", { target: "%4", text: "pwd" })).status,
@@ -659,7 +787,7 @@ testEffect(Layer.empty).effect(
   },
 )
 
-test("resume plan signs one task and state, with no input capability or remembered grant", () => {
+test("resume plan signs one task and state, then installs one takeover grant", () => {
   const permissions = new CosmosPermissions(key)
   const input = {
     id: "task_fixture",
@@ -684,6 +812,24 @@ test("resume plan signs one task and state, with no input capability or remember
     createHmac("sha256", key).update(payload).digest("hex"),
   )
   expect(plan.metadata.cosmos_resume).toBe(true)
+  permissions.finish(
+    plan,
+    reply({
+      resumed: true,
+      state: "active",
+      token: "resume-token",
+      pane: "%4",
+      task: "Continue user task",
+      task_id: "task_fixture",
+    }),
+  )
+  const next = permissions.plan(
+    "cosmos_terminal",
+    "terminal_step",
+    { pane: "%4", token: "resume-token" },
+    "ses_a",
+  )
+  expect(next.taskGranted).toBe(true)
 })
 
 it.effect(

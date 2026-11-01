@@ -1,0 +1,17 @@
+# Copy this file to:
+#   ${XDG_CONFIG_HOME:-~/.config}/cosmos/themes/my-theme.toml
+# The file name (without .toml) is the id stored in config.toml.
+kind = "terminal"
+name = "My Terminal Theme"
+order = 1000
+fg = "#D8DEE9"
+bg = "#1E222A"
+
+# Exactly 16 entries in ANSI order: black, red, green, yellow,
+# blue, magenta, cyan, white, then the bright variants.
+ansi = [
+  "#1E222A", "#E06C75", "#98C379", "#E5C07B",
+  "#61AFEF", "#C678DD", "#56B6C2", "#ABB2BF",
+  "#5C6370", "#E06C75", "#98C379", "#E5C07B",
+  "#61AFEF", "#C678DD", "#56B6C2", "#FFFFFF",
+]

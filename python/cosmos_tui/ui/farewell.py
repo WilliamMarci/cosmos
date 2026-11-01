@@ -5,11 +5,11 @@ import sys
 
 from rich.text import Text
 
-from cosmos_tui.core.paths import ASSET_DIR
 from cosmos_tui.core.hints import command
+from cosmos_tui.ui.logo import DEFAULT_LOGO, render_logo
 
 
-def show_farewell(result, backend, stream=None):
+def show_farewell(result, backend, stream=None, logo_style=None):
     stream = stream or sys.stdout
     target = getattr(backend, "session_id", None) or backend.session
     try:
@@ -25,7 +25,7 @@ def show_farewell(result, backend, stream=None):
     except (OSError, subprocess.TimeoutExpired):
         retained = None
     reason = (result or {}).get("reason", "exit")
-    logo = (ASSET_DIR / "cosmos-logo.ansi").read_text()
+    logo = render_logo(logo_style or DEFAULT_LOGO)
     if not stream.isatty():
         logo = Text.from_ansi(logo).plain
     stream.write("\n" + logo.rstrip() + "\n\n")

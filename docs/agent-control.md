@@ -6,20 +6,21 @@ This increment implements cross-process input ownership and user revocation. The
 
 ## Tools
 
+- `authorize_control(pane, operations, seconds=600)` returns a bounded allowance after one explicit user approval. The adapter stores it for the conversation/agent/pane and uses it only to skip later control-acquisition prompts until expiry; manual pause/end or expiry revokes it. It does not acquire input, create a task or grant Shell/Actions.
 - `control_status()` returns controlled panes, task labels and states (`active`, `paused`, `ready`), without ownership tokens.
-- `acquire_control(pane, snapshot_id, task)` requires a snapshot observed by the same authenticated runtime conversation, re-observes the same region, and rejects changed snapshots. It returns a cryptographically random token and a fresh `task_id`. Another owner cannot replace it, and a manually paused task cannot reacquire until a user resumes it.
-- `control_input(pane, token, kind, arguments, snapshot_id=None)` accepts `send_text`, `send_keys` or `mouse` using the existing terminal input argument names. Tokens belong to one authenticated conversation, task and stable pane. Mouse requires a fresh observation ID covering its target cell. Tmux server PID, pane window and dimensions are checked against acquisition; layout changes require a fresh acquisition. Mouse additionally revalidates its observation before input. These are sampled checks, not atomic application transactions.
-- `release_control(pane, token)` ends the owner's task, including one paused with that token. It does not send Ctrl+C, close a pane or stop a terminal program.
+- `acquire_control(pane, snapshot_id, label, takeover=False)` requires a snapshot observed by the same authenticated runtime conversation, re-observes the same region, and rejects changed snapshots. It returns a cryptographically random token and a fresh control lease ID; it does not create a persistent task. Another active owner cannot replace it. A paused lease can be taken over only with `takeover=true` through the user-approved `cosmos_control begin`; that approval is the takeover confirmation, and an allowance cannot bypass it.
+- `control_input(pane, token, kind, arguments, snapshot_id=None)` accepts `send_text`, `send_keys` or `mouse` using the existing terminal input argument names. Tokens belong to one authenticated conversation, control lease and stable pane; they are separate from persistent task rows. Mouse requires a fresh observation ID covering its target cell. Tmux server PID and pane window identity are checked for text/keys; mouse additionally validates dimensions and revalidates its observation. A harmless resize does not invalidate text/keys. These are sampled checks, not atomic application transactions.
+- `release_control(pane, token)` ends the owner's control lease, including one paused with that token. `end_control(pane)` clears this conversation's own or legacy lease without a token. Neither sends Ctrl+C, closes a pane or stops a terminal program.
 
-The patched runtime groups task acquisition, ordinary controlled input and own release under one scoped confirmation, as described below. Other mutations retain their native permission checks. Ownership alone does not grant unrelated permissions. `control_input` returns `delivery=delivered`, `action_complete=false`, `task_complete=false`: downstream evidence is still required.
+The patched runtime groups control acquisition, ordinary controlled input and own release/end under one scoped confirmation, as described below. Other mutations retain their native permission checks. Ownership alone does not grant unrelated permissions. `control_input` returns `delivery=delivered`, `action_complete=false`, `task_complete=false`: downstream evidence is still required.
 
 ## Human input and recovery
 
-A physical non-modifier key in a workspace terminal, pasted text or a click on a terminal pane pauses that pane's control task before normal UI/terminal handling. Mouse forwarding (including wheel and drag) also revokes ownership. This applies when keyboard passthrough is enabled. The first transition emits a notification; repeated input does not repeat it.
+A key actually delivered to a terminal pane, pasted text or a forwarded mouse event pauses that pane's control lease before normal UI/terminal handling. Changing focus or sessions, opening Cosmos menus and other UI actions do not pause control. Mouse forwarding (including wheel and drag) also revokes ownership. This applies when keyboard passthrough is enabled. The first transition emits a notification; repeated input does not repeat it. Control pauses do not create or modify persistent task rows; task-level human-input pauses remain a separate Tasks policy.
 
 A pause marker is published before waiting for an in-flight sender's lock. Controlled input checks it immediately before dispatch; queued/stale tokens fail. Input already dispatched cannot be recalled. This is not a hard real-time guarantee and aborts a native Cosmos Agent model turn through its Session API. Plain system OpenCode has no such integration. The Agent prompt requires returning to the user after observing paused state, without retrying input or resuming itself.
 
-For an explicit continuation request, the Agent can offer a one-time [resume confirmation](agent-tasks.md#agent-requested-resume-confirmation); approval does not restore input authority. Actions → **Resume pane Agent control** changes the task to `ready` and invalidates the old token. The same Agent connection must observe again and acquire a fresh token. For native logical tasks, resuming queues a fresh model inspection; it does not restore input ownership. **End pane Agent control task** revokes the record and token; the terminal program continues. Both actions can be assigned in Settings → Keybindings and have no default shortcut. The shared PAUSED top row remains reserved until the control task ends.
+For an explicit continuation request, the Agent can offer a one-time [resume confirmation](agent-tasks.md#agent-requested-resume-confirmation); the same approval resumes the persistent task and authorizes one fresh takeover. The old token is never reused. Actions → **Resume pane Agent control** changes a control-only lease to `ready`; the next `cosmos_control begin` is the takeover approval. **End pane Agent control** revokes the record and token; the terminal program continues. Both actions can be assigned in Settings → Keybindings and have no default shortcut. The shared PAUSED top row remains reserved while a control lease or persistent task header targets the pane.
 
 ## Runtime scope
 
@@ -27,17 +28,17 @@ Ownership is shared across local processes/clients of the same managed Tmux sock
 
 Abandoned task records fail closed; the user can end them via Actions. There is no automatic expiry or reconnect-to-owner protocol yet. A Tmux server/layout change rejects the old token; it does not silently retarget a replacement pane. Read-only observation remains available except on private panes.
 
-Legacy `send_text`/`send_keys`/`mouse` still work for panes without a control task. When a task exists (including paused/ready), legacy input rejects it; an Agent cannot bypass a revoked token using these tools. Same-user shell programs or raw Tmux commands are outside this trusted-tool policy, which is not an OS sandbox. The Agent prompt forbids bypassing these boundaries.
+Legacy `send_text`/`send_keys`/`mouse` still work for panes without a control lease. When a control lease exists (including paused/ready), legacy input rejects it; an Agent cannot bypass a revoked token using these tools. Same-user shell programs or raw Tmux commands are outside this trusted-tool policy, which is not an OS sandbox. The Agent prompt forbids bypassing these boundaries.
 
-Implementation boundaries: `control.py` owns shared ownership/revocation state; `control_tools.py` adapts lifecycle and token validation to terminal tools. Input and pointer routers only report human intervention, using the existing terminal delivery and notification systems.
+Implementation boundaries: `control.py` owns shared ownership/revocation state; `control_tools.py` adapts control leases and token validation to terminal tools without creating Tasks rows. Input and pointer routers only report human intervention, using the existing terminal delivery and notification systems.
 
 ## Shared takeover header
 
-An active task displays `COSMOS Taking over`, a locally animated braille indicator and its task label. Label and activity use adjacent background blocks, without a literal separator character. Busy feedback runs at 8 frames/second normally and 2 frames/second under reduced motion; the independent pointer remains steady under reduced motion. A manually paused task displays static `COSMOS PAUSED` with a monochrome `⏸︎`; `ready` adds a reminder that fresh observation is required. The same pane status is visible in every connected Cosmos client. Clicking the header pauses control without forwarding a mouse event into the application. Text is drawn by the existing `TerminalSurface`, never written into shell history.
+An active temporary control lease or persistent task displays `COSMOS Taking over`, a locally animated braille indicator and its label/goal. Label and activity use adjacent background blocks, without a literal separator character. Busy feedback runs at 8 frames/second normally and 2 frames/second under reduced motion; the independent pointer remains steady under reduced motion. A manually paused control or paused/blocked task displays static `COSMOS PAUSED` with a monochrome `⏸︎`; `ready` adds a reminder that fresh observation is required. Control takes precedence when both records target the same pane. The same pane status is visible in every connected Cosmos client. Clicking the header pauses control without forwarding a mouse event into the application. Text is drawn by the existing `TerminalSurface`, never written into shell history.
 
-Reservation uses Tmux's native window-level `pane-border-status=top`. While any controlled pane remains in a window, all its panes therefore have native top-border positions, but only controlled panes show takeover text. This backend granularity is intentional: actual PTY dimensions, captured grids, application cursor and input coordinates remain consistent across clients. The prior local option (or inherited setting) is restored when the last control task ends; pause/resume does not resize. A `@cosmos_control_header` window option records restoration metadata, not tokens.
+Reservation uses Tmux's native window-level `pane-border-status=top`. While any controlled or task-owned pane remains in a window, all its panes therefore have native top-border positions, but only control/task panes show takeover text. This backend granularity is intentional: actual PTY dimensions, captured grids, application cursor and input coordinates remain consistent across clients. The prior local option (or inherited setting) is restored when the last control lease ends; pause/resume does not resize. A `@cosmos_control_header` window option records restoration metadata, not tokens.
 
-Acquisition re-observes after reservation and returns the resulting `snapshot_id` and `dimensions`; geometry validation uses the resized application area. Tools remain one-based application-content cells, excluding the header. The UI reconciles shared state and layout, refreshing active header rows for animation; paused rows do not animate. UI detach keeps reservations/tasks intact. End/release restores layout; there is still no automatic orphan ownership expiry. Logical task continuation uses the scheduler. `headers.py` handles native reservation, and `header_ui.py` handles character composition.
+Acquisition re-observes after reservation and returns the resulting `snapshot_id` and `dimensions`; geometry validation uses the resized application area. Tools remain one-based application-content cells, excluding the header. The UI reconciles shared state and layout, refreshing active header rows for animation; paused rows do not animate. UI detach keeps reservations/tasks intact. End/release restores layout when no task header still targets the pane; there is still no automatic orphan control expiry. Logical task continuation uses the scheduler. `headers.py` handles native reservation, and `header_ui.py` handles character composition.
 
 ## Agent pointer
 
@@ -48,24 +49,31 @@ For background waits, [terminal watches](agent-monitor.md) can release the owner
 
 ### Bounded terminal step
 
-`terminal_step(pane, token, text, submit=false, wait_ms=100, full=false)` pastes one literal
+`terminal_step(pane, token, text="", submit=false, wait_ms=100, full=false)` pastes one literal
 single line, optionally sends Enter, then returns a compact initial snapshot or positioned changed rows.
-The wait is bounded to 0–2000 ms. Each input uses its own ownership/revocation
-check so manual input can stop submission after paste. Newlines and NUL are
-rejected before any delivery. On failure after delivery, the response reports
-`delivery: partial` and the delivered stages; never blindly repeat that input.
+Omitting text/submit is a wait-only observation. The wait is bounded to 0–2000 ms.
+A Tmux copy/view mode is cleared before input and reported as `mode_cleared`;
+observations expose `pane_in_mode` and the visible screen mode. Each input uses
+its own ownership/revocation check so manual input can stop submission after
+paste. Newlines and NUL are rejected before any delivery. On failure after
+delivery, the response reports `delivery: partial` and the delivered stages;
+never blindly repeat that input.
 Successful delivery still sets `action_complete` and `task_complete` to false.
 In the patched runtime this tool uses the acquired task capability; plain system OpenCode has no Cosmos tools.
 
 
-## Conversation/task/pane permission scope
+## Conversation/control/pane permission scope
 
 Cosmos's patched OpenCode adapter asks once at `acquire_control` for a named
-terminal task. The permission resource contains the native model conversation ID,
-stable pane ID, task label and a unique acquisition identity. After successful
-acquisition, the returned token and `task_id` identify the grant. Ordinary
-`control_input` and `terminal_step` reuse it. `release_control` ends only the
-conversation's own token and does not ask again, including after manual pause.
+temporary control lease, unless an unexpired explicit `authorize_control`
+allowance covers the same conversation/agent/pane. The permission resource
+contains the native model conversation ID, stable pane ID, display label and a
+unique acquisition identity.
+After successful acquisition, the returned token and `task_id` identify the
+adapter grant; they do not identify a persistent Tasks row. Ordinary
+`control_input` and `terminal_step` reuse the grant. `release_control` or
+`end_control` ends only the conversation's own control and does not ask again,
+including after manual pause.
 Explicit configured denies and permission hooks still apply. Control-key input
 containing Ctrl+C, Ctrl+Z or Ctrl+D keeps a separate transient confirmation;
 workspace management has its own explicit task capability below; other Actions keep their existing permissions.
@@ -74,7 +82,7 @@ These task checks ignore project-saved approvals, including old wildcard rules.
 Requests carry `save: []`; choosing Always has only one-request effect and cannot
 persist this task permission. Grants live only in the patched Agent process,
 never in the project permission database. A successful new acquisition rotates
-the pane grant. Input failures, partial delivery and release discard it. Process
+the pane grant. Input failures, partial delivery, pause/control loss and release discard it; a pre-input validation error or wait-only step does not. Process
 restart loses the grant and fails closed; orphan control records still need the
 existing user recovery Actions. A configured explicit allow can still customize
 the default confirmation policy.
@@ -128,7 +136,7 @@ Workspace grants are independent of the persistent task scheduler and never gran
 
 `cosmos_terminal.context(target?, client?)` combines target metadata, connected client IDs, current UI context (when a client is unambiguous), this authenticated conversation's unfinished tasks and current control status. `target` accepts `%pane` or the displayed `session:pane`. It does not enumerate Actions or return terminal history. Unknown targets return candidates, ambiguous/stale clients return connected IDs, and paused tasks include the current `resume_challenge`. It does not resume a task or grant input permission.
 
-Acquisition creates or reuses its logical task only after the pane lease, header synchronization and fresh observation succeed. Task reuse is restricted to the same conversation and pane. Ownership conflicts and pauses return an MCP error whose text is JSON with `status`, `message` and `next`; ordinary validation failures remain errors. A conflict does not require the model to mark housekeeping tasks failed.
+Acquisition synchronizes the pane header and takes a fresh observation; it never creates or reuses a persistent task. Control leases and task rows have independent lifetimes. Ownership conflicts and pauses return an MCP error whose text is JSON with `status`, `message` and `next`; ordinary validation failures remain errors. A conflict does not require the model to mark housekeeping tasks failed.
 
 A successful release is remembered for the last 128 handles in that tool connection. Closing the same handle again returns `state: ended, already_finished: true`; it never releases a replacement lease. Unknown handles and handles from other connections remain invalid. Receipts are transient and disappear on restart.
 

@@ -36,9 +36,23 @@ class ResumeTests(unittest.IsolatedAsyncioTestCase):
         self.tools.conversation = "ses_fixture"
         self.tools.runtime_id = "runtime"
         self.tools.pane = AsyncMock(return_value=PANE)
+        self.tools.observe = AsyncMock(
+            return_value=dict(
+                snapshot_id="fresh", dimensions=dict(width=80, height=24)
+            )
+        )
+        self.tools.acquire_control = AsyncMock(
+            return_value=dict(
+                token="takeover-token",
+                task="Resume task",
+                task_id="control_task",
+                snapshot_id="fresh",
+                dimensions=dict(width=80, height=24),
+            )
+        )
         self.store = Tasks("fixture")
         self.row = self.store.create(
-            "ses_fixture", "runtime", PANE, "Continue requested work", kind="control"
+            "ses_fixture", "runtime", PANE, "Continue requested work", kind="schedule"
         )
         self.controls = ControlStore("fixture")
         self.lease = self.controls.acquire(
@@ -49,6 +63,7 @@ class ResumeTests(unittest.IsolatedAsyncioTestCase):
             logical_task=self.row["id"],
         )
         self.controls.change("%4", "pause")
+        self.store.pause("ses_fixture")
 
     async def request(self):
         row = next(
@@ -83,12 +98,12 @@ class ResumeTests(unittest.IsolatedAsyncioTestCase):
         args, proof = await self.request()
         result = await self.tools.request_resume(**args, _cosmos_resume_approval=proof)
         self.assertTrue(result["resumed"])
-        self.assertFalse(result["input_ownership"])
+        self.assertTrue(result["input_ownership"])
+        self.assertEqual(result["token"], "takeover-token")
         row = self.store.get(self.row["id"])
         self.assertEqual(row["state"], "running")
         self.assertIsNone(row["pending"])
         self.assertEqual(self.store.get(other["id"])["state"], "paused")
-        self.assertEqual(self.controls.status()[0]["state"], "ready")
         with self.assertRaises(ValueError):
             self.controls.guarded(
                 "%4", self.tools.owner, self.lease["token"], lambda: None
@@ -114,7 +129,8 @@ class ResumeTests(unittest.IsolatedAsyncioTestCase):
         with self.controls.locked() as records:
             records["%4"]["owner"] = "old-runtime-owner"
         args, proof = await self.request()
-        await self.tools.request_resume(**args, _cosmos_resume_approval=proof)
+        result = await self.tools.request_resume(**args, _cosmos_resume_approval=proof)
+        self.assertEqual(result["token"], "takeover-token")
         with self.controls.locked(write=False) as records:
             self.assertEqual(records["%4"]["owner"], self.tools.owner)
             self.assertIsNone(records["%4"]["token"])

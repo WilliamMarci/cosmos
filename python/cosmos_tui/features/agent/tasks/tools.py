@@ -42,6 +42,7 @@ class TaskTools:
 
     async def list_tasks(self):
         store = self.task_owner()
+        await asyncio.to_thread(store.purge_controls)
         rows = [
             r
             for r in await asyncio.to_thread(store.list)
@@ -69,6 +70,22 @@ class TaskTools:
             raise PermissionError("Task belongs to a different conversation")
         return await asyncio.to_thread(store.history, id)
 
+    async def cancel_task(self, id):
+        store = self.task_owner()
+        if store.get(id)["conversation"] != self.conversation:
+            raise PermissionError("Task belongs to a different conversation")
+        from cosmos_tui.features.agent.tasks.lifecycle import action
+
+        await action(self.backend.argv[2], id, "cancel")
+        await asyncio.to_thread(store.delete, id)
+        return dict(id=id, state="cancelled", deleted=True)
+
+    async def delete_task(self, id):
+        store = self.task_owner()
+        if store.get(id)["conversation"] != self.conversation:
+            raise PermissionError("Task belongs to a different conversation")
+        return await asyncio.to_thread(store.delete, id)
+
     async def finish_task(self, id, outcome, summary):
         store = self.task_owner()
         row = store.get(id)
@@ -86,6 +103,10 @@ class TaskTools:
             )
         for pane, token in list(self.control_tokens.items()):
             await self.release_control(pane, token)
-        return await asyncio.to_thread(
+        row = await asyncio.to_thread(
             store.finish, id, self.conversation, outcome, self.redact(summary)
         )
+        if outcome == "needs_input" or row["state"] == "waiting":
+            return row
+        await asyncio.to_thread(store.delete, id)
+        return dict(row, deleted=True)

@@ -29,6 +29,8 @@ cp config/cosmos-agent-prompt.md "dist/$bundle_name/config/"
 cp -R config/agent-commands "dist/$bundle_name/config/"
 rm -rf "dist/$bundle_name/skills"
 cp -R skills "dist/$bundle_name/"
+rm -rf "dist/$bundle_name/themes"
+cp -R themes "dist/$bundle_name/"
 cp README.md RELEASE.md "dist/$bundle_name/"
 cp cosmos "dist/$bundle_name/"
 mkdir -p "dist/$bundle_name/design"
@@ -74,7 +76,7 @@ else
 fi
 printf '%s\n' 'PDF viewing requires pdfinfo, pdftoppm, pdftotext (Poppler / poppler-utils) on PATH; not bundled.' > "dist/$bundle_name/pdf-dependencies.txt"
 ldd target/release/cosmos > "dist/$bundle_name/runtime-dependencies.txt"
-(cd "dist/$bundle_name" && find bin config skills licenses docs examples sdk design python dev shell terminal_agent mods -type f -exec sha256sum {} + > SHA256SUMS && sha256sum cosmos README.md RELEASE.md runtime-dependencies.txt pdf-dependencies.txt >> SHA256SUMS)
+(cd "dist/$bundle_name" && find bin config skills themes licenses docs examples sdk design python dev shell terminal_agent mods -type f -exec sha256sum {} + > SHA256SUMS && sha256sum cosmos README.md RELEASE.md runtime-dependencies.txt pdf-dependencies.txt >> SHA256SUMS)
 tar -C dist -czf "dist/$bundle_name.tar.gz" "$bundle_name"
 sha256sum "dist/$bundle_name.tar.gz" > "dist/$bundle_name.tar.gz.sha256"
 printf '%s\n' "$project_root/dist/$bundle_name.tar.gz"

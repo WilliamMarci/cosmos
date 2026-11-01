@@ -93,6 +93,15 @@ def build(row, raw, layers, region=None):
         dimensions=dict(width=width, height=height),
         cursor=dict(x=row["cursor_x"] + 1, y=row["cursor_y"] + 1),
         program=row["pane_current_command"],
+        pane_in_mode=bool(row["pane_in_mode"]),
+        alternate_screen=bool(row["alternate_on"]),
+        screen=(
+            "copy"
+            if row["pane_in_mode"]
+            else "alternate"
+            if row["alternate_on"]
+            else "normal"
+        ),
     )
     data["snapshot_id"] = digest(dict(data, grid=styled))
     data["observed_at"] = time.time()

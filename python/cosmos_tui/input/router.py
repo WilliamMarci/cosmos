@@ -23,6 +23,12 @@ from cosmos_tui.ui.menus import CompactMenu
 
 
 class InputRouter(Controller):
+    async def _terminal_input(self):
+        """Only real keys delivered to a terminal count as human input."""
+        from cosmos_tui.features.agent.control import human_input
+
+        await human_input(self.app, self.app.active())
+
     def toggle_passthrough(self):
         self.keyboard_passthrough = not getattr(self, "keyboard_passthrough", False)
         self.passthrough_prefix = None
@@ -43,6 +49,7 @@ class InputRouter(Controller):
                 if command and command.target == "keyboard_passthrough":
                     self.toggle_passthrough()
                     return
+            await self._terminal_input()
             await app.backend.send(chord)
             await app.backend.send(event.key, event.character)
             return
@@ -58,19 +65,11 @@ class InputRouter(Controller):
         if names:
             self.passthrough_prefix = (event.key, names)
         else:
+            await self._terminal_input()
             await app.backend.send(event.key, event.character)
 
     async def on_event(self, event):
         app = self.app
-        if (
-            isinstance(event, events.Key)
-            and not event.is_forwarded
-            and event.key not in MODIFIER_KEYS
-            and self.key_context() == "workspace"
-        ):
-            from cosmos_tui.features.agent.control import human_input
-
-            await human_input(app, app.active())
         if (
             isinstance(event, events.Key)
             and not event.is_forwarded
@@ -273,6 +272,7 @@ class InputRouter(Controller):
         logging.getLogger(__name__).debug("action_leader %s", key)
         if app.prefix and key == getattr(app, "prefix_chord", key):
             app.prefix = False
+            await self._terminal_input()
             await app.backend.send(key)
         else:
             app.prefix = True
@@ -335,6 +335,7 @@ class InputRouter(Controller):
         if pane and pane.viewer:
             await app.reader_ui.on_key(event, pane)
         else:
+            await self._terminal_input()
             await app.backend.send(event.key, event.character)
 
     async def on_paste(self, event: events.Paste):

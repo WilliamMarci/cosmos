@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import os
 import re
 import shlex
@@ -11,6 +12,7 @@ from pathlib import Path
 from dataclasses import dataclass
 
 from cosmos_tui.core.paths import PROJECT_ROOT
+from cosmos_tui.terminal.child_graphics import KittyStream, unescape_output
 
 
 @dataclass
@@ -59,6 +61,14 @@ class Tmux:
         ]
         self.lock = asyncio.Lock()
         self.process = None
+        self.reader_task = None
+        self.reader_error = None
+        self.response_token = None
+        self.response_lines = []
+        self.response_size = 0
+        self.response_future = None
+        self.child_streams = {}
+        self.child_graphics = []
         self.size = None
         self.tabs = []
         self.zoomed = False
@@ -121,6 +131,7 @@ class Tmux:
 
     async def connect(self):
         self.created = False
+        self.reader_error = None
         self.session_id = await self.resolve_session_id()
         if self.session_id is None:
             if self.session.startswith("$"):
@@ -187,17 +198,16 @@ class Tmux:
             *self.argv,
             "-C",
             "attach-session",
-            "-f",
-            "no-output",
             "-t",
             self.session_id,
             stdin=asyncio.subprocess.PIPE,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
             env=env,
-            limit=1024 * 1024,
+            limit=16 * 1024 * 1024,
         )
         await self._response()
+        self.reader_task = asyncio.create_task(self._read_loop())
         await self.install_bell_hook()
         return self.created
 
@@ -239,6 +249,9 @@ class Tmux:
                 line = await self.process.stdout.readline()
                 if not line:
                     raise EOFError("terminal session ended")
+                if token is None and line.startswith(b"%output "):
+                    self._handle_output(line)
+                    continue
                 text = line.decode(errors="replace").rstrip("\r\n")
                 if token is None:
                     if text.startswith("%begin "):
@@ -255,17 +268,110 @@ class Tmux:
                         raise RuntimeError("backend response exceeds budget")
                     lines.append(text)
 
+    def _handle_output(self, line):
+        try:
+            _, pane, data = line.split(b" ", 2)
+            pane_id = pane.decode("ascii")
+        except (ValueError, UnicodeDecodeError):
+            return
+        stream = self.child_streams.get(pane_id)
+        if stream is None:
+            stream = self.child_streams[pane_id] = KittyStream()
+        try:
+            raw = unescape_output(data.rstrip(b"\r\n"))
+            sequences = stream.feed(raw)
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "could not parse pane graphics output", exc_info=True
+            )
+            return
+        for sequence in sequences:
+            self.child_graphics.append((pane_id, sequence))
+
+    def take_child_graphics(self):
+        graphics, self.child_graphics = self.child_graphics, []
+        return graphics
+
+    def _set_response(self, result=None, error=None):
+        future = self.response_future
+        self.response_future = None
+        self.response_token = None
+        self.response_lines = []
+        self.response_size = 0
+        if future is None or future.done():
+            return
+        if error is not None:
+            future.set_exception(error)
+        else:
+            future.set_result(result or [])
+
+    async def _read_loop(self):
+        try:
+            while True:
+                line = await self.process.stdout.readline()
+                if not line:
+                    raise EOFError("terminal session ended")
+                if self.response_token is None and line.startswith(b"%output "):
+                    self._handle_output(line)
+                    continue
+                text = line.decode(errors="replace").rstrip("\r\n")
+                if self.response_token is None:
+                    if text.startswith("%begin "):
+                        self.response_token = text[7:]
+                        self.response_lines = []
+                        self.response_size = 0
+                    elif text.startswith("%exit"):
+                        raise EOFError("terminal session ended")
+                    continue
+                if text == f"%end {self.response_token}":
+                    self._set_response(result=self.response_lines)
+                elif text == f"%error {self.response_token}":
+                    self._set_response(
+                        error=RuntimeError("\n".join(self.response_lines))
+                    )
+                else:
+                    self.response_size += len(line)
+                    if self.response_size > 8 * 1024 * 1024:
+                        self._set_response(
+                            error=RuntimeError("backend response exceeds budget")
+                        )
+                    else:
+                        self.response_lines.append(text)
+        except asyncio.CancelledError:
+            raise
+        except Exception as error:
+            self.reader_error = error
+            self._set_response(error=error)
+        finally:
+            if self.response_future is not None and not self.response_future.done():
+                self._set_response(error=EOFError("terminal session ended"))
+
     async def request(self, command):
         async with self.lock:
+            if self.reader_error is not None:
+                raise EOFError("terminal session ended") from self.reader_error
+            if self.process is None or self.process.returncode is not None:
+                raise EOFError("terminal session ended")
+            future = asyncio.get_running_loop().create_future()
+            self.response_future = future
             try:
                 self.process.stdin.write((command + "\n").encode())
                 await self.process.stdin.drain()
-                return await self._response()
-            except (TimeoutError, ConnectionError) as error:
+                async with asyncio.timeout(3):
+                    return await future
+            except TimeoutError as error:
                 await self.close()
                 raise EOFError(
                     "backend control connection ended; session is retained"
                 ) from error
+            except (BrokenPipeError, ConnectionError) as error:
+                await self.close()
+                raise EOFError(
+                    "backend control connection ended; session is retained"
+                ) from error
+            finally:
+                if self.response_future is future:
+                    self.response_future = None
 
     @staticmethod
     def quote(text):
@@ -509,6 +615,16 @@ class Tmux:
         )
 
     async def close(self):
+        task = self.reader_task
+        self.reader_task = None
+        if task is not None and task is not asyncio.current_task():
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                pass
         if self.process and self.process.returncode is None:
             self.process.terminate()
             try:
