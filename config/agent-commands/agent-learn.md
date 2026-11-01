@@ -1,0 +1,5 @@
+Learn, verify and save this software workflow: $ARGUMENTS
+
+Load the existing cosmos-tui and cosmos-skill-export skills, plus a matching application skill if present. Reuse their observation, control, evidence, recovery and skill-writing procedures; do not create a second learning system. Prefer the designated interactive terminal and the application's help, using an isolated fixture when experimenting. Manual pauses still require request_resume confirmation.
+
+This explicit command includes saving the verified method. Follow cosmos-skill-export to create or update its SKILL.md in the personal library supplied in the system context (the isolated Cosmos profile's skills directory), then validate it and read it back. Preserve existing validated knowledge, remove secrets and transient targets, and report the saved path and verification limits. If learning fails, identify missing evidence instead of saving an invented success. Ordinary OpenCode directories are not the destination. Create a ZIP only when explicitly requested.

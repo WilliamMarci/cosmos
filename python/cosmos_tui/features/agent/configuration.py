@@ -91,6 +91,7 @@ def configuration(socket, source_pane):
                 "resource": "*",
                 "effect": "allow",
             },
+            {"action": "cosmos_terminal_context", "resource": "*", "effect": "allow"},
             {
                 "action": "cosmos_terminal_control_status",
                 "resource": "*",

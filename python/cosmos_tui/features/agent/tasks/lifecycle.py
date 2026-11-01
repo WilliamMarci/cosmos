@@ -10,13 +10,21 @@ def control_task(socket, tools, pane, label):
     if not getattr(tools, "conversation", None):
         return None
     store = Tasks(socket)
+    if store.paused(tools.conversation):
+        raise ValueError(
+            "Conversation paused; request_resume requires user confirmation"
+        )
     for row in store.list():
-        if row["conversation"] == tools.conversation and (
-            row["state"] == "running"
-            or (
-                row["kind"] == "control"
-                and row["goal"] == label
-                and row["state"] in ("waiting", "needs_review", "blocked")
+        if (
+            row["conversation"] == tools.conversation
+            and row["pane"] == pane["pane_id"]
+            and (
+                row["state"] == "running"
+                or (
+                    row["kind"] == "control"
+                    and row["goal"] == label
+                    and row["state"] in ("waiting", "needs_review", "blocked")
+                )
             )
         ):
             store.change(row["id"], state="running", pending=None)

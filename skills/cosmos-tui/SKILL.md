@@ -46,3 +46,11 @@ index is not an input coordinate. Private-pane restrictions apply on every page.
 For a workspace-management task, `acquire_workspace(task)` once, pass its token as
 `workspace_token` to the listed create/rename/focus tools, then `release_workspace`.
 The grant does not include terminal input, closing, interruption or unrelated Actions.
+
+## Efficient discovery and observation
+
+Prefer `cosmos_terminal.context(target)` to repeated separate pane, task, control and client discovery. It returns only the current conversation's unfinished tasks, including current resume challenges, and does not enumerate Actions. A stale target returns candidates; an ambiguous client returns connected IDs. Manual pause still requires `request_resume` confirmation.
+
+`terminal_step` defaults to a compact initial snapshot, then changed positioned rows plus `cleared_rows`. Keep the preceding snapshot as the base; `base_snapshot_id` identifies it. After truncation, use `full=true` or a fresh `observe` when omitted content matters. Layout/program changes reset to a snapshot. Input delivery is never a claim of command or task completion. Do not manually mark housekeeping tasks failed to resolve an acquisition conflict: choose a valid target, wait, or ask for resume as the returned outcome directs.
+
+When explicitly invoked, `/agent-learn` learns, verifies and saves a reusable skill in Cosmos Agent's isolated personal OpenCode skill library. It must remove transient targets and secrets and state verification limits; a saved skill never bypasses input control or permissions.

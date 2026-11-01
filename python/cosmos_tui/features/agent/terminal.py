@@ -11,6 +11,7 @@ from cosmos_tui.features.agent.tasks.tools import TaskTools
 from cosmos_tui.features.agent.history import HistoryTools
 from cosmos_tui.features.agent.workspace_grants import WorkspaceGrants
 from cosmos_tui.features.agent.control_tools import ControlledInput
+from cosmos_tui.features.agent.context import ContextTools
 from cosmos_tui.features.agent.monitor.tools import TerminalWatches
 
 FIELDS = (
@@ -59,7 +60,7 @@ FLAGS = {
 
 
 class TerminalTools(
-    ControlledInput, TerminalWatches, HistoryTools, WorkspaceGrants, TaskTools
+    ContextTools, ControlledInput, TerminalWatches, HistoryTools, WorkspaceGrants, TaskTools
 ):
     def __init__(self, socket):
         from cosmos_tui.features.agent.binding import WorkspaceBinding

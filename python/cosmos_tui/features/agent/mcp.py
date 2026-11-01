@@ -261,7 +261,7 @@ TOOLS.append(
 TOOLS.append(
     dict(
         name="terminal_step",
-        description="One token-validated literal single-line paste, optional explicit Enter, then fresh bounded text observation. Checks revocation before each input. Partial results identify delivered stages: never blindly repeat them. Delivery is not task completion.",
+        description="One token-validated literal single-line paste, optional explicit Enter, then changed rows (first result is a compact snapshot; full=true requests the complete observation). Checks revocation before each input. Partial results identify delivered stages: never blindly repeat them. Delivery is not task completion.",
         inputSchema=schema(
             dict(
                 pane=PANE,
@@ -269,6 +269,7 @@ TOOLS.append(
                 text=dict(type="string", maxLength=32768),
                 submit=dict(type="boolean"),
                 wait_ms=dict(type="integer", minimum=0, maximum=2000),
+                full=dict(type="boolean"),
             ),
             ("pane", "token", "text"),
         ),
@@ -445,6 +446,18 @@ ACTION_TOOLS.append(
 )
 
 
+TOOLS.append(
+    dict(
+        name="context",
+        description="Compact workspace context: stable/display target, connected UI clients, current view, this conversation's active tasks, control status and next step. No Actions catalog or terminal transcript. Private content remains hidden. Target accepts pane ID or session:pane; use before separate discovery calls.",
+        inputSchema=schema(
+            dict(target=dict(type="string"), client=dict(type="string"))
+        ),
+        annotations=dict(readOnlyHint=True),
+    )
+)
+
+
 async def dispatch(tools, message, catalog=TOOLS):
     method = message.get("method")
     if method == "initialize":
@@ -493,7 +506,20 @@ async def dispatch(tools, message, catalog=TOOLS):
             TypeError,
             asyncio.TimeoutError,
         ) as error:
-            return dict(content=[dict(type="text", text=str(error))], isError=True)
+            outcome = getattr(error, "outcome", None)
+            return dict(
+                content=[
+                    dict(
+                        type="text",
+                        text=(
+                            json.dumps(outcome, ensure_ascii=False)
+                            if outcome
+                            else str(error)
+                        ),
+                    )
+                ],
+                isError=True,
+            )
     raise LookupError("method not found")
 
 

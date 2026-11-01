@@ -33,3 +33,48 @@ def compact_snapshot(observation, max_bytes=4096, max_rows=24):
             a["text"] != b["text"] for a, b in zip(selected, rows[-len(selected) :])
         ),
     )
+
+
+def step_observation(cache, observation, *, full=False):
+    """Positioned row replacements, including cleared rows; never a transcript."""
+    pane = observation["pane"]
+    previous = cache.get(pane)
+    cache[pane] = dict(observation)
+    if len(cache) > 32:
+        del cache[next(iter(cache))]
+    compatible = (
+        previous is not None
+        and all(
+            previous.get(key) == observation.get(key)
+            for key in ("dimensions", "region", "program")
+        )
+        and not previous.get("_delivery_truncated")
+        and not previous.get("truncated")
+        and not observation.get("truncated")
+    )
+    if full:
+        return dict(observation, mode="full")
+    if not compatible:
+        result = dict(
+            compact_snapshot(observation),
+            mode="snapshot",
+            full_observation_available=True,
+        )
+        cache[pane]["_delivery_truncated"] = result["truncated"]
+        return result
+    old = {row["y"]: row for row in previous["text"]}
+    new = {row["y"]: row for row in observation["text"]}
+    changed = [row for y, row in new.items() if old.get(y) != row]
+    # Disappeared trailing capture rows clear their previous screen positions.
+    changed.extend(dict(row, text="") for y, row in old.items() if y not in new)
+    result = dict(observation, text=sorted(changed, key=lambda row: row["y"]))
+    result = dict(
+        compact_snapshot(result),
+        mode="delta",
+        base_snapshot_id=previous["snapshot_id"],
+        full_observation_available=True,
+    )
+    # Blank replacements are essential; compact_snapshot omits blank rows.
+    cache[pane]["_delivery_truncated"] = result["truncated"]
+    result["cleared_rows"] = [row["y"] for row in changed if not row["text"].strip()]
+    return result

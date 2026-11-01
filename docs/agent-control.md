@@ -46,8 +46,8 @@ For background waits, [terminal watches](agent-monitor.md) can release the owner
 
 ### Bounded terminal step
 
-`terminal_step(pane, token, text, submit=false, wait_ms=100)` pastes one literal
-single line, optionally sends Enter, then returns a fresh text observation.
+`terminal_step(pane, token, text, submit=false, wait_ms=100, full=false)` pastes one literal
+single line, optionally sends Enter, then returns a compact initial snapshot or positioned changed rows.
 The wait is bounded to 0–2000 ms. Each input uses its own ownership/revocation
 check so manual input can stop submission after paste. Newlines and NUL are
 rejected before any delivery. On failure after delivery, the response reports
@@ -120,3 +120,14 @@ The same explicit-deny rules, signed conversation identity and nonpersistent
 permission behavior apply. A new workspace acquisition rotates the conversation's
 previous workspace token; release/restart/management-tool errors invalidate reuse.
 Workspace grants are independent of the persistent task scheduler and never grant terminal input.
+
+
+## Compact context and lifecycle outcomes
+
+`cosmos_terminal.context(target?, client?)` combines target metadata, connected client IDs, current UI context (when a client is unambiguous), this authenticated conversation's unfinished tasks and current control status. `target` accepts `%pane` or the displayed `session:pane`. It does not enumerate Actions or return terminal history. Unknown targets return candidates, ambiguous/stale clients return connected IDs, and paused tasks include the current `resume_challenge`. It does not resume a task or grant input permission.
+
+Acquisition creates or reuses its logical task only after the pane lease, header synchronization and fresh observation succeed. Task reuse is restricted to the same conversation and pane. Ownership conflicts and pauses return an MCP error whose text is JSON with `status`, `message` and `next`; ordinary validation failures remain errors. A conflict does not require the model to mark housekeeping tasks failed.
+
+A successful release is remembered for the last 128 handles in that tool connection. Closing the same handle again returns `state: ended, already_finished: true`; it never releases a replacement lease. Unknown handles and handles from other connections remain invalid. Receipts are transient and disappear on restart.
+
+Step observations use `mode: snapshot`, `delta` or `full`. Deltas identify `base_snapshot_id`, contain positioned changed nonblank `text` rows, and list blank/removed row numbers in `cleared_rows`. Apply row replacements, not append operations. Layout/program changes reset to a compact snapshot. Compact text is limited to 24 nonblank rows and 4096 UTF-8 bytes; `truncated` requires a full observation if omitted content matters. A truncated delivery cannot become a complete delta baseline. `full=true` explicitly returns the original full observation. Per-connection comparison state is bounded to 32 panes; it is not durable history.

@@ -53,6 +53,11 @@ class SkillTests(unittest.TestCase):
             self.assertEqual(paths[1], str(Path(root) / "cosmos/agent/skills"))
             self.assertEqual(paths[2], str(Path(root) / ".cosmos/skills"))
             config = configuration("service", "%12")
+            self.assertIn("agent-learn", config["commands"])
+            learned = config["commands"]["agent-learn"]["template"]
+            self.assertIn("$ARGUMENTS", learned)
+            self.assertIn("isolated Cosmos profile", learned)
+            self.assertIn("request_resume", learned)
             self.assertIn("cosmos-export-skill", config["commands"])
             self.assertIn(
                 "$ARGUMENTS", config["commands"]["cosmos-export-skill"]["template"]

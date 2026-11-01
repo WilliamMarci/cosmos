@@ -24,12 +24,12 @@ Two skills ship initially:
 Inside Cosmos Agent, type a slash command:
 
 ```text
-/cosmos-learn Use Vim to search and replace text in a temporary file
+/agent-learn Use Vim to search and replace text in a temporary file
 /cosmos-export-skill Save the verified workflow as vim-search-replace
 /cosmos-export-skill Export vim-search-replace to the current project's skill library and create a ZIP
 ```
 
-`cosmos-learn` prompts application-help discovery, scoped experimentation and result verification. It does not automatically turn every interaction into a persistent skill. `cosmos-export-skill` loads the export guidance and asks the model to create or update a skill, defaulting to the personal library. The command includes the current conversation as context; if no operation has actually been observed, the prompt requires identifying missing evidence rather than inventing a tested procedure.
+`agent-learn` explicitly requests discovery, scoped experimentation, result verification and saving a reusable `SKILL.md` in the isolated Cosmos Agent personal library. It validates and reads back the saved skill, parameterizes transient targets and removes secrets. Failed or unverified procedures must not be described as tested. This does not override manual pauses or tool permissions. The older `cosmos-learn` discovery-only prompt remains available for compatibility. `cosmos-export-skill` loads the export guidance and asks the model to create or update a skill, defaulting to the personal library. The command includes the current conversation as context; if no operation has actually been observed, the prompt requires identifying missing evidence rather than inventing a tested procedure.
 
 The model uses OpenCode's existing file tools to write skills. There is no automatic extraction daemon, and a stored skill is not a replay macro. It must rediscover live pane IDs and adapt to the current screen. Skills do not bypass tool permissions. Exporting a skill alone does not execute its scripts or authorize another run of the recorded workflow.
 
@@ -50,4 +50,4 @@ To import, inspect and extract that single directory into the destination person
 
 ## Validation
 
-`dev/test_agent_skills.py` verifies directory resolution, command registration, archive export/import and rejection of missing references. `dev/validate_agent_skills.py` starts a private OpenCode server with temporary XDG/project fixtures and verifies its actual `/api/skill` and `/api/command` registries discover bundled, personal and project skills plus the two slash commands. The fixtures also contain foreign home/project skills, OpenCode commands and an MCP that would write a sentinel if started; the test checks they are excluded and the sentinel is absent. The developer probe also retains an explicit `--system` schema/isolation diagnostic; that diagnostic is not the production fallback, which launches system OpenCode directly without injection. These checks do not call a model or claim that a model-generated skill has been behaviorally replayed.
+`dev/test_agent_skills.py` verifies directory resolution, command registration, archive export/import and rejection of missing references. `dev/validate_agent_skills.py` starts a private OpenCode server with temporary XDG/project fixtures and verifies its actual `/api/skill` and `/api/command` registries discover bundled, personal and project skills plus the registered slash commands. The fixtures also contain foreign home/project skills, OpenCode commands and an MCP that would write a sentinel if started; the test checks they are excluded and the sentinel is absent. The developer probe also retains an explicit `--system` schema/isolation diagnostic; that diagnostic is not the production fallback, which launches system OpenCode directly without injection. These checks do not call a model or claim that a model-generated skill has been behaviorally replayed.

@@ -82,7 +82,7 @@ class ControlledInput:
         return await asyncio.to_thread(ControlStore(self.backend.argv[2]).status)
 
     async def acquire_control(self, pane, snapshot_id, task):
-        from cosmos_tui.features.agent.control import ControlStore
+        from cosmos_tui.features.agent.control import ControlStore, ControlUnavailable
 
         if (
             not isinstance(task, str)
@@ -105,12 +105,12 @@ class ControlledInput:
             from cosmos_tui.features.agent.tasks.storage import Tasks
 
             if Tasks(self.backend.argv[2]).paused(self.conversation):
-                raise ValueError(
-                    "Conversation paused; for an explicit user continuation request, list_tasks then request_resume for confirmation"
+                raise ControlUnavailable(
+                    "paused",
+                    "Conversation paused; request explicit user resume confirmation",
+                    "context_then_request_resume",
                 )
-        logical_task = await asyncio.to_thread(
-            control_task, self.backend.argv[2], self, row, task
-        )
+        logical_task = None
         lease = await asyncio.to_thread(
             ControlStore(self.backend.argv[2]).acquire,
             pane,
@@ -127,6 +127,21 @@ class ControlledInput:
             await asyncio.to_thread(synchronize, self.backend.argv)
             observed = await self.observe(pane, ["text"])
             row = await self.pane(pane)
+
+            # Only create/reuse a logical task after ownership and observation
+            # succeeded. Serialize association against manual revocation.
+            def associate():
+                store = ControlStore(self.backend.argv[2])
+                with store.locked() as state:
+                    store.check(pane)
+                    current = state.get(pane)
+                    if not current or current["token"] != lease["token"]:
+                        raise ValueError("Control revoked before task association")
+                    identity = control_task(self.backend.argv[2], self, row, task)
+                    current["logical_task"] = identity
+                    return identity
+
+            logical_task = await asyncio.to_thread(associate)
         except Exception:
             await asyncio.to_thread(
                 ControlStore(self.backend.argv[2]).release,
@@ -154,14 +169,25 @@ class ControlledInput:
     async def release_control(self, pane, token):
         from cosmos_tui.features.agent.control import ControlStore
 
+        # Receipts are connection-local capabilities, bounded independently of
+        # live controls. A duplicate close must never close a replacement lease.
+        receipts = getattr(self, "_released_controls", None)
+        if receipts is None:
+            self._released_controls = receipts = {}
+        if receipts.get(token) == pane:
+            return dict(pane=pane, state="ended", already_finished=True)
         result = await asyncio.to_thread(
             ControlStore(self.backend.argv[2]).release, pane, self.owner, token
         )
+        receipts[token] = pane
+        if len(receipts) > 128:
+            del receipts[next(iter(receipts))]
         from cosmos_tui.features.agent.headers import synchronize
 
         await asyncio.to_thread(synchronize, self.backend.argv)
         self.control_geometry.pop(token, None)
-        self.control_tokens.pop(pane, None)
+        if self.control_tokens.get(pane) == token:
+            self.control_tokens.pop(pane, None)
         return result
 
     async def control_input(self, pane, token, kind, arguments, snapshot_id=None):
@@ -188,7 +214,9 @@ class ControlledInput:
             result=result,
         )
 
-    async def terminal_step(self, pane, token, text, submit=False, wait_ms=100):
+    async def terminal_step(
+        self, pane, token, text, submit=False, wait_ms=100, full=False
+    ):
         """One literal paste, optional Enter, then a bounded fresh observation."""
         if (
             not isinstance(text, str)
@@ -202,6 +230,8 @@ class ControlledInput:
             or not 0 <= wait_ms <= 2000
         ):
             raise ValueError("submit must be boolean; wait_ms must be 0–2000")
+        if type(full) is not bool:
+            raise ValueError("full must be boolean")
         delivered = []
         try:
             if text:
@@ -229,7 +259,15 @@ class ControlledInput:
         return dict(
             delivery="delivered",
             delivered=delivered,
-            observation=observation,
+            observation=self.step_observation(observation, full=full),
             action_complete=False,
             task_complete=False,
         )
+
+    def step_observation(self, observation, *, full=False):
+        from cosmos_tui.features.agent.compact import step_observation
+
+        cache = getattr(self, "_step_observations", None)
+        if cache is None:
+            self._step_observations = cache = {}
+        return step_observation(cache, observation, full=full)

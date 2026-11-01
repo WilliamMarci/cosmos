@@ -45,7 +45,7 @@ The home screen and exit wordmark use the canonical Cosmos glyphs in theme-relat
 
 ## Reusable software skills
 
-Cosmos skills use OpenCode's native discovery and skill tool. Bundled, personal and project skill libraries are injected at launch. `/cosmos-learn` starts a software-learning task; `/cosmos-export-skill` saves the observed method as a portable `SKILL.md` directory. See [Agent skills](agent-skills.md) for prompts, paths and ZIP export.
+Cosmos skills use OpenCode's native discovery and skill tool. Bundled, personal and project skill libraries are injected at launch. `/agent-learn` learns, verifies and saves an application workflow in the isolated Cosmos Agent skill library; `/cosmos-export-skill` saves the observed method as a portable `SKILL.md` directory. See [Agent skills](agent-skills.md) for prompts, paths and ZIP export.
 
 ## Cosmos Actions
 

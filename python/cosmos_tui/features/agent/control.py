@@ -10,6 +10,14 @@ import secrets
 import tempfile
 
 
+class ControlUnavailable(ValueError):
+    """Recoverable ownership outcome, without asking the model to repair tasks."""
+
+    def __init__(self, status, message, next_step):
+        super().__init__(message)
+        self.outcome = dict(status=status, message=message, next=next_step)
+
+
 def location(socket):
     runtime = Path(os.getenv("XDG_RUNTIME_DIR", f"/tmp/cosmos-{os.getuid()}"))
     runtime.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -38,7 +46,9 @@ class ControlStore:
 
     def check(self, pane):
         if self.marker(pane).exists():
-            raise ValueError("Control paused by user input")
+            raise ControlUnavailable(
+                "paused", "Control paused by user input", "request_resume"
+            )
 
     @contextmanager
     def locked(self, write=True):
@@ -88,7 +98,13 @@ class ControlStore:
             self.check(pane)
             current = state.get(pane)
             if current and (current["owner"] != owner or current["state"] == "paused"):
-                raise ValueError("Pane already controlled or manually paused")
+                raise ControlUnavailable(
+                    "paused" if current["state"] == "paused" else "owned_by_other",
+                    "Pane already controlled or manually paused",
+                    "request_resume"
+                    if current["state"] == "paused"
+                    else "wait_or_choose_another_target",
+                )
             token = secrets.token_urlsafe(32)
             state[pane] = dict(
                 owner=owner,

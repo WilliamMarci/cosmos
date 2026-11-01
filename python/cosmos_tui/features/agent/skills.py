@@ -40,7 +40,8 @@ def commands():
             template=(root / (name + ".md")).read_text(),
         )
         for name, description in (
-            ("cosmos-learn", "Learn a terminal application's task workflow"),
+            ("agent-learn", "Learn, verify and save an application workflow as a Cosmos Agent skill"),
+            ("cosmos-learn", "Legacy learning prompt; use agent-learn to learn and save"),
             ("cosmos-export-skill", "Save the observed workflow as a reusable skill"),
         )
     }
