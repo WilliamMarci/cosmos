@@ -292,7 +292,7 @@ index 09d607f..674be73 100644
 +      : metadata.capability
 +        ? "This conversation + task + terminal; ends on release, finish or pause"
 +        : read
-+          ? "Once, or remember this directory for the project"
++          ? "Once, or remember this directory recursively for the project"
 +          : "This request; existing saved/configured rules are managed separately"
 +  const writes = scopedShell
 +    ? shellScope.writes
@@ -319,7 +319,7 @@ index 09d607f..674be73 100644
 +            `Remember: ${shellScope.sensitive ? "not available for interruption/stop" : shellScope.mode === "exact" ? "this exact command only" : "these tools within the listed directory scope"}`,
 +          ]
 +        : []),
-+      ...(read ? ["Includes: file reads, directory listing and text search; no execution"] : []),
++      ...(read ? ["Includes: recursive reads, listing, search and recognized read-only Shell; no writes or scripts"] : []),
 +      `Scope: ${formatPath(scope)}`,
 +      `Lifetime: ${duration}`,
 +      `Writes: ${writes}`,

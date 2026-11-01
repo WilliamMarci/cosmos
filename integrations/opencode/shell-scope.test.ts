@@ -1,3 +1,4 @@
+import { directoryScopeAllows } from "../src/cosmos/read-scope"
 import { expect, test } from "bun:test"
 import {
   shellScope,
@@ -123,4 +124,21 @@ test("explicit host interruption cannot reuse a remembered scope", () => {
   const scope = shellScope("kill 1234", "/bin/bash", "/tmp/scope-project")
   expect(scope.sensitive).toBe(true)
   expect(shellScopeAllows(encodeShellScope(scope), scope)).toBe(false)
+})
+
+test("recursive read grants cover roots and descendants without sibling or symlink escapes", () => {
+  const project = mkdtempSync(path.join(tmpdir(), "cosmos-read-scope-"))
+  try {
+    mkdirSync(path.join(project, "allowed"))
+    mkdirSync(path.join(project, "outside"))
+    symlinkSync(path.join(project, "outside"), path.join(project, "allowed/link"))
+    expect(directoryScopeAllows("allowed/*", "allowed", project)).toBe(true)
+    expect(directoryScopeAllows("allowed/*", "allowed/a/b.txt", project)).toBe(true)
+    expect(directoryScopeAllows("allowed/*", "allowed-other/file", project)).toBe(false)
+    expect(directoryScopeAllows("allowed/*", "allowed/../outside/file", project)).toBe(false)
+    expect(directoryScopeAllows("allowed/*", "allowed/link/missing/file", project)).toBe(false)
+    expect(directoryScopeAllows("allowed/file.txt", "allowed/other", project)).toBe(false)
+  } finally {
+    rmSync(project, { recursive: true, force: true })
+  }
 })

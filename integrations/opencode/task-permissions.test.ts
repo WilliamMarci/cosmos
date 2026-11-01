@@ -874,6 +874,21 @@ it.effect(
           },
         })
         expect(next.effect).toBe("allow")
+        const inspect = yield* permissions.ask({
+          action: "shell",
+          resources: ["grep -rn needle ./nested | head -5; echo ---; ls ./nested"],
+          save: [],
+          sessionID: Session.ID.make("ses_test"),
+          metadata: {
+            cosmos_shell_scope: shellScope(
+              "grep -rn needle ./nested | head -5; echo ---; ls ./nested",
+              "/bin/bash",
+              "/project/fixture-data",
+            ),
+          },
+          source: { type: "tool", messageID: toolIdentity.messageID, id: "directory-shell-read" },
+        })
+        expect(inspect.effect).toBe("allow")
         const shell = yield* permissions.ask({
           action: "shell",
           resources: ["python3 file.py"],
@@ -1004,4 +1019,57 @@ it.effect(
         else process.env.COSMOS_AGENT = old
       }
     }),
+)
+
+it.effect("recursive directory grants share read tools and bounded read-only Shell", () =>
+  Effect.gen(function* () {
+    const previous = process.env.COSMOS_AGENT
+    process.env.COSMOS_AGENT = "1"
+    try {
+      yield* setup([
+        { action: "read", resource: "/allowed/private/*", effect: "deny" },
+        { action: "shell", resource: "blocked", effect: "deny" },
+      ])
+      const saved = yield* PermissionSaved.Service
+      const permissions = yield* Permission.Service
+      yield* saved.add({ projectID: Project.ID.global, action: "external_directory", resources: ["/allowed/*"] })
+      yield* saved.add({ projectID: Project.ID.global, action: "cosmos_directory_read", resources: ["fixture-data/*"] })
+      const request = (action: string, resource: string, metadata?: Record<string, unknown>) =>
+        permissions.ask({
+          action,
+          resources: [resource],
+          save: [],
+          metadata,
+          sessionID: Session.ID.make("ses_test"),
+          source: {
+            type: "tool",
+            messageID: toolIdentity.messageID,
+            id: "recursive-read",
+          },
+        })
+      for (const action of ["read", "glob", "grep", "list", "external_directory"]) {
+        for (const root of ["/allowed", "fixture-data"]) {
+          expect((yield* request(action, root + "/nested/deeper/file.txt")).effect).toBe("allow")
+          expect((yield* request(action, root + "-other/file.txt")).effect).toBe("ask")
+        }
+      }
+      expect((yield* request("read", "/allowed/private/key")).effect).toBe("deny")
+      const inspect = shellScope("grep -rn needle ./nested | head -5; echo ---; ls ./nested", "/bin/bash", "/allowed")
+      expect(inspect.mode).toBe("tools")
+      expect(inspect.writes).toBe(false)
+      // A configured read deny keeps Shell separate, since lexical roots cannot enforce per-file exclusions.
+      expect((yield* request("shell", "inspection", { cosmos_shell_scope: inspect })).effect).toBe("ask")
+      expect((yield* request("shell", "blocked", { cosmos_shell_scope: inspect })).effect).toBe("deny")
+      for (const command of ["touch new.txt", "python -c 'print(1)'", "cat /etc/passwd"]) {
+        expect(
+          (yield* request("shell", command, {
+            cosmos_shell_scope: shellScope(command, "/bin/bash", "/allowed"),
+          })).effect,
+        ).toBe("ask")
+      }
+    } finally {
+      if (previous === undefined) delete process.env.COSMOS_AGENT
+      else process.env.COSMOS_AGENT = previous
+    }
+  }),
 )
