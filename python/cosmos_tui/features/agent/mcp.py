@@ -192,7 +192,7 @@ TOOLS.extend(
     [
         dict(
             name="watch_terminal",
-            description="Register a background terminal condition/timeout and return immediately. Optional control_token releases this task's control/header while waiting. No model wakeup yet: report the pending watch, do not sleep/poll or claim success.",
+            description="Register a background terminal condition/timeout and return immediately. Optional control_token releases this task's control/header while waiting. Native authenticated tasks wake via the scheduler on condition/timeout; manual/paused tasks only record evidence until user continuation. Report pending watch and return, never sleep/poll or claim success.",
             inputSchema=schema(
                 dict(
                     pane=PANE,
@@ -203,6 +203,7 @@ TOOLS.extend(
                             "text_absent",
                             "changed",
                             "program_changed",
+                            "bash_prompt",
                         ],
                     ),
                     text=dict(type="string"),
@@ -298,6 +299,15 @@ for tool in TOOLS:
             type="string",
             description="Optional acquired workspace task capability; absent uses per-call confirmation",
         )
+
+
+TOOLS.extend([
+    dict(name="schedule_task", description="Persist an automatic or manual Agent task bound to this native conversation and pane. Supports after_seconds, timezone-aware at, interval_seconds or daily HH:MM with IANA timezone. Releases own pane control before waiting; wakes via native Session API, never types into Agent. Requires explicit native permission.",
+        inputSchema=schema(dict(pane=PANE, goal=dict(type="string", maxLength=4000), schedule=dict(type="object"), mode=dict(type="string", enum=["auto","manual"]), control_token=dict(type="string")), ("pane","goal","schedule"))),
+    dict(name="list_tasks", description="List persisted tasks belonging to this authenticated conversation, including pending/manual/paused states. Read-only; a model becoming idle is not task success.", inputSchema=schema({}), annotations=dict(readOnlyHint=True)),
+    dict(name="task_history", description="Read bounded execution/trigger records for one of this conversation's tasks.", inputSchema=schema(dict(id=dict(type="string")), ("id",)), annotations=dict(readOnlyHint=True)),
+    dict(name="finish_task", description="Report a verified task outcome and evidence summary. Does not interrupt the terminal application. Cannot complete cancelled/paused tasks. Recurring successful tasks remain scheduled.", inputSchema=schema(dict(id=dict(type="string"), outcome=dict(type="string", enum=["succeeded","failed","needs_input"]), summary=dict(type="string", maxLength=2000)), ("id","outcome","summary"))),
+])
 
 
 ACTION_TOOLS = [

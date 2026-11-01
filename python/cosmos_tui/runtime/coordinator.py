@@ -93,6 +93,8 @@ class RuntimeController(Controller):
                 from cosmos_tui.features.agent.monitor.service import recover
 
                 await asyncio.to_thread(recover, app.backend.argv[2])
+                from cosmos_tui.features.agent.tasks.service import recover as recover_tasks
+                await asyncio.to_thread(recover_tasks, app.backend.argv[2])
                 self.monitor_started = True
             await self.headers.layout()
             panes = await app.backend.snapshot()
@@ -180,6 +182,9 @@ class RuntimeController(Controller):
                 for run in notice.frame.runs
                 if not run.text
             ]
+            popup_covers = getattr(app.screen, "graphics_covers", None)
+            if popup_covers:
+                covers.extend(popup_covers())
             images = [
                 (
                     key,

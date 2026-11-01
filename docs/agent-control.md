@@ -1,6 +1,6 @@
 # Pane input ownership
 
-This increment implements cross-process input ownership and user revocation. The shared Taking over/PAUSED top row is implemented. A distinct cyan mouse pointer and background terminal watches are implemented. Model-run cancellation, model wakeups and the persistent task scheduler remain unavailable.
+This increment implements cross-process input ownership and user revocation. The shared Taking over/PAUSED top row is implemented. A distinct cyan mouse pointer and background terminal watches are implemented. Native model cancellation and persistent task wakeups are implemented; see [Agent tasks](agent-tasks.md).
 
 ## Tools
 
@@ -15,13 +15,13 @@ The patched runtime groups task acquisition, ordinary controlled input and own r
 
 A physical non-modifier key in a workspace terminal, pasted text or a click on a terminal pane pauses that pane's control task before normal UI/terminal handling. Mouse forwarding (including wheel and drag) also revokes ownership. This applies when keyboard passthrough is enabled. The first transition emits a notification; repeated input does not repeat it.
 
-A pause marker is published before waiting for an in-flight sender's lock. Controlled input checks it immediately before dispatch; queued/stale tokens fail. Input already dispatched cannot be recalled. This is not a hard real-time guarantee and does not cancel a native model request already running. The Agent prompt requires returning to the user after observing paused state, without retrying input or resuming itself.
+A pause marker is published before waiting for an in-flight sender's lock. Controlled input checks it immediately before dispatch; queued/stale tokens fail. Input already dispatched cannot be recalled. This is not a hard real-time guarantee and aborts a native Cosmos Agent model turn through its Session API. Plain system OpenCode has no such integration. The Agent prompt requires returning to the user after observing paused state, without retrying input or resuming itself.
 
-Actions → **Resume pane Agent control** changes the task to `ready` and invalidates the old token. The same Agent connection must observe again and acquire a fresh token. No input or model continuation is automatically started. **End pane Agent control task** revokes the record and token; the terminal program continues. Both actions can be assigned in Settings → Keybindings and have no default shortcut. The shared PAUSED top row remains reserved until the control task ends.
+Actions → **Resume pane Agent control** changes the task to `ready` and invalidates the old token. The same Agent connection must observe again and acquire a fresh token. For native logical tasks, resuming queues a fresh model inspection; it does not restore input ownership. **End pane Agent control task** revokes the record and token; the terminal program continues. Both actions can be assigned in Settings → Keybindings and have no default shortcut. The shared PAUSED top row remains reserved until the control task ends.
 
 ## Runtime scope
 
-Ownership is shared across local processes/clients of the same managed Tmux socket. State and revocation markers are under `${XDG_RUNTIME_DIR:-/tmp/cosmos-UID}/cosmos-agent-control/`; directories are mode 0700, files 0600. File locking serializes validation/dispatch against cancellation, and atomic state replacement prevents partial JSON. State contains task labels and tokens, not screen text or API credentials. It is local runtime state, not the planned persistent scheduler.
+Ownership is shared across local processes/clients of the same managed Tmux socket. State and revocation markers are under `${XDG_RUNTIME_DIR:-/tmp/cosmos-UID}/cosmos-agent-control/`; directories are mode 0700, files 0600. File locking serializes validation/dispatch against cancellation, and atomic state replacement prevents partial JSON. State contains task labels and tokens, not screen text or API credentials. It is local runtime state, separate from the persistent scheduler.
 
 Abandoned task records fail closed; the user can end them via Actions. There is no automatic expiry or reconnect-to-owner protocol yet. A Tmux server/layout change rejects the old token; it does not silently retarget a replacement pane. Read-only observation remains available except on private panes.
 
@@ -31,17 +31,17 @@ Implementation boundaries: `control.py` owns shared ownership/revocation state; 
 
 ## Shared takeover header
 
-An active task displays `COSMOS Taking over`, a locally animated braille indicator and its task label. A manually paused task displays static `COSMOS PAUSED`; `ready` adds a reminder that fresh observation is required. The same pane status is visible in every connected Cosmos client. Clicking the header pauses control without forwarding a mouse event into the application. Text is drawn by the existing `TerminalSurface`, never written into shell history.
+An active task displays `COSMOS Taking over`, a locally animated braille indicator and its task label. A manually paused task displays static `COSMOS PAUSED │ ⏸︎`; `ready` adds a reminder that fresh observation is required. The same pane status is visible in every connected Cosmos client. Clicking the header pauses control without forwarding a mouse event into the application. Text is drawn by the existing `TerminalSurface`, never written into shell history.
 
 Reservation uses Tmux's native window-level `pane-border-status=top`. While any controlled pane remains in a window, all its panes therefore have native top-border positions, but only controlled panes show takeover text. This backend granularity is intentional: actual PTY dimensions, captured grids, application cursor and input coordinates remain consistent across clients. The prior local option (or inherited setting) is restored when the last control task ends; pause/resume does not resize. A `@cosmos_control_header` window option records restoration metadata, not tokens.
 
-Acquisition re-observes after reservation and returns the resulting `snapshot_id` and `dimensions`; geometry validation uses the resized application area. Tools remain one-based application-content cells, excluding the header. The UI reconciles shared state and layout, refreshing active header rows for animation; paused rows do not animate. UI detach keeps reservations/tasks intact. End/release restores layout; there is still no automatic orphan-task expiry or model continuation. `headers.py` handles native reservation, and `header_ui.py` handles character composition.
+Acquisition re-observes after reservation and returns the resulting `snapshot_id` and `dimensions`; geometry validation uses the resized application area. Tools remain one-based application-content cells, excluding the header. The UI reconciles shared state and layout, refreshing active header rows for animation; paused rows do not animate. UI detach keeps reservations/tasks intact. End/release restores layout; there is still no automatic orphan ownership expiry. Logical task continuation uses the scheduler. `headers.py` handles native reservation, and `header_ui.py` handles character composition.
 
 ## Agent pointer
 
 After successful controlled mouse input, all Cosmos clients display a cyan diamond at the one-based application-content cell, independently of the application cursor. It blinks through the existing terminal renderer; reduced motion leaves it steady. Pausing control, releasing it, changing the geometry or sending non-mouse controlled input removes the pointer. Header and pointer animation refresh only their affected rows/cells. The pointer is character chrome, not an image-pixel inspection facility.
 
-For background waits, [terminal watches](agent-monitor.md) can release the owner's control token/header and collect evidence independently; they do not automatically wake the model.
+For background waits, [terminal watches](agent-monitor.md) can release the owner's control token/header and collect evidence independently; native authenticated watches can wake the saved conversation through the scheduler.
 
 
 ### Bounded terminal step
@@ -89,8 +89,7 @@ reading process secrets, and is not an OS sandbox.
 
 Manual pause revokes input at the backend before delivery; an adapter grant cannot
 override it. Resume invalidates the old token. Fresh observation and acquisition
-then require a new task confirmation under default policy. No model request is
-cancelled automatically by this mechanism.
+then require a new task confirmation under default policy. The persisted task pause also cancels the native model turn.
 
 Plain system OpenCode is launched without a Cosmos profile, tools or skills;
 these APIs and grants apply only to Cosmos Agent.
@@ -120,4 +119,4 @@ Actions or terminal input. It cannot be substituted for a pane control token.
 The same explicit-deny rules, signed conversation identity and nonpersistent
 permission behavior apply. A new workspace acquisition rotates the conversation's
 previous workspace token; release/restart/management-tool errors invalidate reuse.
-Workspace grants do not cancel a running model or implement the future scheduler.
+Workspace grants are independent of the persistent task scheduler and never grant terminal input.

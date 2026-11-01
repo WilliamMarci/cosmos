@@ -62,6 +62,11 @@ class WorkspaceController(Controller):
         return event.key == "escape"
 
     async def action_leader_key(self, key):
+        if key == "tasks":
+            from cosmos_tui.features.agent.tasks.panel import TaskPanel
+
+            self.app.push_screen(TaskPanel())
+            return
         if key in ("resume_control", "end_control"):
             import asyncio
             from cosmos_tui.features.agent.control import ControlStore
@@ -84,6 +89,17 @@ class WorkspaceController(Controller):
                 await self.app.backend.request(
                     f"set-option -p -t {pane.id} @cosmos_private {int(enabled)}"
                 )
+                if enabled:
+                    import asyncio
+                    from cosmos_tui.features.agent.tasks.lifecycle import pause_target
+                    from cosmos_tui.features.agent.control import ControlStore
+
+                    await asyncio.to_thread(
+                        ControlStore(self.app.backend.argv[2]).change, pane.id, "pause"
+                    )
+                    await asyncio.to_thread(
+                        pause_target, self.app.backend.argv[2], pane.id
+                    )
                 await self.app.notification_events.publish(
                     "Pane private · Agent access disabled"
                     if enabled

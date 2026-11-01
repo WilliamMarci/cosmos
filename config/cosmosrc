@@ -21,3 +21,22 @@ function open {
 }
 source "$COSMOS_ROOT/terminal_agent/shell/agent.bash"
 unset _cosmos_config_root
+
+# An explicit Bash prompt event, never inferred from a quiet screen/cursor.
+_cosmos_prompt_event() {
+    local cosmos_previous_status=$?
+    _COSMOS_PROMPT_SEQUENCE=$((${_COSMOS_PROMPT_SEQUENCE:-0} + 1))
+    if [[ -n ${TMUX:-} && -n ${TMUX_PANE:-} ]]; then
+        tmux -S "${TMUX%%,*}" set-option -p -t "$TMUX_PANE" \
+            @cosmos_prompt_stamp "$$:$_COSMOS_PROMPT_SEQUENCE" 2>/dev/null || true
+    fi
+    return "$cosmos_previous_status"
+}
+if [[ ${_COSMOS_PROMPT_HOOK_INSTALLED:-0} != 1 ]]; then
+    if [[ $(declare -p PROMPT_COMMAND 2>/dev/null) == 'declare -a '* ]]; then
+        PROMPT_COMMAND+=(_cosmos_prompt_event)
+    else
+        PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND; }_cosmos_prompt_event"
+    fi
+    _COSMOS_PROMPT_HOOK_INSTALLED=1
+fi

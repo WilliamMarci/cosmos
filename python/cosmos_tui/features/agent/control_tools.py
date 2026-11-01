@@ -10,6 +10,11 @@ class ControlledInput:
         from cosmos_tui.features.agent.control import ControlStore
 
         await self.pane(pane)
+        if getattr(self, "conversation", None):
+            from cosmos_tui.features.agent.tasks.storage import Tasks
+
+            if Tasks(self.backend.argv[2]).paused(self.conversation):
+                raise ValueError("Conversation paused by user input")
         store = ControlStore(self.backend.argv[2])
 
         async def deliver():
@@ -94,12 +99,25 @@ class ControlledInput:
         if current["snapshot_id"] != snapshot_id:
             raise ValueError("Snapshot changed; observe again before acquiring control")
         row = await self.pane(pane)
+        from cosmos_tui.features.agent.tasks.lifecycle import control_task
+
+        if getattr(self, "conversation", None):
+            from cosmos_tui.features.agent.tasks.storage import Tasks
+
+            if Tasks(self.backend.argv[2]).paused(self.conversation):
+                raise ValueError("Conversation paused; user resume required")
+        logical_task = await asyncio.to_thread(
+            control_task, self.backend.argv[2], self, row, task
+        )
         lease = await asyncio.to_thread(
             ControlStore(self.backend.argv[2]).acquire,
             pane,
             self.owner,
             task,
             row["pid"],
+            getattr(self, "conversation", None),
+            getattr(self, "runtime_id", None),
+            logical_task,
         )
         from cosmos_tui.features.agent.headers import synchronize
 
@@ -124,6 +142,11 @@ class ControlledInput:
         self.control_geometry[lease["token"]] = tuple(
             row[k] for k in ("pid", "window_id", "pane_width", "pane_height")
         )
+        if logical_task:
+            lease["logical_task"] = logical_task
+            from cosmos_tui.features.agent.tasks.service import start
+
+            await asyncio.to_thread(start, self.backend.argv[2])
         return lease
 
     async def release_control(self, pane, token):

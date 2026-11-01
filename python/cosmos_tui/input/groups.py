@@ -6,6 +6,7 @@ GROUPS = [
     "Panes & layout",
     "History & selection",
     "Command assistant",
+    "Agent tasks",
     "Reader",
     "Files",
     "Mods",
@@ -16,6 +17,8 @@ GROUPS = [
 
 def group(command):
     name, context = command.id, command.context
+    if context == "tasks" or name == "workspace.tasks":
+        return "Agent tasks"
     if context == "switch":
         return "Sessions & windows"
     if context.startswith("mod."):

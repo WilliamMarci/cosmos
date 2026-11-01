@@ -25,6 +25,7 @@ def location(socket):
 
 class ControlStore:
     def __init__(self, socket):
+        self.socket = socket
         self.path = location(socket)
 
     def marker(self, pane):
@@ -73,7 +74,16 @@ class ControlStore:
         finally:
             os.close(descriptor)
 
-    def acquire(self, pane, owner, task, server_pid=None):
+    def acquire(
+        self,
+        pane,
+        owner,
+        task,
+        server_pid=None,
+        conversation=None,
+        runtime_id=None,
+        logical_task=None,
+    ):
         with self.locked() as state:
             self.check(pane)
             current = state.get(pane)
@@ -86,6 +96,9 @@ class ControlStore:
                 token=token,
                 state="active",
                 server_pid=server_pid,
+                conversation=conversation,
+                runtime_id=runtime_id,
+                logical_task=logical_task,
                 task_id=secrets.token_hex(16),
             )
             return dict(
@@ -99,7 +112,7 @@ class ControlStore:
     def change(self, pane, action):
         if not self.path.exists():
             return None
-        if action == "pause" and pane in json.loads(self.path.read_text()):
+        if action in ("pause", "cancel") and pane in json.loads(self.path.read_text()):
             # Publish revocation before waiting for an in-flight sender's lock.
             descriptor = os.open(
                 self.marker(pane), os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW, 0o600
@@ -123,11 +136,19 @@ class ControlStore:
                 self.marker(pane).unlink(missing_ok=True)
             else:
                 raise ValueError("Unknown control state action")
-            return dict(
+            result = dict(
                 pane=pane,
                 state=current["state"] if action != "cancel" else "ended",
                 changed=changed,
             )
+            conversation = current.get("conversation")
+        if conversation and (
+            action == "resume" or changed and action in ("pause", "cancel")
+        ):
+            from cosmos_tui.features.agent.tasks.lifecycle import control_changed
+
+            control_changed(self.socket, conversation, action)
+        return result
 
     def status(self):
         if not self.path.exists():
@@ -182,7 +203,10 @@ async def human_input(app, pane):
         return
     store = ControlStore(app.backend.argv[2])
     result = await asyncio.to_thread(store.change, pane.id, "pause")
-    if result and result["changed"]:
+    from cosmos_tui.features.agent.tasks.lifecycle import pause_target
+
+    task_paused = await asyncio.to_thread(pause_target, app.backend.argv[2], pane.id)
+    if task_paused or result and result["changed"]:
         try:
             await app.notification_events.publish(
                 "Agent control paused · manual input",

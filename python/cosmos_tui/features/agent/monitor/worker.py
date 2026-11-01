@@ -91,6 +91,38 @@ async def run(socket):
                                 program=screen["pane_current_command"],
                             ),
                         )
+                if (
+                    state is None
+                    and watch["kind"] == "bash_prompt"
+                    and "error" not in screen
+                ):
+                    from cosmos_tui.features.agent.monitor.bash import prompt_stamp
+
+                    stamp = await prompt_stamp(tools, pane)
+                    initial = watch["baseline"].get("bash_prompt")
+                    if (
+                        stamp
+                        and initial
+                        and stamp.split(":")[0] != initial.split(":")[0]
+                    ):
+                        state, evidence = (
+                            "invalidated",
+                            dict(type="bash_replaced", source="bash_prompt_adapter"),
+                        )
+                    elif (
+                        stamp
+                        and stamp != initial
+                        and screen["pane_current_command"] == "bash"
+                        and not screen.get("alternate_on")
+                    ):
+                        state, evidence = (
+                            "matched",
+                            dict(
+                                type="bash_prompt",
+                                source="bash_prompt_adapter",
+                                condition_met=True,
+                            ),
+                        )
                 if state is None and time.time() >= watch["deadline"]:
                     state, evidence = (
                         "timed_out",

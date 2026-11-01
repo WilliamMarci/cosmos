@@ -543,6 +543,9 @@ def main(argv=None):
             from cosmos_tui.features.agent.monitor.service import suspend
 
             suspend(os.getenv("COSMOS_TMUX_SOCKET", "cosmos"))
+            from cosmos_tui.features.agent.tasks.service import suspend as suspend_tasks
+
+            suspend_tasks(os.getenv("COSMOS_TMUX_SOCKET", "cosmos"))
             print("Cosmos is stopping · terminal sessions retained")
             return 0
         if operation == "open" and Path(args.file).expanduser().is_dir():

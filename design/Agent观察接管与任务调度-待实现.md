@@ -202,3 +202,21 @@ schedule.list / cancel / reschedule
 已接入区别于应用光标的青色闪烁菱形指针；人工暂停、结束或布局失效时隐藏，遵守 reduced motion。新增后台终端监视工具，独立进程进行文字条件、正文行差异、局部重复帧和程序变化检测及超时；结果持久保存在运行时数据库并通知，条件满足不等于任务成功。可带控制令牌进入等待，释放操作权和顶栏。普通 cosmos stop 暂停监视，UI 重连恢复待检测项。接口见 `docs/agent-monitor.md`。
 
 本步尚无模型自动唤醒、Bash 明确输入适配器、原生输出观察序号/瞬时事件不漏采样保证、任务侧栏/Tasks 总览和周期调度。当前采样文字网格，重复帧判断是推断；后台进程不调用模型、不恢复人工暂停，也不投递终端输入。运行时数据库不是未来的持久任务调度器。
+
+## 2026-11-01：持久调度与原生生命周期闭环
+
+按最新要求，本阶段任务管理首先落在透明背景的 Cosmos Tasks pop window，不扩展 OpenCode 侧栏。正式接口以 docs/agent-tasks.md、agent-monitor.md、agent-control.md 为准；上方各步“尚未实现”是当时记录，不代表当前能力。
+
+已落地：
+
+- 私有 SQLite 任务账本，一次性/间隔/每日时区调度，DST gap/fold 规则，错过时合并补执行，detach 后继续、stop 后保留与 UI 启动恢复。
+- 原生 Session API 的认证 Unix 生命周期桥；后台条件/超时唤醒原对话，按消息 ID 重试 admission；不是往 Agent 输入框粘贴文字。
+- 人工接管持久暂停整个对应对话，撤销旧输入 token、结束旧 run、取消实际模型流；等待期间已释放控制的目标也会暂停。用户显式恢复后重新观察，不重用旧坐标/授权。
+- 跨原生进程的同对话串行和默认最多两个 primary turn；可取消排队；可配置间隔和运行时限。标题等辅助生成不算 primary turn。
+- Tasks 选择任务后的紧凑按钮、记录、改期、模式、原生权限 Once/Reject；取消与发送 Ctrl+C 的“中断程序”分开。统一 Actions/键位分组和 Settings。
+- Bash PROMPT_COMMAND 明确序号事件，监视器 bash_prompt 条件；不把静止画面当作输入等待。
+- Taking over 盲文独立定时刷新，暂停显示单色 ⏸︎。Tasks 弹窗仅覆盖自身矩形，外侧 Reader 图形保持。
+
+验证：独立 Tmux 的真实 Bash prompt 监视；Python 任务持久化/暂停/串行/补执行/DST/透明弹窗与动画回归；原生权限与跨进程租约测试；真实 native Session 对本地模拟模型 API 的 wake/busy/interrupt（确认流式 HTTP 连接被取消，无付费请求）。未构建发行包，未停止用户会话。
+
+仍属于后续能力：通用 TUI 原生语义/密码控件适配、可直接 act 的高置信控件、样式/原生输出序号驱动的瞬时事件可靠收集、图片真实内容观察、更多进程/文件/Reader 事件的统一订阅。当前 watch 仍采样，不能保证捕获短暂事件；worker 无独立 crash supervisor（UI 重连/新注册恢复）。任务创建由 Agent 工具完成，改期弹窗目前使用 JSON 输入，没有额外图形化创建向导。

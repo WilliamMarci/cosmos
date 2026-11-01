@@ -85,6 +85,21 @@ for target, label in (
     ("end_control", "End pane Agent control task"),
 ):
     register("workspace." + target, "workspace", label, [], target)
+for target, label, keys in (
+    ("pause", "Pause task", ["p"]),
+    ("resume", "Resume task", ["r"]),
+    ("check", "Check task now", ["c"]),
+    ("more", "Task options", ["enter"]),
+    ("history", "Task run history", []),
+    ("reschedule", "Reschedule task", []),
+    ("mode", "Toggle task wake mode", []),
+    ("permissions", "Task pending permissions", []),
+    ("cancel_task", "Cancel Agent task", []),
+    ("interrupt_program", "Interrupt task terminal program", []),
+    ("cancel", "Close Tasks", ["escape", "q"]),
+):
+    register("tasks." + target, "tasks", label, keys, "task_" + target)
+register("workspace.tasks", "workspace", "Agent tasks", [], "tasks")
 register("workspace.new_session", "workspace", "New session", [], "new_session")
 register(
     "workspace.private_pane",

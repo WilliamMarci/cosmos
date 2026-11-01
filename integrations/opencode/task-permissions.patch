@@ -74,33 +74,109 @@ index 37d5811..cf435e8 100644
                Effect.catchTag("Session.NotFoundError", () => Effect.undefined),
              )
              if (result?.effect !== "allow") continue
+diff --git a/packages/core/src/session.ts b/packages/core/src/session.ts
+index cb21826..44c0e0e 100644
+--- a/packages/core/src/session.ts
++++ b/packages/core/src/session.ts
+@@ -1,6 +1,9 @@
+ export * as Session from "./session.js"
+ export * from "./session/schema.js"
+ 
++import { startTaskRuntime } from "./cosmos/runtime.js"
++import { paused, clearCancelled } from "./cosmos/lease.js"
++
+ import { DateTime, Effect, Layer, Context, Stream } from "effect"
+ import { LLMClient } from "@opencode/ai"
+ import { ListAnchor, ListCursor, ListFilter } from "@opencode/schema/session"
+@@ -443,7 +446,11 @@ const layer = Layer.effect(
+               Bus.isSynced(item) || isDurableSessionEvent(item),
+           ),
+         ),
+-      prompt: (input) => sessions.forSession(input.sessionID).prompt(input),
++      prompt: (input) => Effect.gen(function* () {
++        if (input.metadata?.source !== "cosmos_scheduler") clearCancelled(input.sessionID)
++        if (paused(input.sessionID)) return yield* Effect.die(new Error("Cosmos task paused; resume it in Tasks"))
++        return yield* sessions.forSession(input.sessionID).prompt(input)
++      }),
+       generate: Effect.fn("Session.generate")(function* (input) {
+         const session = yield* result.get(input.sessionID)
+         return yield* SessionGenerate.generate({ session, prompt: input.prompt }).pipe(
+@@ -499,6 +506,20 @@ const layer = Layer.effect(
+       },
+     })
+ 
++    const runCosmos = Effect.runPromiseWith(yield* Effect.context())
++    const closeCosmos = yield* Effect.promise(() => startTaskRuntime({
++      status: async (session) => {
++        const id = SessionSchema.ID.make(session)
++        await runCosmos(result.get(id))
++        return { active: (await runCosmos(result.active)).has(id) }
++      },
++      wake: (session, message, text) => runCosmos(result.prompt({
++        sessionID: SessionSchema.ID.make(session), id: SessionMessage.ID.make(message), text,
++        metadata: { source: "cosmos_scheduler" }, delivery: "queue",
++      })),
++      interrupt: (session) => runCosmos(result.interrupt(SessionSchema.ID.make(session), { resume: false })),
++    }))
++    yield* Effect.addFinalizer(() => Effect.promise(closeCosmos))
+     return result
+   }),
+ )
+diff --git a/packages/core/src/session/execution.ts b/packages/core/src/session/execution.ts
+index fb7a9d3..2b0b7ef 100644
+--- a/packages/core/src/session/execution.ts
++++ b/packages/core/src/session/execution.ts
+@@ -1,5 +1,7 @@
+ export * as SessionExecution from "./execution.js"
+ 
++import { withRunLease } from "../cosmos/lease.js"
++
+ import { Cause, Context, Effect, Exit, Layer } from "effect"
+ import { Bus } from "../bus.js"
+ import { Database } from "../database/database.js"
+@@ -111,7 +113,7 @@ export const layer = Layer.effect(
+           sessionID,
+           bus.publish(SessionEvent.Execution.Started, { sessionID }, claimOnCommit(sessionID)),
+         ),
+-      drain: (sessionID, force, promotable) => drain(sessionID, force, undefined, promotable),
++      drain: (sessionID, force, promotable) => withRunLease(drain(sessionID, force, undefined, promotable), sessionID),
+       // One terminal observation per busy period, covering every coalesced drain.
+       settled: (sessionID, exit, reason) =>
+         reportLifecycle(
 diff --git a/packages/core/src/tool/mcp.ts b/packages/core/src/tool/mcp.ts
-index 6d1b8cc..507652f 100644
+index 6d1b8cc..9d02518 100644
 --- a/packages/core/src/tool/mcp.ts
 +++ b/packages/core/src/tool/mcp.ts
-@@ -1,5 +1,7 @@
+@@ -1,5 +1,9 @@
  export * as McpTool from "./mcp.js"
  
++import { bindPermissions } from "../cosmos/runtime.js"
++
 +import { CosmosPermissions } from "./cosmos-permissions.js"
 +
  import { ToolFailure } from "@opencode/ai"
  import { McpEvent } from "@opencode/schema/mcp-event"
  import { Context, Effect, Fiber, type JsonSchema, Layer, Option, PubSub, Schema, Semaphore, Stream } from "effect"
-@@ -39,6 +41,7 @@ export const layer = Layer.effect(
+@@ -39,6 +43,8 @@ export const layer = Layer.effect(
      const toolOutput = yield* ToolOutput.Service
      const lock = Semaphore.makeUnsafe(1)
      let discovered: Mcp.Tool[] = []
 +    const cosmosPermissions = new CosmosPermissions()
++    const runCosmos = Effect.runPromiseWith(yield* Effect.context())
  
      // Register once after initial discovery; only subsequent updates need a debounced reload.
      const initial = yield* lock
-@@ -55,11 +58,17 @@ export const layer = Layer.effect(
+@@ -55,11 +61,21 @@ export const layer = Layer.effect(
                  output: (tool.outputSchema ?? {}) as JsonSchema.JsonSchema,
                  execute: (input, context) =>
                    Effect.gen(function* () {
 +                    const plan = yield* Effect.try({
 +                      try: () => cosmosPermissions.plan(tool.server, tool.name, (input ?? {}) as Record<string, unknown>, context.sessionID, context.agent),
 +                      catch: (error) => new ToolFailure({ message: String(error) }),
++                    })
++                    bindPermissions(context.sessionID, {
++                      list: async () => [...await runCosmos(permission.forSession(context.sessionID))],
++                      reply: (id, decision) => runCosmos(permission.reply({ requestID: Permission.ID.make(id), reply: decision })),
 +                    })
                      yield* permission.assert({
                        action: name(tool.server, tool.name),
@@ -115,7 +191,7 @@ index 6d1b8cc..507652f 100644
                        sessionID: context.sessionID,
                        agent: context.agent,
                        source: {
-@@ -72,16 +81,18 @@ export const layer = Layer.effect(
+@@ -72,16 +88,18 @@ export const layer = Layer.effect(
                        .callTool({
                          server: tool.server,
                          name: tool.name,

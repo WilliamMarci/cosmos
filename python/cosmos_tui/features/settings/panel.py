@@ -96,6 +96,20 @@ class Palette(CosmosModal):
                 local=local,
             )
 
+        if self.menu == "task_settings":
+            from cosmos_tui.features.agent.tasks.storage import Tasks
+            task_settings = Tasks(self.app.backend.argv[2]).settings()
+            rows = []
+            for label, key, values in (
+                ("Concurrent Agent runs", "max_models", [1, 2, 3, 4, 8]),
+                ("Minimum wake interval", "wake_interval_ms", [2000, 5000, 10000, 30000, 60000]),
+                ("Agent run timeout", "run_timeout_seconds", [30, 60, 120, 300, 600, 1800, 3600]),
+            ):
+                row = choice(label, key, [(v, str(v) + (" ms" if key.endswith("ms") else " s" if key.endswith("seconds") else "")) for v in values], task_settings[key])
+                row.update(task_setting=True, value=task_settings[key])
+                if row["value"] not in [v for v, _ in row["choices"]]:
+                    row["choices"].append((row["value"], str(row["value"])))
+                rows.append(row)
         if self.menu == "reader_settings":
             rows = [
                 choice(
@@ -355,6 +369,7 @@ class Palette(CosmosModal):
             ]
         if self.menu == "settings":
             rows.append(dict(label="Theme", kind="theme"))
+            rows.append(dict(label="Agent tasks", kind="menu", menu="task_settings"))
             rows.append(dict(label="Reader", kind="menu", menu="reader_settings"))
             rows.append(dict(label="Files", kind="menu", menu="files_settings"))
             rows.append(dict(label="Status bar", kind="menu", menu="status_settings"))
@@ -459,7 +474,10 @@ class Palette(CosmosModal):
         values = [value for value, _ in row["choices"]]
         value = values[(values.index(row["value"]) + direction) % len(values)]
         try:
-            if row.get("local"):
+            if row.get("task_setting"):
+                from cosmos_tui.features.agent.tasks.storage import Tasks
+                Tasks(self.app.backend.argv[2]).settings({row["key"]: value})
+            elif row.get("local"):
                 self.app.set_mouse_mode(value)
             else:
                 settings = await rpc.call("settings.get")

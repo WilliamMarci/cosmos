@@ -71,6 +71,10 @@ def configuration(socket, source_pane):
                 "effect": "allow",
             },
             {"action": "cosmos_terminal_*", "resource": "*", "effect": "ask"},
+            *[
+                dict(action="cosmos_terminal_" + name, resource="*", effect="allow")
+                for name in ("list_tasks", "task_history", "finish_task")
+            ],
             {
                 "action": "cosmos_terminal_read_history",
                 "resource": "*",

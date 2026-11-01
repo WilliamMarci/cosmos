@@ -62,6 +62,7 @@ class NavigationController(Controller):
                     "agent",
                     "mouse_passthrough",
                     "private_pane",
+                    "tasks",
                     "resume_control",
                     "end_control",
                 }
@@ -152,6 +153,7 @@ class NavigationController(Controller):
             ]
             for command in keymap.COMMANDS:
                 if command.id in (
+                    "workspace.tasks",
                     "workspace.switch",
                     "workspace.files",
                     "workspace.agent",
@@ -228,6 +230,8 @@ class NavigationController(Controller):
                 app.inputs.toggle_passthrough()
             elif command.context == "workspace" or command.id.startswith("global.ime_"):
                 await app.action_leader_key(command.target)
+            elif command.context == "tasks":
+                await source.run_action(command.target)
             elif command.context == "copy":
                 await app.copy_action(command.target)
             elif (

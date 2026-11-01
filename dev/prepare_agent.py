@@ -27,6 +27,11 @@ def prepare():
     (vendor / "packages/core/src/tool/cosmos-permissions.ts").write_text(
         (ROOT / "integrations/opencode/cosmos-permissions.ts").read_text()
     )
+    task_runtime = vendor / "packages/core/src/cosmos"
+    task_runtime.mkdir(exist_ok=True)
+    for source in (ROOT / "integrations/opencode/tasks").glob("*.ts"):
+        if not source.name.endswith(".test.ts"):
+            (task_runtime / source.name).write_text(source.read_text())
     (vendor / "packages/tui/src/theme/assets/cosmos.json").write_text(
         (ROOT / "python/cosmos_tui/assets/agent-cosmos.json").read_text()
     )

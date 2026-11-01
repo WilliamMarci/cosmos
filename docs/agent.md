@@ -92,11 +92,11 @@ OpenCode tool names are `cosmos_terminal_<tool>`. Default permission rules allow
 
 `Leader → F12` toggles **keyboard passthrough** for the current Cosmos client. In a terminal pane, keys bypass Cosmos Actions, pane shortcuts and IME and go directly to the child application; for example, `Ctrl+P` opens the Agent's own command menu. The configured passthrough toggle remains reserved so it can restore Cosmos controls. A Leader followed by any other key is forwarded as both original keys. Mouse controls and Cosmos dialogs remain available; Reader/Files surfaces retain their own controls. The status bar displays bold `KEYS OFF` directly after the session name when space permits. This temporary state is not persisted or shared with other clients. `global.keyboard_passthrough` is available in Actions and Settings → Keybindings; its default binding is `leader+f12`.
 
-Pane ownership and human-input revocation are available through `acquire_control`, `control_input`, `release_control` and `control_status`; see [Pane input ownership](agent-control.md) for the current tool contract, recovery Actions and implementation limits. This is separate from the future task scheduler and model wakeup adapter.
+Pane ownership and human-input revocation are available through `acquire_control`, `control_input`, `release_control` and `control_status`; see [Pane input ownership](agent-control.md) for the current tool contract, recovery Actions and implementation limits. See [Persistent Agent tasks](agent-tasks.md) for model cancellation, scheduling and the Tasks popup.
 
 Provider packages use the current runtime's native contract: `@opencode/ai/providers/deepseek`, `@opencode/ai/providers/anthropic`, and `@opencode/ai/providers/openai-compatible`. Raw `@ai-sdk/*` modules do not expose the required `model(modelID, settings)` entry point and must not be used here without an explicit compatibility bridge. `dev/validate_agent_provider.py` exercises a real standalone Agent conversation against a local OpenAI-chat fixture, including streamed response delivery, without a user key or paid API request.
 
-Independent background conditions and timeout detection are available through `watch_terminal`, `terminal_watches` and `cancel_terminal_watch`; see [Terminal watch service](agent-monitor.md) for sampling limits, runtime persistence and the currently unavailable automatic model wakeup adapter.
+Independent background conditions and timeout detection are available through `watch_terminal`, `terminal_watches` and `cancel_terminal_watch`; see [Terminal watch service](agent-monitor.md) for sampling limits, runtime persistence and native model wakeup and persistent task integration.
 
 
 ### Terminal creation response
@@ -133,3 +133,5 @@ See [Agent control](agent-control.md). It does not confer terminal input authori
 Cosmos conversation export requires an installed native Agent; when using plain
 OpenCode, use OpenCode's own session export instead of reading its data through
 Cosmos's private profile.
+
+Persistent tasks and their popup, schedule API, cancellation and recovery are documented in [Agent tasks](agent-tasks.md). Restart an existing Agent frontend to load new native patches; retained ordinary terminal sessions need not stop.

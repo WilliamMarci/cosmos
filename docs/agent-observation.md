@@ -1,6 +1,6 @@
 # Agent observations
 
-This first increment adds read-only layered observations to the terminal MCP server. It does not grant pane ownership, introduce a scheduler, or execute inferred controls.
+This first increment adds read-only layered observations to the terminal MCP server. Observation itself grants no pane ownership and executes no inferred controls. Input ownership and [persistent task scheduling](agent-tasks.md) are separate modules.
 
 ## `cosmos_terminal.observe`
 

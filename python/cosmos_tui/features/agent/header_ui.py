@@ -28,7 +28,9 @@ def header_text(record, width, palette, frame):
             style=Style(color=palette["accl"], bgcolor=palette["base"]),
         )
         text.append(record["task"], style=base)
-    elif record["state"] == "ready":
+    else:
+        text.append(" │ ⏸︎ ", style=base)
+    if record["state"] == "ready":
         text.append(" · Ready for fresh observation", style=base)
     text.truncate(max(0, width), overflow="ellipsis")
     text.append(" " * max(0, width - text.cell_len), style=base)
@@ -96,6 +98,21 @@ class HeaderController:
         self.last_sync = 0
         self.records = []
         self.last_frame = None
+        self.timer = app.set_interval(1 / 8, self.animate)
+
+    def animate(self):
+        if self.app.settings.get("reduced_motion", False):
+            return
+        terminal = self.app.query_one("#terminal")
+        for pane in self.app.panes:
+            record = getattr(self.app, "_agent_headers", {}).get(pane.id)
+            if not record or record["state"] != "active":
+                continue
+            if pane.y > 0:
+                terminal.refresh(Region(pane.x, pane.y - 1, pane.width, 1))
+            point = pointer_cell(record, pane)
+            if point:
+                terminal.refresh(Region(*point, 1, 1))
 
     async def layout(self):
         if not self.store.path.exists():

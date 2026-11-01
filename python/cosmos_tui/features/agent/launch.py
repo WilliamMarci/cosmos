@@ -85,12 +85,20 @@ def environment(socket, source_pane):
         if not key.startswith("OPENCODE_")
     }
     root = profile_root()
+    from cosmos_tui.features.agent.tasks.storage import Tasks
+    from cosmos_tui.features.agent.tasks.runtime import registry
+
+    task_store = Tasks(socket)
+    task_store.settings()
     settings, keys = load_profile()
     env.pop("COSMOS_AGENT_API_KEY", None)
     if keys.get(settings["provider"]):
         env["COSMOS_AGENT_API_KEY"] = keys[settings["provider"]]
     env.update(
         COSMOS_AGENT="1",
+        COSMOS_TASKS_HOME=str(task_store.path.parent),
+        COSMOS_AGENT_TASK_DB=str(task_store.path),
+        COSMOS_AGENT_TASK_DIR=str(registry(socket)),
         COSMOS_AGENT_CONTEXT_KEY=secrets.token_hex(32),
         COSMOS_AGENT_PROFILE=str(root),
         OPENCODE_CONFIG_DIR=str(root),

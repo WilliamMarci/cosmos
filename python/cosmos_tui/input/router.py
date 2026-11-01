@@ -188,6 +188,9 @@ class InputRouter(Controller):
                     }[command.target]
                     await app._dispatch_native(events.Key(canonical, None))
                     return
+                if command and context == "tasks":
+                    await app.screen.run_action(command.target)
+                    return
                 if command and command.context.startswith("mod."):
                     await app.screen.run_action(command.target)
                     return
@@ -214,6 +217,8 @@ class InputRouter(Controller):
             return "workspace"
         if getattr(app.screen, "mod_context", None):
             return app.screen.mod_context
+        if getattr(app.screen, "task_context", False):
+            return "tasks"
         if isinstance(app.screen, Assistant):
             return "assistant_actions" if app.screen.actions_mode else "assistant"
         if isinstance(app.screen, KeyBindingEditor):
