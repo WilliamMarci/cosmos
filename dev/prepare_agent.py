@@ -24,6 +24,9 @@ def prepare():
                 cwd=vendor,
                 check=True,
             )
+    (vendor / "packages/core/src/tool/cosmos-permissions.ts").write_text(
+        (ROOT / "integrations/opencode/cosmos-permissions.ts").read_text()
+    )
     (vendor / "packages/tui/src/theme/assets/cosmos.json").write_text(
         (ROOT / "python/cosmos_tui/assets/agent-cosmos.json").read_text()
     )

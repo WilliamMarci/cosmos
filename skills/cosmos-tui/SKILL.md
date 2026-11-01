@@ -7,7 +7,7 @@ description: Operate interactive terminal applications inside Cosmos using its t
 
 Use the designated existing terminal for interactive tasks. Do not start by exploring Cosmos or the application's source with shell calls. File checks can assist, but do not replace interaction in the requested pane.
 
-Resolve a user target with `resolve_target`: `1:4` means stable session `$1`, pane `%4`, **not** pane index 4. Use its returned `%ID` for terminal operations. `list_panes` discovers targets; `create_terminal(source_pane)` creates a separate background terminal inheriting cwd when a new terminal is needed.
+Resolve a user target with `resolve_target`: `1:4` means stable session `$1`, pane `%4`, **not** pane index 4. Use its returned `%ID` for terminal operations. `list_panes` discovers targets; `create_terminal(source_pane)` creates a separate background terminal inheriting cwd when needed. Its response already reports actual cwd and startup state; use `snapshot.snapshot_id` to acquire control without running `pwd` or capturing the entire screen again. `shell_ready: null` is not a readiness assertion.
 
 For files or directories, use `cosmos_actions.open_file(path, target, client)` to route through Reader/Files. Do not set internal Tmux options. Its `loading: pending` response acknowledges opening, not successful rendering. `list_clients` discovers clients without an action catalog; `client_context` reports current context and pane. Choose a client explicitly if several are connected.
 
@@ -21,7 +21,7 @@ Load an application/task skill if one already matches. Treat its steps as guidan
 4. Use application help when uncertain. In an unfamiliar program, discover its own bindings before experimenting on user data. Test changes in a temporary file or a dedicated terminal when the task permits.
 5. Use mouse events only if tracking is enabled. Coordinates are one-based cells relative to the target pane, and can change after resize. Keyboard navigation is the fallback. Wheel buttons can scroll applications that request mouse reporting.
 
-End your own control task with `release_control` when finished. Releasing does not interrupt the application. Background watches return immediately and do not yet wake the model; report a pending watch rather than polling indefinitely.
+In the patched runtime, acquisition confirms one task for this conversation and pane. Ordinary token input and own release share it; changing tasks or resuming after manual pause requires fresh acquisition/confirmation. Ctrl+C/Ctrl+Z/Ctrl+D and unrelated mutations remain separate. System OpenCode retains per-call permissions. End your own control task with `release_control` when finished. Releasing does not interrupt the application. Background watches return immediately and do not yet wake the model; report a pending watch rather than polling indefinitely.
 
 ## Operational boundaries
 

@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import secrets
 import sys
 
 from cosmos_tui.core.paths import PROJECT_ROOT
@@ -81,6 +82,7 @@ def environment(socket, source_pane):
         env["COSMOS_AGENT_API_KEY"] = keys[settings["provider"]]
     env.update(
         COSMOS_AGENT="1",
+        COSMOS_AGENT_CONTEXT_KEY=secrets.token_hex(32),
         COSMOS_AGENT_PROFILE=str(root),
         OPENCODE_CONFIG_DIR=str(root),
         OPENCODE_CONFIG=str(root / "opencode.json"),

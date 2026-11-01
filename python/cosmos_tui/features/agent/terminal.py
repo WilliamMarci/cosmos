@@ -32,6 +32,7 @@ FIELDS = (
     "mouse_all_flag",
     "mouse_utf8_flag",
     "mouse_sgr_flag",
+    "pane_dead",
     "@cosmos_private",
 )
 NUMBERS = {
@@ -43,6 +44,7 @@ NUMBERS = {
     "cursor_y",
 }
 FLAGS = {
+    "pane_dead",
     "alternate_on",
     "pane_in_mode",
     "mouse_any_flag",
@@ -280,4 +282,24 @@ class TerminalTools(ControlledInput, TerminalWatches):
             "agent-terminal",
             self.backend.shell_command(),
         )
-        return await self.read_screen(ident.strip(), wait_ms=100)
+        return await self.created_terminal(ident.strip())
+
+    async def created_terminal(self, pane):
+        """A creation acknowledgement with actual cwd and a reusable fresh snapshot."""
+        from cosmos_tui.features.agent.compact import compact_snapshot
+
+        await asyncio.sleep(0.1)
+        observed = await self.observe(pane, ["text"])
+        row = await self.pane(pane)
+        return dict(
+            pane_id=row["pane_id"],
+            session_id=row["session_id"],
+            window_id=row["window_id"],
+            display_id=row["display_id"],
+            pane_current_path=row["pane_current_path"],
+            program=row["pane_current_command"],
+            startup="exited" if row["pane_dead"] else "process_running",
+            shell_ready=None,
+            focus_changed=False,
+            snapshot=compact_snapshot(observed),
+        )

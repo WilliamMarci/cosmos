@@ -4,7 +4,7 @@ Cosmos Agent includes a second local MCP server, `cosmos_actions`. It exposes th
 
 ## Tools
 
-`list_actions(client?)` returns:
+`list_actions(client?, scope?, category?)` returns:
 
 - `service_actions`: current coordinator `actions.list` entries, including registered Mod actions. Each entry has `scope="service"`; menu entries additionally have `requires_ui=true`.
 - `clients`: connected Cosmos UI client IDs discovered in this Agent's Tmux service.
@@ -32,7 +32,7 @@ A response with `status="dispatched"` acknowledges routing only. A dialog may st
 
 ## Client transport and lifecycle
 
-The existing private UI bridge also accepts `type="cosmos.actions"` requests from the same Unix UID. Requests specify a client plus `operation="list"`, `"invoke"` , `"menu"` or `"focus"`; focus includes a stable `pane` and reuses Switch target selection. Invocation includes an Action `id`. Responses are one newline-delimited JSON object, with an `error` field on failure. The socket is mode 0600.
+The existing private UI bridge also accepts `type="cosmos.actions"` requests from the same Unix UID. Requests specify a client plus `operation="list"`, `"invoke"`, `"menu"`, `"context"`, `"open_file"` or `"focus"`; focus includes a stable `pane` and reuses Switch target selection. Invocation includes an Action `id`. Responses are one newline-delimited JSON object, with an `error` field on failure. The socket is mode 0600.
 
 Each connected UI publishes its private socket path in its Tmux service under `@cosmos_agent_actions_<client>`. Graceful shutdown removes the entry. Discovery ignores missing socket paths. A stale/unreachable entry returns an explicit connection error; the bridge does not retarget another client. A newly attached UI publishes a new client entry, so a retained Agent can refresh discovery after reconnection.
 
@@ -65,5 +65,6 @@ explicit selection. The result contains actual pane, display ID, path and view
 kind, with `loading: pending` and `complete: false`: it acknowledges routing,
 not successful decoding. This operation can move focus and remains permission-gated.
 
-Task-scoped combined permissions are not implemented by these APIs. Existing
-mutating-tool permissions remain in force.
+Terminal task permissions are grouped in the patched runtime; see
+[Agent control](agent-control.md). These Action APIs retain their existing
+permissions and do not inherit terminal-input authority.

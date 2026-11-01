@@ -5,11 +5,11 @@ This increment implements cross-process input ownership and user revocation. The
 ## Tools
 
 - `control_status()` returns controlled panes, task labels and states (`active`, `paused`, `ready`), without ownership tokens.
-- `acquire_control(pane, snapshot_id, task)` requires a snapshot observed by the same MCP connection, re-observes the same region, and rejects changed snapshots. It returns a cryptographically random token. Another owner cannot replace it, and a manually paused task cannot reacquire until a user resumes it.
-- `control_input(pane, token, kind, arguments, snapshot_id=None)` accepts `send_text`, `send_keys` or `mouse` using the existing terminal input argument names. Tokens belong to one MCP connection and pane. Mouse requires a fresh observation ID covering its target cell. Tmux server PID, pane window and dimensions are checked against acquisition; layout changes require a fresh acquisition. Mouse additionally revalidates its observation before input. These are sampled checks, not atomic application transactions.
+- `acquire_control(pane, snapshot_id, task)` requires a snapshot observed by the same runtime conversation (or MCP connection in system fallback), re-observes the same region, and rejects changed snapshots. It returns a cryptographically random token and a fresh `task_id`. Another owner cannot replace it, and a manually paused task cannot reacquire until a user resumes it.
+- `control_input(pane, token, kind, arguments, snapshot_id=None)` accepts `send_text`, `send_keys` or `mouse` using the existing terminal input argument names. In the patched runtime, tokens belong to one conversation, task and stable pane; system fallback retains connection ownership. Mouse requires a fresh observation ID covering its target cell. Tmux server PID, pane window and dimensions are checked against acquisition; layout changes require a fresh acquisition. Mouse additionally revalidates its observation before input. These are sampled checks, not atomic application transactions.
 - `release_control(pane, token)` ends the owner's task, including one paused with that token. It does not send Ctrl+C, close a pane or stop a terminal program.
 
-All mutating tools retain the native Agent confirmation policy. Ownership does not grant model permissions. `control_input` returns `delivery=delivered`, `action_complete=false`, `task_complete=false`: downstream evidence is still required.
+The patched runtime groups task acquisition, ordinary controlled input and own release under one scoped confirmation, as described below. Other mutations retain their native permission checks. Ownership alone does not grant unrelated permissions. `control_input` returns `delivery=delivered`, `action_complete=false`, `task_complete=false`: downstream evidence is still required.
 
 ## Human input and recovery
 
@@ -53,4 +53,51 @@ check so manual input can stop submission after paste. Newlines and NUL are
 rejected before any delivery. On failure after delivery, the response reports
 `delivery: partial` and the delivered stages; never blindly repeat that input.
 Successful delivery still sets `action_complete` and `task_complete` to false.
-This tool retains the normal mutating-tool permission gate.
+In the patched runtime this tool uses the acquired task capability; system fallback retains per-call confirmation.
+
+
+## Conversation/task/pane permission scope
+
+Cosmos's patched OpenCode adapter asks once at `acquire_control` for a named
+terminal task. The permission resource contains the native model conversation ID,
+stable pane ID, task label and a unique acquisition identity. After successful
+acquisition, the returned token and `task_id` identify the grant. Ordinary
+`control_input` and `terminal_step` reuse it. `release_control` ends only the
+conversation's own token and does not ask again, including after manual pause.
+Explicit configured denies and permission hooks still apply. Control-key input
+containing Ctrl+C, Ctrl+Z or Ctrl+D keeps a separate transient confirmation;
+workspace management and other Actions keep their existing permissions.
+
+These task checks ignore project-saved approvals, including old wildcard rules.
+Requests carry `save: []`; choosing Always has only one-request effect and cannot
+persist this task permission. Grants live only in the patched Agent process,
+never in the project permission database. A successful new acquisition rotates
+the pane grant. Input failures, partial delivery and release discard it. Process
+restart loses the grant and fails closed; orphan control records still need the
+existing user recovery Actions. A configured explicit allow can still customize
+the default confirmation policy.
+
+The adapter supplies an authenticated conversation envelope derived from the
+native tool execution context, overwriting model-supplied identity. The per-launch
+HMAC key is passed only in process environment, not model configuration or tool
+schemas. Python keeps separate observation caches, ownership identity and token
+geometry per authenticated conversation, even when the MCP process is shared.
+A different conversation cannot use another conversation's snapshot or release
+its task. The signature prevents the model choosing an arbitrary conversation
+through tool arguments; it is not protection against trusted same-UID programs
+reading process secrets, and is not an OS sandbox.
+
+Manual pause revokes input at the backend before delivery; an adapter grant cannot
+override it. Resume invalidates the old token. Fresh observation and acquisition
+then require a new task confirmation under default policy. No model request is
+cancelled automatically by this mechanism.
+
+System OpenCode without the Cosmos adapter uses the original per-call permission
+path and connection-scoped ownership; it does not claim conversation grouping.
+Restart the Agent frontend after updating this patch. Ordinary Cosmos clients and
+retained terminal applications do not need to be stopped.
+
+Implementation: `integrations/opencode/task-permissions.patch` patches MCP and
+permission evaluation; `cosmos-permissions.ts` holds transient grants;
+`conversation.py` authenticates context and partitions the Python tool state.
+`dev/prepare_agent.py` installs the tracked integration idempotently.

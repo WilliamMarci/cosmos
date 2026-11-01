@@ -41,7 +41,7 @@ class WorkspaceTools(TerminalTools):
             source["pane_current_path"],
             self.backend.shell_command(),
         )
-        return await self.read_screen(ident.strip(), wait_ms=100)
+        return await self.created_terminal(ident.strip())
 
     async def rename_target(self, target, name):
         if not isinstance(target, str) or not re.fullmatch(r"[$@%]\d+", target):

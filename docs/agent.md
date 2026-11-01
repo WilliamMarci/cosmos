@@ -66,13 +66,13 @@ The MCP server speaks newline-delimited stdio JSON-RPC. It has no listening netw
 - `send_text(pane, text)` pastes at most 32 KiB of UTF-8 using an isolated, disposable Tmux buffer and bracketed paste when the application supports it. It adds no Return. Embedded newlines may execute in applications without bracketed paste. Escape/control characters are rejected; use `send_keys` for controls.
 - `send_keys(pane, keys)` sends 1–64 ordered Tmux key names or single printable ASCII keys. Examples: `["Escape"]`, `["C-c"]`, `["Tab", "Down", "Enter"]`, `["PageDown"]`. Arguments are passed directly to Tmux with an option terminator, never interpolated into a shell command.
 - `mouse(pane, x, y, button="left", action="click")` uses one-based pane-local cells. Buttons: left, middle, right, wheel_up, wheel_down. Actions: click, press, release, move. It reuses Cosmos's SGR/UTF-8/X10 encoder and checks application tracking/motion flags. Unsupported tracking or out-of-bounds coordinates produce a tool error; no guessed click is sent.
-- `create_terminal(source_pane)` creates a retained Bash window in the source session and cwd, without selecting it. It returns the new stable pane ID and initial screen. It does not close or replace existing work.
+- `create_terminal(source_pane)` creates a retained Bash window in the source session and cwd, without selecting it. It returns stable/display IDs, actual cwd/program, process startup state and a compact fresh snapshot. The same response is used for `create_session`. It does not close or replace existing work.
 
 Every targeted operation validates a stable `%ID` against the selected service. A closed pane produces a tool error. The bridge does not silently retarget another pane. Returned application output is untrusted data, not authorization or new instructions. It is a text-grid bridge: it does not send image pixels or expose Cosmos-owned Reader/Files overlays as terminal content.
 
 ## Permissions
 
-OpenCode tool names are `cosmos_terminal_<tool>`. Default permission rules allow `list_sessions`, `list_panes` and `read_screen`; `send_text`, `send_keys`, `mouse`, `create_terminal`, session creation/rename/focus and history export require OpenCode's normal confirmation. The bridge itself is a trusted local program, not a sandbox. Users can change tool policies using OpenCode's permission mechanisms. The command assistant's File access setting does not govern this full Agent.
+OpenCode tool names are `cosmos_terminal_<tool>`. Default permission rules allow `list_sessions`, `list_panes` and `read_screen`; `send_text`, `send_keys`, `mouse`, `create_terminal`, session creation/rename/focus and history export require OpenCode's normal confirmation. The patched runtime groups terminal task acquisition, ordinary token input and own release by native conversation/task/pane; see [Agent control](agent-control.md). The bridge itself is a trusted local program, not a sandbox. Users can change tool policies using OpenCode's permission mechanisms. The command assistant's File access setting does not govern this full Agent.
 
 `config/cosmos-agent-prompt.md` tells the agent to inspect before acting, prefer a new terminal for new tasks, send short input sequences, and read back the result. Successful input delivery alone is not treated as task completion.
 
@@ -97,3 +97,21 @@ Pane ownership and human-input revocation are available through `acquire_control
 Provider packages use the current runtime's native contract: `@opencode/ai/providers/deepseek`, `@opencode/ai/providers/anthropic`, and `@opencode/ai/providers/openai-compatible`. Raw `@ai-sdk/*` modules do not expose the required `model(modelID, settings)` entry point and must not be used here without an explicit compatibility bridge. `dev/validate_agent_provider.py` exercises a real standalone Agent conversation against a local OpenAI-chat fixture, including streamed response delivery, without a user key or paid API request.
 
 Independent background conditions and timeout detection are available through `watch_terminal`, `terminal_watches` and `cancel_terminal_watch`; see [Terminal watch service](agent-monitor.md) for sampling limits, runtime persistence and the currently unavailable automatic model wakeup adapter.
+
+
+### Terminal creation response
+
+`create_terminal` and `create_session` return `pane_id`, `session_id`, `window_id`,
+`display_id`, `pane_current_path`, `program`, `startup`, `shell_ready`,
+`focus_changed` and `snapshot`. `startup` is `process_running` or `exited`,
+reflecting Tmux's process state; `shell_ready: null` explicitly avoids claiming
+shell startup scripts have finished. The cwd is read from the actual pane, so an
+extra `pwd` is unnecessary. `focus_changed` is false.
+
+The snapshot contains identity, pane dimensions, cursor, region, coordinate space
+and positioned text. Blank rows are omitted explicitly. At most 24 nonempty rows
+and 4096 UTF-8 text bytes are included, preferring recent rows; `truncated` marks
+omitted nonblank content. The ID still identifies the full observation and can
+be passed directly to `acquire_control` in the same conversation. As usual, a
+changing startup screen can invalidate that ID; observe again if acquisition
+reports a change. This is an initial observation, not proof of task completion.

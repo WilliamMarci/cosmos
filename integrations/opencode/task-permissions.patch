@@ -1,0 +1,137 @@
+diff --git a/packages/core/src/permission.ts b/packages/core/src/permission.ts
+index 37d5811..cf435e8 100644
+--- a/packages/core/src/permission.ts
++++ b/packages/core/src/permission.ts
+@@ -33,6 +33,10 @@ export type Reply = typeof Reply.Type
+ export interface AssertInput extends Omit<Request, "id" | "message"> {
+   readonly id?: ID
+   readonly agent?: Agent.ID
++  /** Internal Cosmos task capability; explicit denies and hooks still apply. */
++  readonly taskGranted?: boolean
++  /** Do not consult project-persisted permissions for a task acquisition. */
++  readonly transient?: boolean
+ }
+ 
+ export interface ReplyInput {
+@@ -100,6 +104,7 @@ export interface Interface {
+ export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
+ 
+ interface Pending {
++  readonly transient?: boolean
+   readonly request: Request
+   readonly agent?: Agent.ID
+   readonly deferred: Deferred.Deferred<void, DeclinedError | CorrectedError>
+@@ -160,9 +165,9 @@ const layer = Layer.effect(
+     const evaluateInput = Effect.fnUntraced(function* (input: AssertInput) {
+       const rules = yield* configured(input.sessionID, input.agent)
+       if (denied(input, rules)) return { effect: "deny" as const, rules }
+-      const all = [...rules, ...(yield* savedRules())]
++      const all = [...rules, ...(input.transient ? [] : yield* savedRules())]
+       const effects = input.resources.map((resource) => evaluate(input.action, resource, all).effect)
+-      const effect: Permission.Effect = effects.includes("ask") ? "ask" : "allow"
++      const effect: Permission.Effect = effects.includes("ask") && !input.taskGranted ? "ask" : "allow"
+       const event = yield* hooks.trigger("permission", "evaluate", {
+         sessionID: input.sessionID,
+         agent: input.agent,
+@@ -192,11 +197,11 @@ const layer = Layer.effect(
+       }
+     }
+ 
+-    const create = (request: Request, agent?: Agent.ID) =>
++    const create = (request: Request, agent?: Agent.ID, transient = false) =>
+       Effect.uninterruptible(
+         Effect.gen(function* () {
+           const deferred = yield* Deferred.make<void, DeclinedError | CorrectedError>()
+-          const item = { request, agent, deferred }
++          const item = { request, agent, deferred, transient }
+           if (closed) {
+             yield* Deferred.fail(deferred, new DeclinedError())
+             return item
+@@ -215,7 +220,7 @@ const layer = Layer.effect(
+       if (closed) return { id: input.id ?? ID.create(), effect: "deny" as const }
+       const result = yield* evaluateInput(input)
+       const value = request(input, result.message)
+-      if (result.effect === "ask") yield* create(value, input.agent)
++      if (result.effect === "ask") yield* create(value, input.agent, input.transient)
+       return { id: value.id, effect: result.effect }
+     })
+ 
+@@ -234,7 +239,7 @@ const layer = Layer.effect(
+               })
+             }
+             if (result.effect === "allow") return
+-            const item = yield* create(request(input, result.message), input.agent)
++            const item = yield* create(request(input, result.message), input.agent, input.transient)
+             return yield* restore(Deferred.await(item.deferred)).pipe(
+               // Deliberate defect tunnel: leaves wrap execution in blanket `mapError`, which
+               // must not convert a user's decline into model-facing tool output. The decline
+@@ -299,7 +304,7 @@ const layer = Layer.effect(
+           if (input.reply !== "always" || !existing.request.save?.length) return
+ 
+           for (const [id, item] of pending) {
+-            const result = yield* evaluateInput({ ...item.request, agent: item.agent }).pipe(
++            const result = yield* evaluateInput({ ...item.request, agent: item.agent, transient: item.transient }).pipe(
+               Effect.catchTag("Session.NotFoundError", () => Effect.undefined),
+             )
+             if (result?.effect !== "allow") continue
+diff --git a/packages/core/src/tool/mcp.ts b/packages/core/src/tool/mcp.ts
+index 6d1b8cc..507652f 100644
+--- a/packages/core/src/tool/mcp.ts
++++ b/packages/core/src/tool/mcp.ts
+@@ -1,5 +1,7 @@
+ export * as McpTool from "./mcp.js"
+ 
++import { CosmosPermissions } from "./cosmos-permissions.js"
++
+ import { ToolFailure } from "@opencode/ai"
+ import { McpEvent } from "@opencode/schema/mcp-event"
+ import { Context, Effect, Fiber, type JsonSchema, Layer, Option, PubSub, Schema, Semaphore, Stream } from "effect"
+@@ -39,6 +41,7 @@ export const layer = Layer.effect(
+     const toolOutput = yield* ToolOutput.Service
+     const lock = Semaphore.makeUnsafe(1)
+     let discovered: Mcp.Tool[] = []
++    const cosmosPermissions = new CosmosPermissions()
+ 
+     // Register once after initial discovery; only subsequent updates need a debounced reload.
+     const initial = yield* lock
+@@ -55,11 +58,17 @@ export const layer = Layer.effect(
+                 output: (tool.outputSchema ?? {}) as JsonSchema.JsonSchema,
+                 execute: (input, context) =>
+                   Effect.gen(function* () {
++                    const plan = yield* Effect.try({
++                      try: () => cosmosPermissions.plan(tool.server, tool.name, (input ?? {}) as Record<string, unknown>, context.sessionID, context.agent),
++                      catch: (error) => new ToolFailure({ message: String(error) }),
++                    })
+                     yield* permission.assert({
+                       action: name(tool.server, tool.name),
+-                      resources: ["*"],
+-                      save: ["*"],
+-                      metadata: { input: input ?? {} },
++                      resources: plan.resources,
++                      save: plan.save,
++                      transient: plan.transient,
++                      taskGranted: plan.taskGranted,
++                      metadata: plan.metadata,
+                       sessionID: context.sessionID,
+                       agent: context.agent,
+                       source: {
+@@ -72,16 +81,18 @@ export const layer = Layer.effect(
+                       .callTool({
+                         server: tool.server,
+                         name: tool.name,
+-                        args: (input ?? {}) as Record<string, unknown>,
++                        args: plan.args,
+                         sessionID: context.sessionID,
+                       })
+                       .pipe(
++                        Effect.tapError(() => Effect.sync(() => cosmosPermissions.finish(plan, { isError: true, content: [] }))),
+                         Effect.catchTags({
+                           "MCP.NotFoundError": (error) =>
+                             new ToolFailure({ message: `MCP server "${error.server}" is not available` }),
+                           "MCP.ToolCallError": (error) => new ToolFailure({ message: error.message }),
+                         }),
+                       )
++                    cosmosPermissions.finish(plan, result)
+                     if (result.isError)
+                       return yield* new ToolFailure({
+                         message:

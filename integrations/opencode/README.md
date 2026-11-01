@@ -13,3 +13,14 @@ License: MIT, preserved in `LICENSE-OpenCode`.
 `agent.test.ts` is a focused OpenCode-side schema and permission-rule test. Copy it to `vendor/opencode/packages/core/test/cosmos-agent.test.ts` and run there with `COSMOS_AGENT_TEST_CONFIG=/absolute/path/config.json bun test test/cosmos-agent.test.ts`. Generate that JSON with `cosmos_tui.features.agent.launch.configuration(socket, source_pane)`.
 
 The terminal tools and launcher live in `python/cosmos_tui/features/agent/`, outside the upstream tree. See `docs/agent.md` for the implemented API and limits.
+
+
+`task-permissions.patch` and `cosmos-permissions.ts` implement ephemeral native
+conversation/task/pane grants for terminal acquisition, ordinary controlled input
+and own release. They ignore project-saved task approvals, preserve explicit
+denies and retain separate interruption checks. The signed runtime context also
+partitions Python MCP ownership and observations by conversation. Stock system
+OpenCode keeps per-call permissions. `task-permissions.test.ts` exercises the
+adapter, the actual permission service/database and the real MCP tool registry;
+copy it to `packages/core/test/cosmos-task-permissions.test.ts` before running Bun.
+No provider/API calls are required. See `docs/agent-control.md` for lifecycle limits.

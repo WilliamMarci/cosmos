@@ -101,7 +101,7 @@ TOOLS = [
     ),
     dict(
         name="create_terminal",
-        description="Create a retained Bash terminal in a new background window of the source pane's session, inheriting its cwd. Does not steal focus. Returns its stable pane ID.",
+        description="Create a retained Bash terminal in a new background window of the source pane's session, inheriting its cwd. Does not steal focus. Returns stable/display IDs, actual cwd/program, process startup state and a fresh compact snapshot reusable for acquire_control; shell_ready is unknown until verified.",
         inputSchema=schema(dict(source_pane=PANE), ("source_pane",)),
     ),
 ]
@@ -116,7 +116,7 @@ TOOLS += [
     ),
     dict(
         name="create_session",
-        description="Create a new retained Cosmos session with a required task name, inheriting the source pane's cwd. It starts in the background; use focus_pane to switch a UI client.",
+        description="Create a new retained Cosmos session with a required task name, inheriting the source pane's cwd. Starts in the background and returns actual cwd/startup state plus a compact fresh snapshot; use focus_pane to switch a UI client.",
         inputSchema=schema(
             dict(name=dict(type="string"), source_pane=PANE), ("name", "source_pane")
         ),
@@ -153,7 +153,7 @@ TOOLS.extend(
         ),
         dict(
             name="acquire_control",
-            description="Acquire exclusive pane input ownership after a fresh observe snapshot. Cannot override a manually paused task. Does not grant model/tool permissions.",
+            description="Confirm one task capability scoped to the current conversation, task and stable pane, then acquire exclusive input after a fresh observation. The patched Cosmos runtime groups ordinary token input and own release; pauses revoke control, and reacquisition requires fresh confirmation. System runtimes retain per-call permissions.",
             inputSchema=schema(
                 dict(
                     pane=PANE, snapshot_id=dict(type="string"), task=dict(type="string")
@@ -340,8 +340,11 @@ async def dispatch(tools, message, catalog=TOOLS):
         try:
             if not isinstance(args, dict) or set(args) - set(
                 spec["inputSchema"]["properties"]
-            ):
+            ) - {"_cosmos_context"}:
                 raise ValueError("invalid tool arguments")
+            from cosmos_tui.features.agent.conversation import scoped_tools
+
+            tools, args = scoped_tools(tools, args)
             function = tools.panes if name == "list_panes" else getattr(tools, name)
             result = await function(**args)
             return dict(

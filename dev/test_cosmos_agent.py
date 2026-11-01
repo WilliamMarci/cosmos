@@ -51,6 +51,139 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
         finally:
             await self.tools.release_control(self.pane, lease["token"])
 
+    async def test_authenticated_conversations_cannot_share_snapshots_or_tokens(self):
+        import hashlib
+        import hmac
+        from unittest.mock import patch
+        from cosmos_tui.features.agent.mcp import dispatch
+        from cosmos_tui.features.agent.control import ControlStore
+
+        async def call(session, name, **arguments):
+            arguments["_cosmos_context"] = dict(
+                session=session,
+                signature=hmac.new(
+                    b"fixture-key", session.encode(), hashlib.sha256
+                ).hexdigest(),
+            )
+            result = await dispatch(
+                self.tools,
+                dict(method="tools/call", params=dict(name=name, arguments=arguments)),
+            )
+            text = result["content"][0]["text"]
+            return result["isError"], text if result["isError"] else json.loads(text)
+
+        with patch.dict(os.environ, COSMOS_AGENT_CONTEXT_KEY="fixture-key"):
+            error, observed = await call(
+                "conversation-a", "observe", pane=self.pane, layers=["text"]
+            )
+            self.assertFalse(error)
+            error, _ = await call(
+                "conversation-b",
+                "acquire_control",
+                pane=self.pane,
+                snapshot_id=observed["snapshot_id"],
+                task="Wrong conversation",
+            )
+            self.assertTrue(error)
+            error, lease = await call(
+                "conversation-a",
+                "acquire_control",
+                pane=self.pane,
+                snapshot_id=observed["snapshot_id"],
+                task="Task A",
+            )
+            self.assertFalse(error)
+            try:
+                error, _ = await call(
+                    "conversation-b",
+                    "release_control",
+                    pane=self.pane,
+                    token=lease["token"],
+                )
+                self.assertTrue(error)
+                error, _ = await call(
+                    "conversation-b",
+                    "terminal_step",
+                    pane=self.pane,
+                    token=lease["token"],
+                    text=":echo 'WRONG'",
+                    submit=True,
+                )
+                self.assertTrue(error)
+                self.assertNotIn(
+                    "WRONG", (await self.tools.read_screen(self.pane))["text"]
+                )
+                ControlStore(self.socket).change(self.pane, "pause")
+                error, _ = await call(
+                    "conversation-a",
+                    "terminal_step",
+                    pane=self.pane,
+                    token=lease["token"],
+                    text="",
+                    submit=True,
+                )
+                self.assertTrue(error)
+                ControlStore(self.socket).change(self.pane, "resume")
+                error, _ = await call(
+                    "conversation-a",
+                    "terminal_step",
+                    pane=self.pane,
+                    token=lease["token"],
+                    text="",
+                    submit=True,
+                )
+                self.assertTrue(error)
+                _, observed = await call(
+                    "conversation-a", "observe", pane=self.pane, layers=["text"]
+                )
+                error, fresh = await call(
+                    "conversation-a",
+                    "acquire_control",
+                    pane=self.pane,
+                    snapshot_id=observed["snapshot_id"],
+                    task="Task A",
+                )
+                self.assertFalse(error)
+                self.assertNotEqual(fresh["task_id"], lease["task_id"])
+                lease = fresh
+            finally:
+                error, _ = await call(
+                    "conversation-a",
+                    "release_control",
+                    pane=self.pane,
+                    token=lease["token"],
+                )
+                self.assertFalse(error)
+            forged = await dispatch(
+                self.tools,
+                dict(
+                    method="tools/call",
+                    params=dict(
+                        name="list_panes",
+                        arguments=dict(
+                            _cosmos_context=dict(
+                                session="conversation-a", signature="forged"
+                            )
+                        ),
+                    ),
+                ),
+            )
+            self.assertTrue(forged["isError"])
+
+    async def test_compact_snapshot_bounds_keep_identity_and_positions(self):
+        from cosmos_tui.features.agent.compact import compact_snapshot
+
+        source = await self.tools.observe(self.pane, ["text"])
+        source["text"] = [dict(y=i + 1, x=1, text="字" * 200) for i in range(50)]
+        result = compact_snapshot(source)
+        self.assertTrue(result["truncated"])
+        self.assertEqual(result["snapshot_id"], source["snapshot_id"])
+        self.assertEqual(result["text"][-1]["y"], 50)
+        self.assertLessEqual(len(result["text"]), 24)
+        self.assertLessEqual(
+            sum(len(row["text"].encode()) for row in result["text"]), 4096
+        )
+
     async def test_display_target_resolution(self):
         row = (await self.tools.panes())[0]
         resolved = await self.tools.resolve_target(row["display_id"])
@@ -130,6 +263,16 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(created["pane_id"], self.pane)
         self.assertEqual(created["session_id"], screen["session_id"])
         self.assertEqual(created["pane_current_path"], self.directory.name)
+        self.assertEqual(created["startup"], "process_running")
+        self.assertIsNone(created["shell_ready"])
+        self.assertNotIn("text", created)
+        self.assertLess(len(json.dumps(created).encode()), 10000)
+        self.assertTrue(created["snapshot"]["blank_rows_omitted"])
+        observed = created["snapshot"]
+        lease = await self.tools.acquire_control(
+            created["pane_id"], observed["snapshot_id"], "Use newly created terminal"
+        )
+        await self.tools.release_control(created["pane_id"], lease["token"])
 
     async def test_session_management_and_private_history_export(self):
         from unittest.mock import patch

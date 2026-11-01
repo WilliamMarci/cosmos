@@ -86,8 +86,15 @@ class ControlStore:
                 token=token,
                 state="active",
                 server_pid=server_pid,
+                task_id=secrets.token_hex(16),
             )
-            return dict(pane=pane, token=token, state="active", task=task)
+            return dict(
+                pane=pane,
+                token=token,
+                state="active",
+                task=task,
+                task_id=state[pane]["task_id"],
+            )
 
     def change(self, pane, action):
         if not self.path.exists():
