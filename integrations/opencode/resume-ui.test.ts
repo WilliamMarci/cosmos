@@ -4,7 +4,7 @@ import { createAppFixture } from "./fixture/app"
 import { directory, json } from "./fixture/tui-client"
 import { permissionPresentation } from "../src/util/permission"
 
-async function fixture(shell = false) {
+async function fixture(shell: boolean | "scoped" = false) {
   const session = {
     id: `ses_resume_${crypto.randomUUID()}`,
     title: "Resume fixture",
@@ -48,6 +48,24 @@ async function fixture(shell = false) {
           ),
       },
     })
+  if (shell === "scoped") {
+    const scope = {
+      version: 1,
+      cwd: "/tmp/fixture",
+      shell: "/bin/bash",
+      tools: ["grep", "head"],
+      roots: [{ path: "/tmp/fixture", directory: true }],
+      mode: "tools",
+      writes: false,
+    }
+    Object.assign(permission, {
+      save: [
+        "cosmos-shell-v1:" +
+          Buffer.from(JSON.stringify(scope)).toString("base64url"),
+      ],
+    })
+    Object.assign(permission.metadata, { cosmos_shell_scope: scope })
+  }
   const location = {
     directory,
     project: { id: session.projectID, directory, canonical: directory },
@@ -173,4 +191,18 @@ test("long Shell approval wraps and scrolls without overlapping permission rows 
   setup.mockInput.pressEnter()
   await setup.waitFor(() => setup.replies.length === 1)
   expect(setup.replies).toEqual([{ decision: "once" }])
+})
+
+test("scoped Shell approval exposes Always and remembers only the displayed scope", async () => {
+  await using setup = await fixture("scoped")
+  await setup.waitForFrame((frame) => frame.includes("Always allow"), {
+    maxPasses: 120,
+  })
+  const always = setup.renderer.root.findDescendantById(
+    "session.permission.action.always",
+  )!
+  expect(always).toBeDefined()
+  await setup.mockMouse.click(always.x + 1, always.y)
+  await setup.waitFor(() => setup.replies.length === 1)
+  expect(setup.replies).toEqual([{ decision: "always" }])
 })

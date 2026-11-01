@@ -166,7 +166,7 @@ index 07338ab..b1bfc67 100644
        <box
          flexDirection={narrow() ? "column" : "row"}
 diff --git a/packages/tui/src/util/permission.ts b/packages/tui/src/util/permission.ts
-index 09d607f..78df574 100644
+index 09d607f..674be73 100644
 --- a/packages/tui/src/util/permission.ts
 +++ b/packages/tui/src/util/permission.ts
 @@ -5,6 +5,7 @@ type Dict = Record<string, unknown>
@@ -207,7 +207,7 @@ index 09d607f..78df574 100644
    if (action === "edit") {
      const file = text(input.path) || resources[0] || ""
      const first = dict(Array.isArray(metadata.files) ? metadata.files[0] : undefined)
-@@ -143,6 +158,70 @@ export function permissionPresentation(
+@@ -143,6 +158,106 @@ export function permissionPresentation(
    }
  }
  
@@ -229,6 +229,23 @@ index 09d607f..78df574 100644
 +  return "Host writes / execution"
 +}
 +
++export function permissionScopeLabel(resource: string) {
++  if (!resource.startsWith("cosmos-shell-v1:")) return resource
++  try {
++    const scope = JSON.parse(Buffer.from(resource.slice("cosmos-shell-v1:".length), "base64url").toString())
++    if (
++      scope.version !== 1 ||
++      !Array.isArray(scope.tools) ||
++      typeof scope.cwd !== "string" ||
++      !Array.isArray(scope.roots)
++    )
++      return resource
++    return `${scope.mode === "exact" ? `Exact ${scope.tools.join(" + ") || "Shell"} #${String(scope.digest ?? "").slice(0, 8)}` : "Tools: " + scope.tools.join(" + ")} @ ${scope.cwd} · ${scope.roots.map((r: any) => r.path + (r.directory ? "/" : "")).join(", ")}`
++  } catch {
++    return resource
++  }
++}
++
 +export function permissionPresentation(
 +  source: PermissionPresentationInput,
 +  formatPath: (value: string) => string = (value) => value,
@@ -239,33 +256,52 @@ index 09d607f..78df574 100644
 +  if (metadata.cosmos_scope === undefined && !metadata.capability && !metadata.cosmos_resume) return base
 +  const category = cosmosPermissionCategory(source.action, metadata)
 +  const read = category === "Read directory"
++  const shellScope = dict(metadata.cosmos_shell_scope)
++  const scopedShell = shellScope.version === 1
 +  const scope =
++    (scopedShell
++      ? `${text(shellScope.cwd)} · ${(Array.isArray(shellScope.roots) ? shellScope.roots : []).map((r: any) => r.path).join(", ")}`
++      : "") ||
 +    text(metadata.pane) ||
 +    text(metadata.cosmos_scope) ||
 +    source.resources.filter((r) => typeof r === "string").join(", ") ||
 +    "Current project"
-+  const duration = metadata.cosmos_resume
-+    ? "One resume confirmation; no terminal input permission"
-+    : metadata.capability
-+      ? "This conversation + task + terminal; ends on release, finish or pause"
-+      : read
-+        ? "Once, or remember this directory for the project"
-+        : "This request; existing saved/configured rules are managed separately"
-+  const writes = read
-+    ? "No"
++  const duration = scopedShell
++    ? shellScope.sensitive
++      ? "This interruption/stop request only; cannot be remembered"
++      : "Once, or remember this toolset/scope for the project until revoked"
 +    : metadata.cosmos_resume
-+      ? "No terminal input; resumes task state only"
-+      : category === "Terminal task"
-+        ? "Yes: terminal input can run commands and modify files"
-+        : category === "Workspace management"
-+          ? "Workspace state; close/interrupt require separate approval"
-+          : "Yes or possible: inspect command, directory and changes"
++      ? "One resume confirmation; no terminal input permission"
++      : metadata.capability
++        ? "This conversation + task + terminal; ends on release, finish or pause"
++        : read
++          ? "Once, or remember this directory for the project"
++          : "This request; existing saved/configured rules are managed separately"
++  const writes = scopedShell
++    ? shellScope.writes
++      ? "Yes or possible; scoped Shell execution"
++      : "No declared file writes; toolset execution, not an OS sandbox"
++    : read
++      ? "No"
++      : metadata.cosmos_resume
++        ? "No terminal input; resumes task state only"
++        : category === "Terminal task"
++          ? "Yes: terminal input can run commands and modify files"
++          : category === "Workspace management"
++            ? "Workspace state; close/interrupt require separate approval"
++            : "Yes or possible: inspect command, directory and changes"
 +  return {
 +    ...base,
 +    lines: [
 +      ...(base.variant === "resume" ? base.lines.slice(0, 2) : base.lines),
 +      ...(metadata.task ? [`Task: ${text(metadata.task)}`] : []),
 +      `Category: ${category}`,
++      ...(scopedShell
++        ? [
++            `Tools: ${(Array.isArray(shellScope.tools) ? shellScope.tools : []).join(" + ")}`,
++            `Remember: ${shellScope.sensitive ? "not available for interruption/stop" : shellScope.mode === "exact" ? "this exact command only" : "these tools within the listed directory scope"}`,
++          ]
++        : []),
 +      ...(read ? ["Includes: file reads, directory listing and text search; no execution"] : []),
 +      `Scope: ${formatPath(scope)}`,
 +      `Lifetime: ${duration}`,
@@ -278,3 +314,15 @@ index 09d607f..78df574 100644
  function wildcardDirectory(value: string) {
    const wildcard = value.indexOf("*")
    if (wildcard === -1) return value
+@@ -152,6 +267,11 @@ function wildcardDirectory(value: string) {
+ }
+ 
+ export function permissionAlwaysLines(input: { action: string; save?: ReadonlyArray<string> }): string[] {
++  if (input.save?.some((r) => r.startsWith("cosmos-shell-v1:")))
++    return [
++      "Remember these Shell tools and this directory scope for this project until revoked.",
++      ...input.save.map(permissionScopeLabel),
++    ]
+   const save = input.save ?? []
+   if (save.length === 1 && save[0] === "*") {
+     return [`This will always allow ${input.action} for this project.`]

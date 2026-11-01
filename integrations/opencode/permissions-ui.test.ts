@@ -4,6 +4,8 @@ import { createAppFixture } from "./fixture/app"
 import { directory, json } from "./fixture/tui-client"
 import {
   cosmosPermissionCategory,
+  permissionScopeLabel,
+  permissionAlwaysLines,
   permissionPresentation,
 } from "../src/util/permission"
 
@@ -165,4 +167,29 @@ test("native Permissions dialog inspects legacy grants, defaults to Keep and onl
     (frame) => frame.includes("No saved project approvals."),
     { maxPasses: 120 },
   )
+})
+
+test("saved Shell scope labels are readable, not encoded payloads", () => {
+  const scope = {
+    version: 1,
+    cwd: "/tmp/fixture",
+    tools: ["grep", "head"],
+    roots: [{ path: "/tmp/fixture", directory: true }],
+    mode: "tools",
+    writes: false,
+  }
+  const record =
+    "cosmos-shell-v1:" +
+    Buffer.from(JSON.stringify(scope)).toString("base64url")
+  expect(permissionScopeLabel(record)).toContain("grep + head")
+  expect(permissionScopeLabel(record)).not.toContain("cosmos-shell-v1:")
+  const shown = permissionPresentation({
+    action: "shell",
+    resources: ["grep first ."],
+    metadata: { cosmos_scope: "fixture", cosmos_shell_scope: scope },
+  })
+  expect(shown.lines.join("\n")).toContain("remember this toolset/scope")
+  expect(
+    permissionAlwaysLines({ action: "shell", save: [record] }).join("\n"),
+  ).toContain("until revoked")
 })

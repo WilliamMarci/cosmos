@@ -72,10 +72,15 @@ index e13466a..f0cdc04 100644
                    path: input.path,
                    include: input.include,
 diff --git a/packages/core/src/tool/plugin/shell.ts b/packages/core/src/tool/plugin/shell.ts
-index af454a7..2dd62a8 100644
+index af454a7..1b75b11 100644
 --- a/packages/core/src/tool/plugin/shell.ts
 +++ b/packages/core/src/tool/plugin/shell.ts
-@@ -39,6 +39,11 @@ const description = (shell?: string) =>
+@@ -1,3 +1,4 @@
++import { shellScope, encodeShellScope } from "../../cosmos/shell-scope.js"
+ export * as ShellTool from "./shell.js"
+ 
+ import { ToolFailure } from "@opencode/ai"
+@@ -39,6 +40,11 @@ const description = (shell?: string) =>
      ...(shell ? [`Commands run on ${OS} using ${shell}.`] : []),
      "Quote file paths containing spaces or special characters.",
      "Prefer dedicated tools over shell commands when possible.",
@@ -87,14 +92,25 @@ index af454a7..2dd62a8 100644
      "When output is large, the full result is saved to a file and a truncated preview is returned.",
      "Rely on automatic truncation unless filtering the output is more useful.",
      "Commands accept an optional timeout, background commands have no timeout by default.",
-@@ -138,7 +143,10 @@ export const Plugin = {
+@@ -134,11 +140,21 @@ export const Plugin = {
+         }),
+       )
+       yield* access.authorizeExternal([target, ...directories], context)
++      const cosmosScope =
++        process.env.COSMOS_AGENT === "1" ? shellScope(invocation.command, invocation.shell, target.absolute) : undefined
+       if (parsed.commands.length > 0)
          yield* permission.assert({
            action: name,
            resources: parsed.commands.map((command) => command.resource),
 -          save: parsed.commands.map((command) => command.save),
-+          save: process.env.COSMOS_AGENT === "1" ? [] : parsed.commands.map((command) => command.save),
++          save: cosmosScope
++            ? cosmosScope.sensitive
++              ? []
++              : [encodeShellScope(cosmosScope)]
++            : parsed.commands.map((command) => command.save),
++          forceAsk: cosmosScope?.sensitive,
 +          ...(process.env.COSMOS_AGENT === "1"
-+            ? { metadata: { workdir: target.absolute, command: invocation.command } }
++            ? { metadata: { workdir: target.absolute, command: invocation.command, cosmos_shell_scope: cosmosScope } }
 +            : {}),
            sessionID: context.sessionID,
            agent: context.agent,

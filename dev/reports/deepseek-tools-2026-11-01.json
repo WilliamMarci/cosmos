@@ -1,0 +1,56 @@
+{
+  "provider": "deepseek",
+  "model": "deepseek-flash",
+  "exit_code": 0,
+  "tools": [
+    {
+      "tool": "execute",
+      "status": "completed"
+    },
+    {
+      "tool": "execute",
+      "status": "completed"
+    },
+    {
+      "tool": "cosmos_context",
+      "status": "completed"
+    },
+    {
+      "tool": "read",
+      "status": "completed"
+    },
+    {
+      "tool": "glob",
+      "status": "completed"
+    },
+    {
+      "tool": "grep",
+      "status": "completed"
+    },
+    {
+      "tool": "cosmos_observe",
+      "status": "completed"
+    },
+    {
+      "tool": "cosmos_task",
+      "status": "completed"
+    },
+    {
+      "tool": "cosmos_step",
+      "status": "completed"
+    },
+    {
+      "tool": "cosmos_task",
+      "status": "completed"
+    }
+  ],
+  "missing": [],
+  "final_marker": true,
+  "terminal_marker": true,
+  "native_read_marker": true,
+  "reported_cost": 0.00287562,
+  "date": "2026-11-01",
+  "scope": "Disposable DeepSeek API tool invocation probe; not full Reader/UI or long MadGraph acceptance",
+  "credential_values_recorded": false,
+  "live_user_panes_modified": false
+}

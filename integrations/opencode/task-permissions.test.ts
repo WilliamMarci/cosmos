@@ -1,3 +1,4 @@
+import { shellScope, encodeShellScope } from "../src/cosmos/shell-scope"
 import { Mcp } from "@opencode/core/mcp/index"
 import { McpTool } from "@opencode/core/tool/mcp"
 import { Tool } from "@opencode/core/tool"
@@ -536,7 +537,12 @@ testEffect(Layer.empty).effect(
           }
           const handle = findHandle(observed)
           expect(handle).toBeDefined()
-          const begun = yield* run("task", {operation:"begin",target:"%4",observation:handle,task:"Plot"})
+          const begun = yield* run("task", {
+            operation: "begin",
+            target: "%4",
+            observation: handle,
+            task: "Plot",
+          })
           expect(begun.status).toBe("completed")
           expect(JSON.stringify(begun)).not.toContain(lease.token)
           expect(JSON.stringify(begun)).toContain("context")
@@ -781,4 +787,75 @@ it.effect("public short alias denies survive a captured task executor", () =>
     })
     expect(result.effect).toBe("deny")
   }),
+)
+
+it.effect(
+  "Shell Always remembers toolset+scope and explicit revoke restores ask",
+  () =>
+    Effect.gen(function* () {
+      const old = process.env.COSMOS_AGENT
+      process.env.COSMOS_AGENT = "1"
+      try {
+        yield* setup()
+        const permission = yield* Permission.Service
+        const saved = yield* PermissionSaved.Service
+        const scope = shellScope(
+          "grep first ./src | head -5",
+          "/bin/bash",
+          "/tmp/cosmos-scope",
+        )
+        const request = {
+          action: "shell",
+          resources: ["grep first ./src", "head -5"],
+          save: [encodeShellScope(scope)],
+          metadata: { cosmos_shell_scope: scope },
+          sessionID: Session.ID.make("ses_test"),
+          source: {
+            type: "tool" as const,
+            messageID: toolIdentity.messageID,
+            id: "shell-scope",
+          },
+        }
+        const first = yield* permission.ask(request)
+        expect(first.effect).toBe("ask")
+        const card = yield* permission.get(first.id)
+        expect(card?.save?.length).toBe(1)
+        yield* permission.reply({ requestID: first.id, reply: "always" })
+        const rows = yield* saved.list({ projectID: Project.ID.global })
+        const rule = rows.find((r) => r.action === "cosmos_shell_scope")!
+        expect(rule).toBeDefined()
+        const follow = {
+          ...request,
+          resources: ["grep second ./src"],
+          metadata: {
+            cosmos_shell_scope: shellScope(
+              "grep second ./src",
+              "/bin/bash",
+              "/tmp/cosmos-scope",
+            ),
+          },
+        }
+        expect((yield* permission.ask(follow)).effect).toBe("allow")
+        expect(
+          (yield* permission.ask({
+            ...follow,
+            metadata: {
+              cosmos_shell_scope: shellScope(
+                "grep second /etc/passwd",
+                "/bin/bash",
+                "/tmp/cosmos-scope",
+              ),
+            },
+          })).effect,
+        ).toBe("ask")
+        yield* setRules([{ action: "shell", resource: "*", effect: "deny" }])
+        expect((yield* permission.ask(follow)).effect).toBe("deny")
+        yield* setRules([])
+        yield* saved.remove(rule.id)
+        expect((yield* permission.ask(follow)).effect).toBe("ask")
+      } finally {
+        if (old === undefined) delete process.env.COSMOS_AGENT
+        else process.env.COSMOS_AGENT = old
+      }
+    }),
 )

@@ -6,7 +6,10 @@ import { useLocation } from "../context/location"
 import { useDialog } from "../ui/dialog"
 import { DialogSelect } from "../ui/dialog-select"
 import { useToast } from "../ui/toast"
-import { cosmosPermissionCategory } from "../util/permission"
+import {
+  cosmosPermissionCategory,
+  permissionScopeLabel,
+} from "../util/permission"
 
 export function DialogCosmosPermissions() {
   const client = useClient()
@@ -85,7 +88,7 @@ export function DialogCosmosPermissions() {
         <text>
           {error() ||
             (selected()
-              ? `Scope: ${selected()!.resource}\nLifetime: saved for this project until revoked\nWrites: ${["read", "glob", "grep", "list", "cosmos_directory_read"].includes(selected()!.action) ? "No" : "Possible; legacy rule"}\nRevoking does not cancel running commands or active task capabilities.`
+              ? `Scope: ${permissionScopeLabel(selected()!.resource)}\nLifetime: saved for this project until revoked\nWrites: ${["read", "glob", "grep", "list", "cosmos_directory_read"].includes(selected()!.action) ? "No" : "Possible; inspect the selected scope"}\nRevoking does not cancel running commands or active task capabilities.`
               : "Scope: current project · Lifetime: until revoked · Select a rule to inspect")}
         </text>
       }
@@ -100,21 +103,23 @@ export function DialogCosmosPermissions() {
               {
                 value: "revoke",
                 title: busy() ? "Revoking…" : "Revoke this approval",
-                description: `${selected()!.action} · ${selected()!.resource}`,
+                description: `${selected()!.action} · ${permissionScopeLabel(selected()!.resource)}`,
               },
             ]
           : rules().map((row) => ({
               value: row.id,
-              title: `${row.action} · ${row.resource}`,
+              title: `${row.action} · ${permissionScopeLabel(row.resource)}`,
               category: cosmosPermissionCategory(row.action),
               details: [
-                `Scope: ${row.resource}`,
+                `Scope: ${permissionScopeLabel(row.resource)}`,
                 "Lifetime: saved for this project until revoked",
-                `Writes: ${["read", "glob", "grep", "list", "cosmos_directory_read"].includes(row.action) ? "No" : "May change files or workspace; legacy wildcard approval"}`,
+                `Writes: ${["read", "glob", "grep", "list", "cosmos_directory_read"].includes(row.action) ? "No" : "May change files or workspace; inspect the selected scope"}`,
               ],
               description: row.resource.includes("*")
                 ? "Wildcard rule · inspect before keeping"
-                : "Saved approval",
+                : row.action === "cosmos_shell_scope"
+                  ? "Remembered Shell toolset / exact command scope"
+                  : "Saved approval",
             }))
       }
       current={selected() ? "keep" : undefined}
