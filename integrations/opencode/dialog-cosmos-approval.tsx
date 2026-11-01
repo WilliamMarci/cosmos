@@ -89,24 +89,7 @@ export function DialogCosmosApproval() {
       return
     }
     if (field === "workspaces") {
-      dialog.replace(() => (
-        <DialogPrompt
-          title="Approved working scopes"
-          value={settings().workspaces.join("\n")}
-          subtitle="One absolute directory per line; includes descendants and a private temporary directory."
-          onConfirm={(value) => {
-            save({
-              ...settings(),
-              workspaces: value
-                .split("\n")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            })
-            dialog.replace(() => <DialogCosmosApproval />)
-          }}
-          onCancel={() => dialog.replace(() => <DialogCosmosApproval />)}
-        />
-      ))
+      dialog.replace(() => <DialogCosmosScopeList />)
       return
     }
     if (field === "effort") {
@@ -157,6 +140,84 @@ export function DialogCosmosApproval() {
         })),
       ]}
       onSelect={(option) => select(option.value)}
+    />
+  )
+}
+
+/** Individual entries, never a newline editor or a bulk replacement of the scope list. */
+export function DialogCosmosScopeList() {
+  const dialog = useDialog()
+  const toast = useToast()
+  const location = useLocation()
+  let current: ApprovalSettings
+  try {
+    current = loadApprovalSettings()
+  } catch (error) {
+    toast.show({ variant: "error", message: String(error) })
+    current = { ...defaults, tools: {} }
+  }
+  const reopen = () => dialog.replace(() => <DialogCosmosScopeList />)
+  function update(change: (settings: ApprovalSettings) => ApprovalSettings) {
+    try {
+      saveApprovalSettings(change(loadApprovalSettings()))
+      reopen()
+    } catch (error) {
+      toast.show({ variant: "error", message: String(error) })
+    }
+  }
+  return (
+    <DialogSelect
+      title="Approved working scopes"
+      description="Recursive directory grants for subsequent operations. Removing a scope does not terminate running processes."
+      options={[
+        { value: "+", title: "Add directory…", description: "Authorize one directory and its descendants" },
+        ...current.workspaces.map((root) => ({
+          value: root,
+          title: root,
+          description: "Recursive · select to remove",
+        })),
+      ]}
+      onSelect={(option) => {
+        if (option.value === "+") {
+          dialog.replace(() => (
+            <DialogPrompt
+              title="Add working directory"
+              value={location.current?.directory ?? ""}
+              onConfirm={(value) =>
+                update((settings) => ({
+                  ...settings,
+                  workspaces: [...new Set([...settings.workspaces, value.trim()])],
+                }))
+              }
+              onCancel={reopen}
+            />
+          ))
+          return
+        }
+        const root = option.value
+        dialog.replace(() => (
+          <DialogSelect
+            title="Remove working scope?"
+            description={root}
+            options={[
+              { value: "keep", title: "Keep scope" },
+              {
+                value: "remove",
+                title: "Remove directory",
+                description: "Subsequent requests must satisfy another scope or boundary approval",
+              },
+            ]}
+            onSelect={(choice) =>
+              choice.value === "remove"
+                ? update((settings) => ({
+                    ...settings,
+                    workspaces: settings.workspaces.filter((entry) => entry !== root),
+                  }))
+                : reopen()
+            }
+          />
+        ))
+      }}
     />
   )
 }

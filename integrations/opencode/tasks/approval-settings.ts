@@ -106,7 +106,16 @@ export function loadApprovalSettings(): ApprovalSettings {
 }
 export function saveApprovalSettings(value: ApprovalSettings) {
   const settings = validateSettings(value)
+  let previous: string[] = []
+  try {
+    previous = loadApprovalSettings().workspaces
+  } catch (error: any) {
+    if (error.code !== "ENOENT") throw error
+  }
   settings.workspaces = settings.workspaces.map((root) => {
+    // Keep unchanged entries verbatim, including inactive/missing roots, so they can be removed individually.
+    // approvedRoots() refuses changed symlinks; only genuinely new entries need fresh filesystem validation.
+    if (previous.includes(root)) return root
     const resolved = realpathSync(root)
     if (resolved !== path.resolve(root))
       throw new Error("Use the canonical scope directory; its symlink target may have changed")

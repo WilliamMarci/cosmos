@@ -41,6 +41,7 @@ const groups: Record<string, Record<string, string>> = {
     delete: "delete_task",
   },
   workspace: {
+    request_scope: "request_scope",
     list: "list_sessions",
     begin: "acquire_workspace",
     release: "release_workspace",
@@ -102,6 +103,11 @@ export class CosmosInterface {
         .filter((t) => ["cosmos_terminal", "cosmos_actions"].includes(t.server))
         .map((t) => [t.name, t]),
     )
+    available.set("request_scope", {
+      server: "cosmos_terminal", name: "request_scope",
+      description: "Ask the user to add one recursive working directory scope. This native confirmation cannot be auto-approved. It does not enable AI mode or grant terminal control.",
+      inputSchema: { type: "object", properties: { path: { type: "string", description: "Absolute existing directory" }, reason: { type: "string", minLength: 1, maxLength: 240 } }, required: ["path", "reason"], additionalProperties: false },
+    })
     for (const [short, canonical] of Object.entries(direct)) {
       const remote = available.get(canonical)
       if (!remote) continue

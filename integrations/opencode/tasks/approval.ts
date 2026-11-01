@@ -50,7 +50,7 @@ export function humanRequired(input: Input) {
     !!input.forceAsk ||
     m.cosmos_resume === true ||
     m.interrupt === true ||
-    /resume|interrupt|close|kill|privacy|delete_task/.test(input.action) ||
+    /resume|request_scope|interrupt|close|kill|privacy|delete_task/.test(input.action) ||
     /(?:^|[\s;|&'"(])(?:[^\s;|&]*\/)?(?:sudo|su|rm|rmdir|kill|pkill|killall|shutdown|reboot|chmod|chown|ssh|scp|rsync|mount|dd|mkfs)(?:[\s'";|&)]|$)/.test(
       command,
     ) ||

@@ -1,4 +1,5 @@
 /** Cosmos-only control grants and explicit time-limited pane allowances. */
+import { scopeRequest, type ScopeRequest } from "../cosmos/scope-request.js"
 import { createHmac, randomUUID } from "node:crypto"
 
 type Grant = {
@@ -17,6 +18,7 @@ type Allowance = {
   expires: number
 }
 type Plan = {
+  scopeRequest?: ScopeRequest
   args: Record<string, unknown>
   resources: string[]
   save: string[]
@@ -109,6 +111,16 @@ export class CosmosPermissions {
         plan.forceAsk = true
         plan.metadata.interrupt = true
       }
+      return plan
+    }
+    if (tool === "request_scope") {
+      const request = scopeRequest(input.path, input.reason)
+      plan.scopeRequest = request
+      plan.transient = true
+      plan.forceAsk = true
+      plan.save = []
+      plan.resources = [request.directory]
+      plan.metadata = { cosmos_scope_request: true, directory: request.directory, reason: request.reason }
       return plan
     }
     if (tool === "request_resume") {

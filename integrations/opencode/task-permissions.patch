@@ -268,10 +268,11 @@ index fb7a9d3..2b0b7ef 100644
        settled: (sessionID, exit, reason) =>
          reportLifecycle(
 diff --git a/packages/core/src/tool/mcp.ts b/packages/core/src/tool/mcp.ts
-index 6d1b8cc..11b803c 100644
+index 6d1b8cc..90a2cc8 100644
 --- a/packages/core/src/tool/mcp.ts
 +++ b/packages/core/src/tool/mcp.ts
-@@ -1,5 +1,11 @@
+@@ -1,5 +1,12 @@
++import { applyScopeRequest } from "../cosmos/scope-request.js"
  export * as McpTool from "./mcp.js"
  
 +import { bindPermissions } from "../cosmos/runtime.js"
@@ -283,7 +284,7 @@ index 6d1b8cc..11b803c 100644
  import { ToolFailure } from "@opencode/ai"
  import { McpEvent } from "@opencode/schema/mcp-event"
  import { Context, Effect, Fiber, type JsonSchema, Layer, Option, PubSub, Schema, Semaphore, Stream } from "effect"
-@@ -39,6 +45,9 @@ export const layer = Layer.effect(
+@@ -39,6 +46,9 @@ export const layer = Layer.effect(
      const toolOutput = yield* ToolOutput.Service
      const lock = Semaphore.makeUnsafe(1)
      let discovered: Mcp.Tool[] = []
@@ -293,7 +294,7 @@ index 6d1b8cc..11b803c 100644
  
      // Register once after initial discovery; only subsequent updates need a debounced reload.
      const initial = yield* lock
-@@ -46,20 +55,47 @@ export const layer = Layer.effect(
+@@ -46,20 +56,47 @@ export const layer = Layer.effect(
          Effect.gen(function* () {
            discovered = yield* mcp.tools()
            yield* tools.transform((editor) => {
@@ -347,11 +348,15 @@ index 6d1b8cc..11b803c 100644
                        sessionID: context.sessionID,
                        agent: context.agent,
                        source: {
-@@ -68,20 +104,91 @@ export const layer = Layer.effect(
+@@ -68,20 +105,95 @@ export const layer = Layer.effect(
                          id: context.id,
                        },
                      })
 -                    const result = yield* mcp
+-                      .callTool({
+-                        server: tool.server,
+-                        name: tool.name,
+-                        args: (input ?? {}) as Record<string, unknown>,
 +                    const contextPlan =
 +                      tool.cosmos && call.name !== "context"
 +                        ? cosmosPermissions.plan("cosmos_terminal", "context", {}, context.sessionID, context.agent)
@@ -366,11 +371,12 @@ index 6d1b8cc..11b803c 100644
 +                        agent: context.agent,
 +                        source: { type: "tool", messageID: context.messageID, id: context.id },
 +                      })
-+                    let result = yield* mcp
-                       .callTool({
--                        server: tool.server,
--                        name: tool.name,
--                        args: (input ?? {}) as Record<string, unknown>,
++                    let result = yield* (plan.scopeRequest
++                      ? Effect.try({
++                          try: () => ({ isError: false, structured: undefined, content: [{ type: "text" as const, text: JSON.stringify(applyScopeRequest(plan.scopeRequest!)) }] }),
++                          catch: (error) => new ToolFailure({ message: String(error) }),
++                        })
++                      : mcp.callTool({
 +                        server: call.server,
 +                        name: call.name,
 +                        args: plan.args,
@@ -385,7 +391,8 @@ index 6d1b8cc..11b803c 100644
                              new ToolFailure({ message: `MCP server "${error.server}" is not available` }),
                            "MCP.ToolCallError": (error) => new ToolFailure({ message: error.message }),
                          }),
-                       )
+-                      )
++                      ))
 +                    cosmosPermissions.finish(plan, result)
 +                    if (tool.cosmos) {
 +                      const parse = (r: typeof result) => {
