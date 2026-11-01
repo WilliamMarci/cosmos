@@ -3,6 +3,7 @@ import { createServer } from "node:net"
 import { chmodSync, mkdirSync, lstatSync, writeFileSync, unlinkSync } from "node:fs"
 import { createHash, timingSafeEqual } from "node:crypto"
 import path from "node:path"
+import { paused, chatOnly } from "./lease.js"
 
 const readers = new Map<string, { list: () => Promise<any[]>; reply: (id: string, decision: "once" | "reject") => Promise<unknown> }>()
 export function bindPermissions(session: string, value: { list: () => Promise<any[]>; reply: (id: string, decision: "once" | "reject") => Promise<unknown> }) {
@@ -44,20 +45,29 @@ export async function startTaskRuntime(api: {
           const session = request.session
           let value: unknown
           if (request.operation === "status") {
-            value = { ...await api.status(session), permissions: await readers.get(session)?.list() ?? [] }
+            value = { ...await api.status(session), task_state: paused(session) ? "paused" : "ready", chat_only: chatOnly(session), resume_in: "COSMOS → Agent tasks → Resume", permissions: await readers.get(session)?.list() ?? [] }
           } else if (request.operation === "wake") {
             if (typeof request.message !== "string" || !/^msg_[\w-]+$/.test(request.message) || typeof request.text !== "string" || request.text.length > 16000) throw new Error("Invalid wake request")
             const state = await api.status(session)
-            if (state.active) value = { accepted: false, busy: true }
+            if (paused(session)) value = { accepted: false, paused: true, task_state: "paused", resume_in: "COSMOS → Agent tasks → Resume" }
+            else if (state.active) value = { accepted: false, busy: true }
             else { await api.wake(session, request.message, request.text); value = { accepted: true } }
           } else if (request.operation === "interrupt") {
             value = { interrupted: await api.interrupt(session) }
           } else if (request.operation === "permission") {
             const reader = readers.get(session)
             const pending = await reader?.list() ?? []
-            if (!reader || !["once", "reject"].includes(request.decision) || !pending.some((p) => p.id === request.request_id && p.sessionID === session)) throw new Error("Unknown permission request")
-            await reader.reply(request.request_id, request.decision)
-            value = { replied: true }
+            if (!["once", "reject"].includes(request.decision)) throw new Error("Invalid permission decision")
+            if (!reader || !pending.some((p) => p.id === request.request_id && p.sessionID === session)) value = { replied: false, stale: true, message: "Permission request expired; reopen Pending permissions" }
+            else {
+              try {
+                await reader.reply(request.request_id, request.decision)
+                value = { replied: true }
+              } catch (error) {
+                if ((await reader.list()).some((p) => p.id === request.request_id)) throw error
+                value = { replied: false, stale: true, message: "Permission request expired; reopen Pending permissions" }
+              }
+            }
           } else throw new Error("Unknown lifecycle operation")
           client.end(JSON.stringify({ result: value }) + "\n")
         } catch (error) { client.end(JSON.stringify({ error: String(error) }) + "\n") }

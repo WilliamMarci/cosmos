@@ -1,0 +1,86 @@
+diff --git a/packages/core/src/file-access.ts b/packages/core/src/file-access.ts
+index 154d5d3..02f66d0 100644
+--- a/packages/core/src/file-access.ts
++++ b/packages/core/src/file-access.ts
+@@ -5,6 +5,7 @@ import { FSUtil } from "@opencode/util/fs-util"
+ import { Global } from "@opencode/util/global"
+ import { Array, Context, Effect, Layer, Schema } from "effect"
+ import path from "path"
++import { readScope } from "./cosmos/read-scope.js"
+ import { Location } from "./location.js"
+ import { Permission } from "./permission.js"
+ import { Project } from "./project.js"
+@@ -154,7 +155,7 @@ const layer = Layer.effect(
+       yield* permission.assert({
+         action: "read",
+         resources: [target.resource],
+-        save: ["*"],
++        save: process.env.COSMOS_AGENT === "1" ? readScope(target.resource).save : ["*"],
+         ...invocation(context),
+       })
+       return target
+diff --git a/packages/core/src/tool/plugin/glob.ts b/packages/core/src/tool/plugin/glob.ts
+index ebe9af1..33b5865 100644
+--- a/packages/core/src/tool/plugin/glob.ts
++++ b/packages/core/src/tool/plugin/glob.ts
+@@ -2,6 +2,7 @@ export * as GlobTool from "./glob.js"
+ 
+ import { ToolFailure } from "@opencode/ai"
+ import type { Context } from "@opencode/plugin/effect/plugin"
++import { readScope } from "../../cosmos/read-scope.js"
+ import { Effect, Schema } from "effect"
+ import path from "path"
+ import { Environment } from "../../environment/index.js"
+@@ -67,9 +68,11 @@ export const Plugin = {
+               yield* access.authorizeExternal([target], context)
+               yield* permission.assert({
+                 action: name,
+-                resources: [input.pattern],
+-                save: ["*"],
++                ...(process.env.COSMOS_AGENT === "1" ? { denyResources: [input.pattern] } : {}),
++                resources: [process.env.COSMOS_AGENT === "1" ? readScope(target.resource, true).resource : input.pattern],
++                save: process.env.COSMOS_AGENT === "1" ? readScope(target.resource, true).save : ["*"],
+                 metadata: {
++                  pattern: input.pattern,
+                   root: searchPath ?? ".",
+                   path: searchPath,
+                   hidden: input.hidden,
+diff --git a/packages/core/src/tool/plugin/grep.ts b/packages/core/src/tool/plugin/grep.ts
+index e13466a..f0cdc04 100644
+--- a/packages/core/src/tool/plugin/grep.ts
++++ b/packages/core/src/tool/plugin/grep.ts
+@@ -2,6 +2,7 @@ export * as GrepTool from "./grep.js"
+ 
+ import type { Context } from "@opencode/plugin/effect/plugin"
+ import { ToolFailure } from "@opencode/ai"
++import { readScope } from "../../cosmos/read-scope.js"
+ import { Effect, Schema } from "effect"
+ import path from "path"
+ import { Environment } from "../../environment/index.js"
+@@ -86,9 +87,11 @@ export const Plugin = {
+               yield* access.authorizeExternal([target], context)
+               yield* permission.assert({
+                 action: name,
+-                resources: [input.pattern],
+-                save: ["*"],
++                ...(process.env.COSMOS_AGENT === "1" ? { denyResources: [input.pattern] } : {}),
++                resources: [process.env.COSMOS_AGENT === "1" ? readScope(target.resource, true).resource : input.pattern],
++                save: process.env.COSMOS_AGENT === "1" ? readScope(target.resource, true).save : ["*"],
+                 metadata: {
++                  pattern: input.pattern,
+                   root: ".",
+                   path: input.path,
+                   include: input.include,
+diff --git a/packages/core/src/tool/plugin/shell.ts b/packages/core/src/tool/plugin/shell.ts
+index af454a7..11983ee 100644
+--- a/packages/core/src/tool/plugin/shell.ts
++++ b/packages/core/src/tool/plugin/shell.ts
+@@ -138,7 +138,7 @@ export const Plugin = {
+         yield* permission.assert({
+           action: name,
+           resources: parsed.commands.map((command) => command.resource),
+-          save: parsed.commands.map((command) => command.save),
++          save: process.env.COSMOS_AGENT === "1" ? [] : parsed.commands.map((command) => command.save),
+           sessionID: context.sessionID,
+           agent: context.agent,
+           source,

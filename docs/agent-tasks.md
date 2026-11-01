@@ -32,7 +32,7 @@ Only one scheduler holds the per-service worker lock. Claims are transactional a
 
 ## Pause, cancellation and permissions
 
-Human keyboard, paste and mouse input revoke input ownership before delivery. Both active control tasks and background tasks targeting that pane are paused. A persisted conversation fence prevents model wakeups and queued primary model runs. Native Session interruption aborts the running model request. Already delivered terminal input cannot be recalled; this is not a hard real-time guarantee. Monitoring can continue recording conditions while paused. Resume is a user action, invalidates the old input token and starts a new inspection. Pauses survive service restart.
+Human keyboard, paste and mouse input revoke input ownership before delivery. Both active control tasks and background tasks targeting that pane are paused. A persisted conversation fence prevents automatic task wakeups and queued task model runs. Explicit new user chat is admitted separately, without clearing the task pause or granting terminal ownership. Native Session interruption aborts the running model request. Already delivered terminal input cannot be recalled; this is not a hard real-time guarantee. Monitoring can continue recording conditions while paused. Resume is a user action, invalidates the old input token and starts a new inspection. Pauses survive service restart.
 
 Primary Agent turns are serialized by conversation and use SQLite leases across native processes, with a default limit of two per Cosmos service. Waiting for permission also holds its primary-run slot; respond in the original Agent UI or Tasks → Pending permissions. Auxiliary title/summary generation is outside this primary-turn limit. Native approval rules remain authoritative; the scheduler cannot self-approve a request.
 
@@ -41,3 +41,9 @@ The native bridge uses a private owned Unix socket and a per-launch authenticati
 ## Limits
 
 There is no built-in crash supervisor; UI reconnect or a new task registration recovers a failed worker. Runtime terminal watches remain sampled and can miss transient screen events; the durable ledger does not make them an output-event journal. Native Bash prompt sequence signals are available for newly sourced `cosmosrc`; arbitrary TUI input requests and file/process completion adapters are not universally detected. Tasks are managed in the Cosmos popup, not an additional native OpenCode sidebar. Image/pixel observation remains outside this task API.
+
+## Chat while a terminal task is paused
+
+A manual pause is an operational state, not an HTTP failure. An explicit user prompt can continue the same model conversation while its terminal task stays paused. Each such admission grants one chat-only primary turn through the normal concurrency limit; it does not restore input tokens, permission grants or task schedules. The scheduler recovery path distinguishes chat-only runs and leaves them alone. A new manual pause still cancels the active turn and clears queued chat permits. An automatic Unix wake while paused returns `accepted:false`, `paused:true`, `task_state:"paused"`, and `resume_in:"COSMOS → Agent tasks → Resume"`. Task Resume remains the explicit operational recovery path, followed by fresh observation/acquisition.
+
+An expired Tasks permission request returns a stale result and a warning to reopen Pending permissions. If expiry races with reply, the bridge refreshes pending requests and reports stale when that request has disappeared; unrelated transport/native failures remain errors.

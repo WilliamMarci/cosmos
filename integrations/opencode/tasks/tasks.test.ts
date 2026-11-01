@@ -5,7 +5,8 @@ import { mkdtempSync, rmSync, readdirSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { createConnection } from "node:net"
-import { withRunLease } from "../src/cosmos/lease"
+import { readScope } from "../src/cosmos/read-scope"
+import { withRunLease, permitChat, paused, chatOnly } from "../src/cosmos/lease"
 import { startTaskRuntime, bindPermissions } from "../src/cosmos/runtime"
 
 const saved = { ...process.env }
@@ -68,7 +69,47 @@ test("authenticated lifecycle wake, busy, interrupt and scoped permission reply"
     await request({operation:"interrupt"});expect(interruptions).toBe(1)
     bindPermissions("ses_fixture",{list:async()=>[{id:"per_1",sessionID:"ses_fixture",action:"test"}],reply:async()=>{replies++}})
     expect((await request({operation:"status"})).result.permissions).toHaveLength(1)
-    expect((await request({operation:"permission",request_id:"per_wrong",decision:"once"})).error).toContain("Unknown permission")
+    expect((await request({operation:"permission",request_id:"per_wrong",decision:"once"})).result.stale).toBe(true)
     await request({operation:"permission",request_id:"per_1",decision:"once"});expect(replies).toBe(1)
   } finally { await close() }
+})
+
+test("user chat permit does not resume terminal task or permit automatic wake", async () => {
+  setup()
+  permitChat("ses_chat")
+  const db = new Database(process.env.COSMOS_AGENT_TASK_DB!)
+  db.query("INSERT INTO conversation_pauses VALUES (?,?)").run("ses_chat","manual")
+  let calls=0
+  await Effect.runPromise(withRunLease(Effect.sync(() => { calls++; expect(chatOnly("ses_chat")).toBe(true) }),"ses_chat"))
+  expect(calls).toBe(1)
+  expect(paused("ses_chat")).toBe(true)
+  const next=await Effect.runPromiseExit(withRunLease(Effect.sync(()=>{calls++}),"ses_chat"))
+  expect(next._tag).toBe("Failure");expect(calls).toBe(1)
+  db.close()
+})
+
+test("paused wake is recoverable structured state without admitting a prompt", async () => {
+  const dir=setup();let wakes=0
+  permitChat("ses_fixture")
+  const db=new Database(process.env.COSMOS_AGENT_TASK_DB!)
+  db.query("INSERT INTO conversation_pauses VALUES (?,?)").run("ses_fixture","manual");db.close()
+  const close=await startTaskRuntime({status:async()=>({active:false}),wake:async()=>{wakes++},interrupt:async()=>true})
+  try {
+    const descriptor=JSON.parse(readFileSync(path.join(dir,readdirSync(dir).find(x=>x.endsWith('.json'))!),"utf8"))
+    const response=await new Promise<any>((resolve,reject)=>{
+      const socket=createConnection(descriptor.socket);let data=""
+      socket.on("connect",()=>socket.write(JSON.stringify({auth:descriptor.key,session:"ses_fixture",operation:"wake",message:"msg_fixture",text:"Continue"})+"\n"))
+      socket.on("data",chunk=>data+=chunk);socket.on("end",()=>resolve(JSON.parse(data)));socket.on("error",reject)
+    })
+    expect(response.result.paused).toBe(true);expect(response.result.accepted).toBe(false)
+    expect(response.result.resume_in).toContain("Agent tasks");expect(wakes).toBe(0)
+  } finally {await close()}
+})
+
+test("directory read scopes never save arbitrary code execution or all host paths", () => {
+  expect(readScope("/home/user/project/a.txt").save).toEqual(["/home/user/project/*"])
+  expect(readScope("src/a.txt").save).toEqual(["src/*"])
+  expect(readScope("/home/user/project",true).save).toEqual(["/home/user/project/*"])
+  expect(readScope("a.txt").save).toEqual(["a.txt"])
+  expect(readScope(".",true).save).toEqual(["./*"])
 })

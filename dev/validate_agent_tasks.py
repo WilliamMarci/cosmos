@@ -152,6 +152,47 @@ def main():
                     rows = descriptors(service)
                     assert rows, "Native Session lifecycle descriptor missing"
                     asyncio.run(validate(service, rows[0], conversation))
+                    from cosmos_tui.features.agent.tasks.storage import Tasks
+
+                    ledger = Tasks(service)
+                    ledger.pause(conversation)
+                    denied = asyncio.run(
+                        call(
+                            rows[0],
+                            "wake",
+                            conversation,
+                            message="msg_cosmos_paused",
+                            text="Do not resume",
+                        )
+                    )
+                    assert denied.get("paused") and not denied["accepted"]
+                    entered.clear()
+                    aborted.clear()
+                    chat = Request(
+                        f"http://127.0.0.1:{port}/api/session/{conversation}/prompt",
+                        data=json.dumps(
+                            dict(
+                                id="msg_cosmos_manual_chat",
+                                text="Discuss the plan only; do not operate the paused terminal.",
+                            )
+                        ).encode(),
+                        headers=dict(request.headers),
+                        method="POST",
+                    )
+                    with urlopen(chat, timeout=5) as response:
+                        assert response.status == 200
+                        json.load(response)
+                    assert entered.wait(15), (
+                        "Explicit user chat did not reach model while task was paused"
+                    )
+                    assert ledger.paused(conversation), (
+                        "Chat unexpectedly resumed terminal task"
+                    )
+                    assert asyncio.run(call(rows[0], "status", conversation)).get(
+                        "chat_only"
+                    ), "Chat was not distinguished from task execution"
+                    asyncio.run(call(rows[0], "interrupt", conversation))
+                    assert aborted.wait(5), "Chat stream was not aborted"
                     proc.terminate()
                     proc.wait(timeout=5)
                     from cosmos_tui.features.agent.tasks.runtime import ensure
@@ -165,7 +206,7 @@ def main():
                     finally:
                         os.kill(replacement["pid"], signal.SIGTERM)
                     print(
-                        "PASS: native Session wake/busy/interrupt; actual model HTTP aborted; headless restart reopened saved conversation"
+                        "PASS: native Session wake/busy/interrupt; actual model HTTP aborted; paused HTTP user chat accepted without restoring control; headless restart reopened saved conversation"
                     )
                 finally:
                     proc.terminate()

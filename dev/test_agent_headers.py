@@ -19,6 +19,24 @@ from cosmos_tui.ui.styles import DARK
 
 
 class HeaderRenderTests(unittest.TestCase):
+    def test_busy_indicator_keeps_low_frequency_feedback_and_block_boundary(self):
+        from cosmos_tui.features.agent.header_ui import activity_frame
+
+        with patch(
+            "cosmos_tui.features.agent.header_ui.time.monotonic", return_value=10.0
+        ):
+            first = activity_frame(True)
+        with patch(
+            "cosmos_tui.features.agent.header_ui.time.monotonic", return_value=10.6
+        ):
+            second = activity_frame(True)
+        self.assertNotEqual(first, second)
+        line = header_text(dict(state="active", task="Task"), 60, DARK, first)
+        self.assertNotIn("│", line.plain)
+        segments = list(line.render(Console(), end=""))
+        backgrounds = {segment.style.bgcolor for segment in segments if segment.style}
+        self.assertGreaterEqual(len(backgrounds), 2)
+
     def test_paused_is_static_and_does_not_cover_content(self):
         paused = dict(state="paused", task="Task")
         a = header_text(paused, 40, DARK, 0)

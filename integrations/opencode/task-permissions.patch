@@ -1,8 +1,8 @@
 diff --git a/packages/core/src/permission.ts b/packages/core/src/permission.ts
-index 37d5811..cf435e8 100644
+index 37d5811..251aa41 100644
 --- a/packages/core/src/permission.ts
 +++ b/packages/core/src/permission.ts
-@@ -33,6 +33,10 @@ export type Reply = typeof Reply.Type
+@@ -33,6 +33,12 @@ export type Reply = typeof Reply.Type
  export interface AssertInput extends Omit<Request, "id" | "message"> {
    readonly id?: ID
    readonly agent?: Agent.ID
@@ -10,10 +10,12 @@ index 37d5811..cf435e8 100644
 +  readonly taskGranted?: boolean
 +  /** Do not consult project-persisted permissions for a task acquisition. */
 +  readonly transient?: boolean
++  /** Compatibility deny checks when a Cosmos search changes its approval resource to a directory. */
++  readonly denyResources?: string[]
  }
  
  export interface ReplyInput {
-@@ -100,6 +104,7 @@ export interface Interface {
+@@ -100,6 +106,7 @@ export interface Interface {
  export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
  
  interface Pending {
@@ -21,11 +23,13 @@ index 37d5811..cf435e8 100644
    readonly request: Request
    readonly agent?: Agent.ID
    readonly deferred: Deferred.Deferred<void, DeclinedError | CorrectedError>
-@@ -160,9 +165,9 @@ const layer = Layer.effect(
+@@ -159,10 +166,10 @@ const layer = Layer.effect(
+ 
      const evaluateInput = Effect.fnUntraced(function* (input: AssertInput) {
        const rules = yield* configured(input.sessionID, input.agent)
-       if (denied(input, rules)) return { effect: "deny" as const, rules }
+-      if (denied(input, rules)) return { effect: "deny" as const, rules }
 -      const all = [...rules, ...(yield* savedRules())]
++      if (denied(input, rules) || (input.denyResources?.some((resource) => evaluate(input.action, resource, rules).effect === "deny") ?? false)) return { effect: "deny" as const, rules }
 +      const all = [...rules, ...(input.transient ? [] : yield* savedRules())]
        const effects = input.resources.map((resource) => evaluate(input.action, resource, all).effect)
 -      const effect: Permission.Effect = effects.includes("ask") ? "ask" : "allow"
@@ -33,7 +37,7 @@ index 37d5811..cf435e8 100644
        const event = yield* hooks.trigger("permission", "evaluate", {
          sessionID: input.sessionID,
          agent: input.agent,
-@@ -192,11 +197,11 @@ const layer = Layer.effect(
+@@ -192,11 +199,11 @@ const layer = Layer.effect(
        }
      }
  
@@ -47,7 +51,7 @@ index 37d5811..cf435e8 100644
            if (closed) {
              yield* Deferred.fail(deferred, new DeclinedError())
              return item
-@@ -215,7 +220,7 @@ const layer = Layer.effect(
+@@ -215,7 +222,7 @@ const layer = Layer.effect(
        if (closed) return { id: input.id ?? ID.create(), effect: "deny" as const }
        const result = yield* evaluateInput(input)
        const value = request(input, result.message)
@@ -56,7 +60,7 @@ index 37d5811..cf435e8 100644
        return { id: value.id, effect: result.effect }
      })
  
-@@ -234,7 +239,7 @@ const layer = Layer.effect(
+@@ -234,7 +241,7 @@ const layer = Layer.effect(
                })
              }
              if (result.effect === "allow") return
@@ -65,7 +69,7 @@ index 37d5811..cf435e8 100644
              return yield* restore(Deferred.await(item.deferred)).pipe(
                // Deliberate defect tunnel: leaves wrap execution in blanket `mapError`, which
                // must not convert a user's decline into model-facing tool output. The decline
-@@ -299,7 +304,7 @@ const layer = Layer.effect(
+@@ -299,7 +306,7 @@ const layer = Layer.effect(
            if (input.reply !== "always" || !existing.request.save?.length) return
  
            for (const [id, item] of pending) {
@@ -75,7 +79,7 @@ index 37d5811..cf435e8 100644
              )
              if (result?.effect !== "allow") continue
 diff --git a/packages/core/src/session.ts b/packages/core/src/session.ts
-index cb21826..44c0e0e 100644
+index cb21826..ca9f1fb 100644
 --- a/packages/core/src/session.ts
 +++ b/packages/core/src/session.ts
 @@ -1,6 +1,9 @@
@@ -83,25 +87,29 @@ index cb21826..44c0e0e 100644
  export * from "./session/schema.js"
  
 +import { startTaskRuntime } from "./cosmos/runtime.js"
-+import { paused, clearCancelled } from "./cosmos/lease.js"
++import { paused, clearCancelled, permitChat, revokeChat } from "./cosmos/lease.js"
 +
  import { DateTime, Effect, Layer, Context, Stream } from "effect"
  import { LLMClient } from "@opencode/ai"
  import { ListAnchor, ListCursor, ListFilter } from "@opencode/schema/session"
-@@ -443,7 +446,11 @@ const layer = Layer.effect(
+@@ -443,7 +446,15 @@ const layer = Layer.effect(
                Bus.isSynced(item) || isDurableSessionEvent(item),
            ),
          ),
 -      prompt: (input) => sessions.forSession(input.sessionID).prompt(input),
 +      prompt: (input) => Effect.gen(function* () {
-+        if (input.metadata?.source !== "cosmos_scheduler") clearCancelled(input.sessionID)
-+        if (paused(input.sessionID)) return yield* Effect.die(new Error("Cosmos task paused; resume it in Tasks"))
-+        return yield* sessions.forSession(input.sessionID).prompt(input)
++        const background = input.metadata?.source === "cosmos_scheduler"
++        if (!background) clearCancelled(input.sessionID)
++        const chatting = !background && paused(input.sessionID)
++        if (chatting) permitChat(input.sessionID)
++        return yield* sessions.forSession(input.sessionID).prompt(input).pipe(
++          Effect.tapCause(() => Effect.sync(() => { if (chatting) revokeChat(input.sessionID) })),
++        )
 +      }),
        generate: Effect.fn("Session.generate")(function* (input) {
          const session = yield* result.get(input.sessionID)
          return yield* SessionGenerate.generate({ session, prompt: input.prompt }).pipe(
-@@ -499,6 +506,20 @@ const layer = Layer.effect(
+@@ -499,6 +510,20 @@ const layer = Layer.effect(
        },
      })
  

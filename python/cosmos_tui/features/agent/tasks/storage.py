@@ -46,6 +46,7 @@ class Tasks:
             started REAL, finished REAL, detail TEXT);
           CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT);
           CREATE TABLE IF NOT EXISTS conversation_pauses(conversation TEXT PRIMARY KEY,reason TEXT);
+          CREATE TABLE IF NOT EXISTS conversation_chats(conversation TEXT PRIMARY KEY,pending INTEGER);
           CREATE TABLE IF NOT EXISTS model_runs(conversation TEXT PRIMARY KEY,owner TEXT,pid INTEGER,start TEXT,created REAL);
         """)
         try:
@@ -190,6 +191,9 @@ class Tasks:
 
     def pause(self, conversation, reason="manual"):
         with self.db() as db:
+            db.execute(
+                "DELETE FROM conversation_chats WHERE conversation=?", (conversation,)
+            )
             db.execute(
                 "INSERT OR REPLACE INTO conversation_pauses VALUES (?,?)",
                 (conversation, reason),

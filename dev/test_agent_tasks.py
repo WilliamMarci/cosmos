@@ -96,6 +96,22 @@ class StorageTests(Fixture, unittest.TestCase):
 
 
 class EngineTests(Fixture, unittest.IsolatedAsyncioTestCase):
+    async def test_paused_task_recovery_does_not_interrupt_explicit_chat(self):
+        self.task()
+        self.store.pause("ses_fixture")
+        engine = Engine("fixture")
+        call = AsyncMock(return_value=dict(active=True, chat_only=True))
+        with (
+            patch(
+                "cosmos_tui.features.agent.tasks.runtime.descriptors",
+                return_value=[dict(id="runtime")],
+            ),
+            patch("cosmos_tui.features.agent.tasks.runtime.call", call),
+        ):
+            await engine.step()
+        self.assertFalse(any(c.args[1] == "interrupt" for c in call.await_args_list))
+        self.assertTrue(self.store.paused("ses_fixture"))
+
     async def test_due_once_admitted_once_and_return_is_not_success(self):
         row = self.task(schedule=dict(after_seconds=1), next_run=1)
         engine = Engine("fixture")

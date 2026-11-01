@@ -15,23 +15,29 @@ from cosmos_tui.features.agent.headers import synchronize
 SPINNER = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 
 
+def activity_frame(reduced=False):
+    # Busy feedback is functional; reduced motion lowers cadence instead of freezing it.
+    return int(time.monotonic() * (2 if reduced else 8))
+
+
 def header_text(record, width, palette, frame):
     active = record["state"] == "active"
-    base = Style(color=palette["fg"], bgcolor=palette["base"])
+    base = Style(color=palette["fg"], bgcolor=palette["bg"])
+    label = Style(color=palette["fg"], bgcolor=palette["base"])
     text = Text(
         " COSMOS ", style=Style(color="#b48ead", bgcolor=palette["base"], bold=True)
     )
-    text.append("Taking over" if active else "PAUSED", style=base)
+    text.append(("Taking over" if active else "PAUSED") + " ", style=label)
     if active:
         text.append(
-            " │ " + SPINNER[frame % len(SPINNER)] + " ",
-            style=Style(color=palette["accl"], bgcolor=palette["base"]),
+            " " + SPINNER[frame % len(SPINNER)] + " ",
+            style=Style(color=palette["accl"], bgcolor=palette["bg"]),
         )
         text.append(record["task"], style=base)
     else:
-        text.append(" │ ⏸︎ ", style=base)
+        text.append(" ⏸︎ ", style=base)
     if record["state"] == "ready":
-        text.append(" · Ready for fresh observation", style=base)
+        text.append("Ready for fresh observation", style=base)
     text.truncate(max(0, width), overflow="ellipsis")
     text.append(" " * max(0, width - text.cell_len), style=base)
     return text
@@ -61,7 +67,7 @@ def paint_headers(app, strip, y, width):
                 record,
                 pane.width,
                 app.role_colors,
-                0 if reduced else int(time.monotonic() * 8),
+                activity_frame(reduced),
             )
             rendered = Strip(
                 Segment(s.text, s.style) for s in text.render(app.console, end="")
@@ -101,8 +107,10 @@ class HeaderController:
         self.timer = app.set_interval(1 / 8, self.animate)
 
     def animate(self):
-        if self.app.settings.get("reduced_motion", False):
+        frame = activity_frame(self.app.settings.get("reduced_motion", False))
+        if frame == getattr(self, "animated_frame", None):
             return
+        self.animated_frame = frame
         terminal = self.app.query_one("#terminal")
         for pane in self.app.panes:
             record = getattr(self.app, "_agent_headers", {}).get(pane.id)
@@ -128,11 +136,7 @@ class HeaderController:
         previous = getattr(self.app, "_agent_headers", {})
         current = {row["pane"]: row for row in self.records}
         self.app._agent_headers = current
-        frame = (
-            0
-            if self.app.settings.get("reduced_motion", False)
-            else int(time.monotonic() * 8)
-        )
+        frame = activity_frame(self.app.settings.get("reduced_motion", False))
         for pane in panes:
             before, after = previous.get(pane.id), current.get(pane.id)
             if (

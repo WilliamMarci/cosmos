@@ -209,6 +209,13 @@ describe("Cosmos task adapter", () => {
   })
 })
 describe("Real Cosmos task permission service", () => {
+  it.effect("directory-scoped search approvals preserve legacy pattern denies", () =>
+    Effect.gen(function* () {
+      yield* setup([{action:"grep",resource:"*",effect:"allow"},{action:"grep",resource:"SECRET",effect:"deny"}])
+      const service=yield* Permission.Service
+      expect((yield* service.ask(assertion({action:"grep",resources:["/approved/"],denyResources:["SECRET"],save:["/approved/*"]}))).effect).toBe("deny")
+    }),
+  )
   it.effect("another Always approval cannot auto-approve a waiting transient task", () =>
     Effect.gen(function* () {
       yield* setup([{ action: "cosmos_terminal_*", resource: "*", effect: "ask" }])

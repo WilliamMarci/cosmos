@@ -71,6 +71,9 @@ class Engine:
                     if key in self.interrupted:
                         continue
                     try:
+                        status = await runtime.call(descriptor, "status", conversation)
+                        if status.get("chat_only"):
+                            continue
                         await runtime.call(descriptor, "interrupt", conversation)
                         self.interrupted.add(key)
                     except (OSError, RuntimeError, ValueError, TimeoutError):

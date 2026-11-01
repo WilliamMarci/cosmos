@@ -290,13 +290,19 @@ class TaskPanel(TaskPopup):
                 async def reply(value):
                     if value and "request" in value:
                         try:
-                            await runtime.call(
+                            result = await runtime.call(
                                 descriptor,
                                 "permission",
                                 row["conversation"],
                                 request_id=value["request"],
                                 decision=value["decision"],
                             )
+                            if result.get("stale"):
+                                await self.app.notification_events.publish(
+                                    result["message"],
+                                    source="agent-tasks",
+                                    level="warning",
+                                )
                         except (OSError, RuntimeError, ValueError) as error:
                             await self.app.action_error("task.permission", error)
 

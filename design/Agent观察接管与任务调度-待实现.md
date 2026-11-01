@@ -220,3 +220,11 @@ schedule.list / cancel / reschedule
 验证：独立 Tmux 的真实 Bash prompt 监视；Python 任务持久化/暂停/串行/补执行/DST/透明弹窗与动画回归；原生权限与跨进程租约测试；真实 native Session 对本地模拟模型 API 的 wake/busy/interrupt（确认流式 HTTP 连接被取消，无付费请求）。未构建发行包，未停止用户会话。
 
 仍属于后续能力：通用 TUI 原生语义/密码控件适配、可直接 act 的高置信控件、样式/原生输出序号驱动的瞬时事件可靠收集、图片真实内容观察、更多进程/文件/Reader 事件的统一订阅。当前 watch 仍采样，不能保证捕获短暂事件；worker 无独立 crash supervisor（UI 重连/新注册恢复）。任务创建由 Agent 工具完成，改期弹窗目前使用 JSON 输入，没有额外图形化创建向导。
+
+## 2026-11-01：暂停状态、聊天与接管指示修正
+
+人工暂停保持任务和操作权的 fence，但明确的用户新消息可作为 chat-only turn 进入原生对话，不再因暂停触发 HTTP 500。chat permit 仅让模型回答，不恢复旧 token 或任务调度；worker 的暂停恢复检查不会取消这种显式聊天，新的人工暂停仍可取消当前轮次。自动唤醒返回 paused 状态与 Tasks → Resume 入口。过期的 Tasks 权限请求以 stale/warning 呈现。
+
+Taking over 改为相邻不同底色色块，去掉 │；reduced motion 下保留 2fps 的功能性忙碌反馈，正常 8fps，暂停用静态单色 ⏸︎，没有修改用户现有 reduced_motion 配置。
+
+原生 read/glob/grep 的记住范围收窄到目录，保留旧搜索表达式的显式 deny；相对项目根文件保守记住精确文件。宿主 Shell 的新批准不保存命令前缀，混合读写/任意代码执行不当作只读；既有用户批准未自动删除。正式接口和边界已同步 docs。验证使用临时数据库、独立终端及本地模拟模型 API，未恢复用户的实际暂停任务，未重发用户消息。
