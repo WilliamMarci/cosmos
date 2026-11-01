@@ -13,7 +13,7 @@ The bundled/source Cosmos Agent advertises ten short tools. The native MCP produ
 - `cosmos_open(path,target,client?)`: opens a supported document or image (PNG, JPEG, WebP, PDF, EPUB, Markdown, HTML) in Reader, or a directory in Files. Use it instead of terminal `cat`/decode/render attempts. A pending request is not proof of loading; use `cosmos_actions events` for actual Reader lifecycle.
 - `cosmos_history(target?,query?,limit?,cursor?)`: bounded immutable scrollback pages; follow `next_cursor` for older retained rows. Privacy is checked on every page.
 - `cosmos_actions(operation, ...)`: `discover(scope?,category?,client?)`, `invoke(id,scope,params?,client?)`, `events(request_id,client?,wait_ms?)`. Reader lifecycle events are emitted by the Reader itself. A routed action is not proof that a modal completed.
-- `cosmos_watch(operation, ...)`: `begin(target,condition,text?,timeout_seconds?)`, `list`, `cancel(handle)` where handle is the returned watch ID. Background waiting releases held input control. Conditions/timers never resume a manually paused task.
+- `cosmos_watch(operation, ...)`: `begin(target,condition,text?,timeout_seconds?)`, `list`, `cancel(handle)` where handle is the returned watch ID. Conditions include literal `text_present`/`text_absent`, `regex_present`/`regex_absent` (inline flags supported, 256-character pattern, 20 ms search limit), `changed`, `program_changed` and `bash_prompt`. Background waiting releases held input control. Conditions/timers never resume a manually paused task.
 
 The advertised schemas are authoritative for optional arguments. Old internal MCP methods remain available to the transport for compatibility, but are not duplicate model catalog entries.
 

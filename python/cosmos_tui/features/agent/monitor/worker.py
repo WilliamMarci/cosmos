@@ -6,6 +6,7 @@ import os
 import sys
 import time
 
+from cosmos_tui.features.agent.monitor.predicates import TEXT_CONDITIONS, text_matches
 from cosmos_tui.features.agent.monitor.detector import Detector
 from cosmos_tui.features.agent.monitor.storage import Watches
 from cosmos_tui.features.agent.monitor.service import starting
@@ -61,18 +62,24 @@ async def run(socket):
                     event = detector.update(screen, time.monotonic())
                     if event and event["type"] == "invalidated":
                         state, evidence = "invalidated", event
-                    elif watch["kind"] in ("text_present", "text_absent") and (
-                        (watch["needle"] in screen["text"])
-                        == (watch["kind"] == "text_present")
-                    ):
-                        state, evidence = (
-                            "matched",
-                            dict(
-                                type=watch["kind"],
-                                source="terminal_text",
-                                condition_met=True,
-                            ),
-                        )
+                    elif watch["kind"] in TEXT_CONDITIONS:
+                        try:
+                            matched = text_matches(
+                                watch["kind"], watch["needle"], screen["text"]
+                            )
+                        except (TimeoutError, ValueError) as error:
+                            state, evidence = "invalidated", dict(
+                                type="regex_error",
+                                reason=str(error),
+                                condition_met=False,
+                            )
+                        else:
+                            if matched:
+                                state, evidence = "matched", dict(
+                                    type=watch["kind"],
+                                    source="terminal_text",
+                                    condition_met=True,
+                                )
                     elif (
                         watch["kind"] == "changed"
                         and event

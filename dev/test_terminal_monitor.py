@@ -24,6 +24,30 @@ def screen(text):
     )
 
 
+class TextPredicateTests(unittest.TestCase):
+    def test_regex_flags_alternatives_absence_and_literal_compatibility(self):
+        from cosmos_tui.features.agent.monitor.predicates import text_matches
+
+        output = "progress\nInstallation COMPLETE\n"
+        pattern = r"(?im)^(successful installation|installation complete)$"
+        self.assertTrue(text_matches("regex_present", pattern, output))
+        self.assertFalse(text_matches("regex_absent", pattern, output))
+        self.assertTrue(text_matches("regex_absent", "error|failed", output))
+        self.assertFalse(text_matches("text_present", "COMPLETE|failed", output))
+        self.assertTrue(text_matches("text_present", "Installation COMPLETE", output))
+
+    def test_invalid_and_expensive_patterns(self):
+        from cosmos_tui.features.agent.monitor.predicates import (
+            text_matches, validate_pattern,
+        )
+
+        with self.assertRaisesRegex(ValueError, "Invalid watch regex"):
+            validate_pattern("regex_present", "[")
+        for condition in ("regex_present", "regex_absent"):
+            with self.assertRaises(TimeoutError):
+                text_matches(condition, r"(a+)+$", "a" * 20000 + "!")
+
+
 class DetectorTests(unittest.TestCase):
     def test_local_animation_is_not_completion(self):
         detector = Detector(baseline(screen("A\nbody")))
@@ -78,6 +102,8 @@ class DetachedMonitorTests(unittest.IsolatedAsyncioTestCase):
                 lease = await tools.acquire_control(
                     pane, snapshot["snapshot_id"], "Watch fixture"
                 )
+                # A prior CLI stop must not disable newly registered watches.
+                Watches(socket).path.with_suffix(".suspended").touch()
                 first = await tools.watch_terminal(
                     pane,
                     "text_present",
@@ -85,6 +111,11 @@ class DetachedMonitorTests(unittest.IsolatedAsyncioTestCase):
                     8,
                     control_token=lease["token"],
                 )
+                regex_watch = await tools.watch_terminal(
+                    pane, "regex_present", r"(?i)watch_outp.t", 8
+                )
+                with self.assertRaisesRegex(ValueError, "Invalid watch regex"):
+                    await tools.watch_terminal(pane, "regex_present", "[", 8)
                 second = await tools.watch_terminal(
                     pane, "text_present", "NEVER_EMITTED", 1
                 )
@@ -99,10 +130,12 @@ class DetachedMonitorTests(unittest.IsolatedAsyncioTestCase):
                     if (
                         rows[first["id"]]["state"] == "matched"
                         and rows[second["id"]]["state"] == "timed_out"
+                        and rows[regex_watch["id"]]["state"] == "matched"
                     ):
                         break
                     await asyncio.sleep(0.1)
                 self.assertEqual(rows[first["id"]]["state"], "matched")
+                self.assertEqual(rows[regex_watch["id"]]["state"], "matched")
                 self.assertFalse(rows[first["id"]]["result"]["model_woken"])
                 self.assertFalse(rows[first["id"]]["result"]["task_complete"])
                 self.assertEqual(rows[second["id"]]["state"], "timed_out")

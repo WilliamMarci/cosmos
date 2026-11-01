@@ -2,6 +2,8 @@
 
 import asyncio
 
+from cosmos_tui.features.agent.monitor.predicates import TEXT_CONDITIONS, validate_pattern
+
 from cosmos_tui.features.agent.monitor.detector import baseline
 from cosmos_tui.features.agent.monitor.storage import Watches
 from cosmos_tui.features.agent.monitor.service import starting, start
@@ -14,6 +16,8 @@ class TerminalWatches:
         if condition not in (
             "text_present",
             "text_absent",
+            "regex_present",
+            "regex_absent",
             "changed",
             "program_changed",
             "bash_prompt",
@@ -27,12 +31,13 @@ class TerminalWatches:
         if (
             not isinstance(text, str)
             or len(text) > 256
-            or condition.startswith("text_")
+            or condition in TEXT_CONDITIONS
             and not text
         ):
             raise ValueError(
                 "Text conditions need a nonempty string of at most 256 characters"
             )
+        validate_pattern(condition, text)
         if self.redact(text) != text:
             raise ValueError("Do not register credentials as watch text")
         await self.pane(pane)

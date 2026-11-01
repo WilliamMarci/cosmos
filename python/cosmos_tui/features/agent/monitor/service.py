@@ -24,6 +24,7 @@ def starting(watches):
 
 def start(watches, socket):
     """Caller holds starting(); duplicate startup contenders exit without monitoring."""
+    watches.path.with_suffix(".suspended").unlink(missing_ok=True)
     fd = os.open(
         str(watches.path) + ".worker", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600
     )

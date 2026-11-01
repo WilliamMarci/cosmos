@@ -247,6 +247,8 @@ TOOLS.extend(
                         enum=[
                             "text_present",
                             "text_absent",
+                            "regex_present",
+                            "regex_absent",
                             "changed",
                             "program_changed",
                             "bash_prompt",
