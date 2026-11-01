@@ -60,6 +60,7 @@ class SkillTests(unittest.TestCase):
             self.assertEqual(paths[2], str(Path(root) / ".cosmos/skills"))
             config = configuration("service", "%12")
             self.assertIn("agent-learn", config["commands"])
+            self.assertNotIn("cosmos-learn", config["commands"])
             learned = config["commands"]["agent-learn"]["template"]
             self.assertIn("$ARGUMENTS", learned)
             self.assertIn("isolated Cosmos profile", learned)

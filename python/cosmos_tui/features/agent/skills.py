@@ -177,7 +177,6 @@ def commands():
         )
         for name, description in (
             ("agent-learn", "Learn or extend, verify and save a Cosmos Agent skill"),
-            ("cosmos-learn", "Learn or extend, verify and save a Cosmos Agent skill"),
             ("cosmos-export-skill", "Save the observed workflow as a reusable skill"),
         )
     }
