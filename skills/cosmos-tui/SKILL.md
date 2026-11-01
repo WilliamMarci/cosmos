@@ -36,3 +36,7 @@ Use `cosmos_open` for Reader/Files, then `cosmos_actions events` for actual Read
 `/permissions` or Agent Settings → Permissions inspects saved project grants and explicitly revokes a selected rule. Read-directory scopes do not grant host writes or execution. Skills never supply authorization.
 
 For an explicit `/agent-learn`, reuse `cosmos-skill-export` to save the verified, parameterized procedure in Cosmos Agent's personal skill library. Preserve checkpoints and recovery, remove secrets/transient targets and state verification gaps. Do not save every interaction automatically.
+
+# Native file tools, not Shell search batches
+
+For auxiliary filesystem inspection use OpenCode `read` (file or directory), `glob` (filename discovery) and `grep` (content search) with explicit roots and limits. For example, inspect MadGraph process examples with native grep under the installation's tests/models/input directories, rather than a Shell `grep -rn ... | head; echo ...` batch. Use native edit/write/patch for changes. Remembered directory-read authorization covers native reads/listing/search only; it is not Shell approval. Shell is for required execution that a native tool cannot express, with its specific scope explained. Do not create repeated Shell searches merely because a previous command was approved. Software interaction remains in the designated Cosmos terminal.

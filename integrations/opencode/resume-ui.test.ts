@@ -4,7 +4,7 @@ import { createAppFixture } from "./fixture/app"
 import { directory, json } from "./fixture/tui-client"
 import { permissionPresentation } from "../src/util/permission"
 
-async function fixture() {
+async function fixture(shell = false) {
   const session = {
     id: `ses_resume_${crypto.randomUUID()}`,
     title: "Resume fixture",
@@ -28,6 +28,26 @@ async function fixture() {
       reason: "Continue the user's changed request",
     },
   } satisfies PermissionRequest
+  if (shell)
+    Object.assign(permission, {
+      action: "shell",
+      resources: [
+        "grep -rn pattern /some/very/long/project/path | head; echo ---; ".repeat(
+          8,
+        ),
+      ],
+      metadata: {
+        cosmos_scope:
+          "grep -rn pattern /some/very/long/project/path | head; echo ---; ".repeat(
+            8,
+          ),
+        workdir: "/some/very/long/project/path",
+        command:
+          "grep -rn pattern /some/very/long/project/path | head; echo ---; ".repeat(
+            8,
+          ),
+      },
+    })
   const location = {
     directory,
     project: { id: session.projectID, directory, canonical: directory },
@@ -121,6 +141,36 @@ test("clicking Resume task sends only the explicit once decision", async () => {
   )!
   expect(resume).toBeDefined()
   await setup.mockMouse.click(resume.x + 1, resume.y)
+  await setup.waitFor(() => setup.replies.length === 1)
+  expect(setup.replies).toEqual([{ decision: "once" }])
+})
+
+test("long Shell approval wraps and scrolls without overlapping permission rows or buttons", async () => {
+  await using setup = await fixture(true)
+  await setup.waitForFrame(
+    (frame) =>
+      frame.includes("Permission required") && frame.includes("Allow once"),
+    { maxPasses: 120 },
+  )
+  await setup.renderOnce()
+  const body = setup.renderer.root.findDescendantById(
+    "session.permission.body",
+  ) as any
+  const command = setup.renderer.root.findDescendantById(
+    "session.permission.line.0",
+  )!
+  const category = setup.renderer.root.findDescendantById(
+    "session.permission.line.1",
+  )!
+  const button = setup.renderer.root.findDescendantById(
+    "session.permission.action.once",
+  )!
+  expect(body).toBeDefined()
+  expect(command.height).toBeGreaterThan(1)
+  expect(category.y).toBeGreaterThanOrEqual(command.y + command.height)
+  expect(body.scrollHeight).toBeGreaterThan(body.height)
+  expect(button.y).toBeGreaterThanOrEqual(body.y + body.height)
+  setup.mockInput.pressEnter()
   await setup.waitFor(() => setup.replies.length === 1)
   expect(setup.replies).toEqual([{ decision: "once" }])
 })

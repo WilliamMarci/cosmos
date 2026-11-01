@@ -63,6 +63,10 @@ class SkillTests(unittest.TestCase):
                 "$ARGUMENTS", config["commands"]["cosmos-export-skill"]["template"]
             )
             self.assertIn(paths[1], config["agents"]["cosmos"]["system"])
+            self.assertIn(
+                "For filesystem investigation use OpenCode's native tools directly",
+                config["agents"]["cosmos"]["system"],
+            )
             self.assertFalse((Path(root) / "cosmos/agent/skills").exists())
 
     def test_builtin_skill_export_roundtrip(self):

@@ -1,20 +1,50 @@
 diff --git a/packages/tui/src/routes/session/permission.tsx b/packages/tui/src/routes/session/permission.tsx
-index 07338ab..f579186 100644
+index 07338ab..b1bfc67 100644
 --- a/packages/tui/src/routes/session/permission.tsx
 +++ b/packages/tui/src/routes/session/permission.tsx
-@@ -167,7 +167,10 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+@@ -167,21 +167,38 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
            )
            const presentationBody = () =>
              props.request.action === "edit" ? (
 -              <EditBody file={current.file} diff={current.diff} patch={current.patch} />
 +              <box flexDirection="column">
 +                <EditBody file={current.file} diff={current.diff} patch={current.patch} />
-+                <For each={current.lines}>{(line) => <text fg={theme.text.muted}>{line}</text>}</For>
++                <For each={current.lines}>
++                  {(line) => (
++                    <text flexShrink={0} fg={theme.text.muted}>
++                      {line}
++                    </text>
++                  )}
++                </For>
 +              </box>
              ) : props.request.action === "external_directory" ? (
                <Show when={current.lines.length > 0}>
                  <box paddingLeft={1} gap={1}>
-@@ -200,8 +203,14 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+                   <text fg={theme.text.muted}>Patterns</text>
+                   <box>
+-                    <For each={current.lines}>{(line) => <text fg={theme.text.base}>{line}</text>}</For>
++                    <For each={current.lines}>
++                      {(line) => (
++                        <text flexShrink={0} fg={theme.text.base}>
++                          {line}
++                        </text>
++                      )}
++                    </For>
+                   </box>
+                 </box>
+               </Show>
+             ) : (
+               <box paddingLeft={1}>
+                 <For each={current.lines}>
+-                  {(line) => (
++                  {(line, index) => (
+                     <text
++                      id={`session.permission.line.${index()}`}
++                      flexShrink={0}
+                       fg={
+                         props.request.action === "shell" ||
+                         props.request.action === "subagent" ||
+@@ -200,8 +217,14 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
            const header = () => (
              <box flexDirection="column" gap={0}>
                <box flexDirection="row" gap={1} flexShrink={0}>
@@ -31,7 +61,7 @@ index 07338ab..f579186 100644
                </box>
                <Show when={props.request.action !== "shell" && current.title}>
                  <box flexDirection="row" gap={1} paddingLeft={2} flexShrink={0}>
-@@ -216,7 +225,8 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+@@ -216,7 +239,8 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
  
            const body = (
              <SessionQuestion
@@ -41,11 +71,17 @@ index 07338ab..f579186 100644
                semanticLabel={permissionSemanticLabel(props.request.action, current.title)}
                instance={props.request.id}
                header={header()}
-@@ -226,17 +236,20 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+@@ -226,17 +250,26 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
                      <For each={permissionAlwaysLines(props.request)}>
                        {(line, index) => <text fg={index() === 0 ? theme.text.muted : theme.text.base}>{line}</text>}
                      </For>
-+                    <For each={current.lines.filter(line=>/^(Category|Scope|Lifetime|Writes):/.test(line))}>{line=><text fg={theme.text.muted}>{line}</text>}</For>
++                    <For each={current.lines.filter((line) => /^(Category|Scope|Lifetime|Writes):/.test(line))}>
++                      {(line) => (
++                        <text flexShrink={0} fg={theme.text.muted}>
++                          {line}
++                        </text>
++                      )}
++                    </For>
                    </box>
                  </Show>
                )}
@@ -69,7 +105,7 @@ index 07338ab..f579186 100644
                }
                escapeKey="reject"
                fullscreen
-@@ -246,7 +259,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+@@ -246,7 +279,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
                    return
                  }
                  if (option === "reject") {
@@ -78,7 +114,7 @@ index 07338ab..f579186 100644
                      setStore("stage", "reject")
                      return
                    }
-@@ -406,6 +419,7 @@ function RejectPrompt(props: {
+@@ -406,6 +439,7 @@ function RejectPrompt(props: {
  
  export function SessionQuestion<const T extends Record<string, string>>(props: {
    title: string
@@ -86,7 +122,15 @@ index 07338ab..f579186 100644
    semanticLabel?: string
    instance: string
    id?: string
-@@ -509,7 +523,7 @@ export function SessionQuestion<const T extends Record<string, string>>(props: {
+@@ -418,6 +452,7 @@ export function SessionQuestion<const T extends Record<string, string>>(props: {
+   fullscreen?: boolean
+   onSelect: (option: keyof T) => void
+ }) {
++  const config = useConfig().data
+   const theme = useTheme()
+   const dimensions = useTerminalDimensions()
+   const keys = Object.keys(props.options) as (keyof T)[]
+@@ -509,7 +544,7 @@ export function SessionQuestion<const T extends Record<string, string>>(props: {
        }))}
        backgroundColor={theme.background.raised.base}
        border={["left"]}
@@ -95,6 +139,32 @@ index 07338ab..f579186 100644
        customBorderChars={SplitBorder.customBorderChars}
        {...(store.expanded
          ? { top: dimensions().height * -1 + 1, bottom: 1, left: 2, right: 2, position: "absolute" }
+@@ -522,7 +557,7 @@ export function SessionQuestion<const T extends Record<string, string>>(props: {
+             position: "relative",
+           })}
+     >
+-      <box gap={1} paddingLeft={1} paddingRight={3} paddingTop={1} paddingBottom={1} flexGrow={1}>
++      <box gap={1} paddingLeft={1} paddingRight={3} paddingTop={1} paddingBottom={1} flexGrow={1} minHeight={0}>
+         <Show
+           when={props.header}
+           fallback={
+@@ -536,7 +571,15 @@ export function SessionQuestion<const T extends Record<string, string>>(props: {
+             {props.header}
+           </box>
+         </Show>
+-        {typeof props.body === "function" ? props.body(store.selected) : props.body}
++        <scrollbox
++          id={`${id()}.body`}
++          flexGrow={1}
++          minHeight={1}
++          maxHeight={store.expanded ? Math.max(1, dimensions().height - 10) : 7}
++          scrollAcceleration={getScrollAcceleration(config)}
++        >
++          {typeof props.body === "function" ? props.body(store.selected) : props.body}
++        </scrollbox>
+       </box>
+       <box
+         flexDirection={narrow() ? "column" : "row"}
 diff --git a/packages/tui/src/util/permission.ts b/packages/tui/src/util/permission.ts
 index 09d607f..78df574 100644
 --- a/packages/tui/src/util/permission.ts

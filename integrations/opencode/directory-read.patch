@@ -72,10 +72,22 @@ index e13466a..f0cdc04 100644
                    path: input.path,
                    include: input.include,
 diff --git a/packages/core/src/tool/plugin/shell.ts b/packages/core/src/tool/plugin/shell.ts
-index af454a7..3217ba4 100644
+index af454a7..2dd62a8 100644
 --- a/packages/core/src/tool/plugin/shell.ts
 +++ b/packages/core/src/tool/plugin/shell.ts
-@@ -138,7 +138,10 @@ export const Plugin = {
+@@ -39,6 +39,11 @@ const description = (shell?: string) =>
+     ...(shell ? [`Commands run on ${OS} using ${shell}.`] : []),
+     "Quote file paths containing spaces or special characters.",
+     "Prefer dedicated tools over shell commands when possible.",
++    ...(process.env.COSMOS_AGENT === "1"
++      ? [
++          "For filesystem investigation use native read (file/directory), glob (filenames), grep (text with path/include/limit), and edit/write/patch for changes. Do not batch grep/rg/find/cat/head, echo separators or Python file-inspection snippets through Shell when native tools cover the task. Directory-read grants do not cover Shell execution. Use Shell only for an operation native tools cannot express; explain that limitation. Interactive software work belongs in cosmos_step.",
++        ]
++      : []),
+     "When output is large, the full result is saved to a file and a truncated preview is returned.",
+     "Rely on automatic truncation unless filtering the output is more useful.",
+     "Commands accept an optional timeout, background commands have no timeout by default.",
+@@ -138,7 +143,10 @@ export const Plugin = {
          yield* permission.assert({
            action: name,
            resources: parsed.commands.map((command) => command.resource),
