@@ -11,10 +11,18 @@
 - terminal_step 首次紧凑快照、后续变化行，支持 full=true；保留逐步撤销与部分投递反馈。
 - /agent-learn 复用既有 cosmos-tui 与 cosmos-skill-export，学习验证后保存到 Cosmos Agent 独立 OpenCode skill 目录。保留旧命令，无新增技能注册系统。
 
-## 尚未完成
+## 本轮补齐（短工具入口与授权界面）
 
-- 原生模型目录中的短工具名称，以及隐藏 token/revision/challenge 的短句柄适配。当前仍使用 cosmos_terminal_context / cosmos_terminal_terminal_step 等原有 MCP 前缀。
-- 授权查看、按范围撤销旧规则的统一界面。当前旧规则没有自动删除或修改。
-- 创建、聚焦、打开等所有操作统一附带更新后的紧凑 context；当前 context 是独立入口。
-- SQLite 任务与 JSON 操作权之间的跨文件崩溃恢复事务；本轮解决常规接管冲突/捕获失败遗留任务，不声称进程在任意落盘瞬间崩溃都能原子回滚。
-- 实际长任务的调用次数和返回字节对比。针对性回归通过不等于已经复测报告中的整段 MadGraph 工作流。
+- 原生模型目录默认九个 `cosmos_*` 工具；旧 MCP 方法只留在内部传输层，不再重复列出。
+- token、snapshot ID、revision、challenge 由适配层保管；模型使用对话/Agent 绑定的短观察和任务句柄。
+- context 包含当前目标/视图/客户端、当前任务和控制状态、暂停标志、可用下一步与恢复入口、最多 8 行/1024 字节近期输出。
+- 操作返回 result 和更新后的 context。客户端失效返回候选，读取状态不需要再枚举 Actions。
+- 原生确认卡显示权限分类、范围、有效期、写入影响；目录读取新授权统一覆盖读取/列目录/搜索，显式拒绝仍优先；宿主写入和执行不新建永久通配规则。
+- Agent Settings → Permissions、Ctrl+P → Cosmos permissions、/permissions 可查看当前项目已记住规则，显式确认后撤销单条；默认 Keep，不自动迁移/删除旧规则。
+- 关闭/中断强制单独确认，暂停恢复仍使用独立蓝色确认，不恢复旧输入权。
+
+## 仍需后续验证/优化
+
+- SQLite 任务与 JSON 操作权之间的跨文件崩溃恢复事务；不声称任意落盘瞬间崩溃都能原子回滚。
+- 实际长任务的调用次数和返回字节对比；针对性回归不等于重新执行整段 MadGraph 工作流。
+- 当前授权管理编辑的是已记住的项目规则；配置文件中的策略保留在 Agent config，运行中任务能力通过既有 Tasks 暂停/结束。

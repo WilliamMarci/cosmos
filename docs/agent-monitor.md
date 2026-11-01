@@ -1,5 +1,7 @@
 # Terminal watch service
 
+The default model-facing entry points are `cosmos_task` and `cosmos_watch`; see [Agent tools and permissions](agent-tools.md). Detailed method names below describe the internal compatibility transport, not additional model catalog entries.
+
 This increment supplies an independent deterministic terminal monitor. It makes no provider/model requests and does not grant input ownership. Native authenticated Cosmos Agent conversations connect these watches to the [persistent task scheduler](agent-tasks.md), including automatic wakeup and a transparent Tasks popup. The monitor itself never calls a model.
 
 ## Tools

@@ -42,6 +42,12 @@ class ContextTools:
                 view = await bridge.client_context(selected_client)
             except (OSError, RuntimeError, TimeoutError) as error:
                 client_error = self.redact(str(error))
+        if client_error and selected_client is not None:
+            clients.pop(selected_client, None)
+            selected_client = None
+        if target is None and view:
+            active_pane = view.get("active_pane")
+            selected = next((r for r in rows if r["pane_id"] == active_pane), None)
         tasks = await self.list_tasks() if getattr(self, "conversation", None) else []
         tasks = [
             dict(
@@ -77,9 +83,42 @@ class ContextTools:
         pane = selected["pane_id"] if selected else None
         control = next((r for r in controls if r["pane"] == pane), None)
         paused = any(t["state"] == "paused" for t in tasks)
+        if getattr(self, "conversation", None) and callable(
+            getattr(self, "task_owner", None)
+        ):
+            from cosmos_tui.features.agent.tasks.storage import Tasks
+
+            paused = paused or Tasks(self.backend.argv[2]).paused(self.conversation)
         owned = bool(pane and self.control_tokens.get(pane)) and (
             control is not None and control["state"] == "active" and control["owned"]
         )
+        recent = None
+        if selected and not selected["private"]:
+            from cosmos_tui.features.agent.compact import compact_snapshot
+
+            try:
+                recent = compact_snapshot(
+                    await self.observe(pane, ["text"]), max_bytes=1024, max_rows=8
+                )
+            except (OSError, RuntimeError, ValueError) as error:
+                recent = dict(status="unavailable", message=self.redact(str(error)))
+        allowed = []
+        if selected and not selected["private"]:
+            allowed.append(dict(tool="cosmos_observe", target=pane))
+            if owned and not paused:
+                allowed.append(dict(tool="cosmos_step", target=pane))
+            elif not paused and not control:
+                allowed.append(dict(tool="cosmos_task", operation="begin", target=pane))
+        resume = next(
+            (
+                row
+                for row in tasks
+                if row["state"] == "paused" and "resume_challenge" in row
+            ),
+            None,
+        )
+        if resume:
+            allowed.append(dict(tool="cosmos_task", operation="resume", task=resume))
         status = (
             "target_not_found"
             if target is not None and selected is None
@@ -95,6 +134,14 @@ class ContextTools:
         )
         return dict(
             status=status,
+            paused=paused,
+            control=(
+                None
+                if control is None
+                else dict(state=control["state"], owned=control["owned"])
+            ),
+            allowed_next=allowed,
+            recent=recent,
             target=(
                 None
                 if selected is None

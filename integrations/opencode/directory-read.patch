@@ -72,15 +72,18 @@ index e13466a..f0cdc04 100644
                    path: input.path,
                    include: input.include,
 diff --git a/packages/core/src/tool/plugin/shell.ts b/packages/core/src/tool/plugin/shell.ts
-index af454a7..11983ee 100644
+index af454a7..3217ba4 100644
 --- a/packages/core/src/tool/plugin/shell.ts
 +++ b/packages/core/src/tool/plugin/shell.ts
-@@ -138,7 +138,7 @@ export const Plugin = {
+@@ -138,7 +138,10 @@ export const Plugin = {
          yield* permission.assert({
            action: name,
            resources: parsed.commands.map((command) => command.resource),
 -          save: parsed.commands.map((command) => command.save),
 +          save: process.env.COSMOS_AGENT === "1" ? [] : parsed.commands.map((command) => command.save),
++          ...(process.env.COSMOS_AGENT === "1"
++            ? { metadata: { workdir: target.absolute, command: invocation.command } }
++            : {}),
            sessionID: context.sessionID,
            agent: context.agent,
            source,

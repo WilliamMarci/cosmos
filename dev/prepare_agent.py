@@ -27,6 +27,9 @@ def prepare():
     (vendor / "packages/core/src/tool/cosmos-permissions.ts").write_text(
         (ROOT / "integrations/opencode/cosmos-permissions.ts").read_text()
     )
+    (vendor / "packages/core/src/tool/cosmos-interface.ts").write_text(
+        (ROOT / "integrations/opencode/cosmos-interface.ts").read_text()
+    )
     task_runtime = vendor / "packages/core/src/cosmos"
     task_runtime.mkdir(exist_ok=True)
     for source in (ROOT / "integrations/opencode/tasks").glob("*.ts"):
@@ -36,6 +39,9 @@ def prepare():
         (ROOT / "python/cosmos_tui/assets/agent-cosmos.json").read_text()
     )
     component = vendor / "packages/tui/src/component"
+    (component / "dialog-cosmos-permissions.tsx").write_text(
+        (ROOT / "integrations/opencode/dialog-cosmos-permissions.tsx").read_text()
+    )
     (component / "cosmos-logo.tsx").write_text(
         (ROOT / "integrations/opencode/cosmos-logo.tsx").read_text()
     )

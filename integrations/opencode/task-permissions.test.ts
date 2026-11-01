@@ -34,12 +34,22 @@ const current = Layer.succeed(
 )
 const it = testEffect(
   AppNodeBuilder.build(
-    LayerNode.group([Database.node, Bus.node, SessionStore.node, PermissionSaved.node, Agent.node, Permission.node]),
+    LayerNode.group([
+      Database.node,
+      Bus.node,
+      SessionStore.node,
+      PermissionSaved.node,
+      Agent.node,
+      Permission.node,
+    ]),
     [Location.node.replace(current)],
   ),
 )
 
-function setup(rules: Permission.Ruleset = [], sessionID = Session.ID.make("ses_test")) {
+function setup(
+  rules: Permission.Ruleset = [],
+  sessionID = Session.ID.make("ses_test"),
+) {
   return Effect.gen(function* () {
     const { db } = yield* Database.Service
     yield* db
@@ -104,7 +114,12 @@ const lease = {
   state: "active",
 }
 const acquire = (p: CosmosPermissions) => {
-  const plan = p.plan("cosmos_terminal", "acquire_control", { pane: "%4", task: "Plot" }, "ses_a")
+  const plan = p.plan(
+    "cosmos_terminal",
+    "acquire_control",
+    { pane: "%4", task: "Plot" },
+    "ses_a",
+  )
   p.finish(plan, reply(lease))
   return plan
 }
@@ -112,7 +127,12 @@ const input = { pane: "%4", token: lease.token }
 describe("Cosmos task adapter", () => {
   test("workspace capability groups only management and cannot cross conversations or grant terminal input", () => {
     const policy = new CosmosPermissions(key)
-    const acquisition = policy.plan("cosmos_terminal", "acquire_workspace", { task: "Organize workspace" }, "ses_a")
+    const acquisition = policy.plan(
+      "cosmos_terminal",
+      "acquire_workspace",
+      { task: "Organize workspace" },
+      "ses_a",
+    )
     expect(acquisition.taskGranted).toBe(false)
     expect(acquisition.save).toEqual([])
     policy.finish(
@@ -125,24 +145,63 @@ describe("Cosmos task adapter", () => {
         state: "active",
       }),
     )
-    for (const tool of ["create_terminal", "create_session", "rename_target", "focus_pane"]) {
-      expect(policy.plan("cosmos_terminal", tool, { workspace_token: "workspace-token" }, "ses_a").taskGranted).toBe(
-        true,
-      )
-      expect(() => policy.plan("cosmos_terminal", tool, { workspace_token: "workspace-token" }, "ses_b")).toThrow()
-      expect(policy.plan("cosmos_terminal", tool, {}, "ses_a").taskGranted).toBeUndefined()
+    for (const tool of [
+      "create_terminal",
+      "create_session",
+      "rename_target",
+      "focus_pane",
+    ]) {
+      expect(
+        policy.plan(
+          "cosmos_terminal",
+          tool,
+          { workspace_token: "workspace-token" },
+          "ses_a",
+        ).taskGranted,
+      ).toBe(true)
+      expect(() =>
+        policy.plan(
+          "cosmos_terminal",
+          tool,
+          { workspace_token: "workspace-token" },
+          "ses_b",
+        ),
+      ).toThrow()
+      expect(
+        policy.plan("cosmos_terminal", tool, {}, "ses_a").taskGranted,
+      ).toBeUndefined()
     }
     expect(() =>
-      policy.plan("cosmos_terminal", "terminal_step", { pane: "%4", token: "workspace-token" }, "ses_a"),
+      policy.plan(
+        "cosmos_terminal",
+        "terminal_step",
+        { pane: "%4", token: "workspace-token" },
+        "ses_a",
+      ),
     ).toThrow()
     expect(
-      policy.plan("cosmos_actions", "invoke_action", { workspace_token: "workspace-token" }, "ses_a").taskGranted,
+      policy.plan(
+        "cosmos_actions",
+        "invoke_action",
+        { workspace_token: "workspace-token" },
+        "ses_a",
+      ).taskGranted,
     ).toBeUndefined()
-    const released = policy.plan("cosmos_terminal", "release_workspace", { token: "workspace-token" }, "ses_a")
+    const released = policy.plan(
+      "cosmos_terminal",
+      "release_workspace",
+      { token: "workspace-token" },
+      "ses_a",
+    )
     expect(released.taskGranted).toBe(true)
     policy.finish(released, reply({ state: "ended" }))
     expect(() =>
-      policy.plan("cosmos_terminal", "focus_pane", { workspace_token: "workspace-token" }, "ses_a"),
+      policy.plan(
+        "cosmos_terminal",
+        "focus_pane",
+        { workspace_token: "workspace-token" },
+        "ses_a",
+      ),
     ).toThrow()
   })
 
@@ -161,10 +220,23 @@ describe("Cosmos task adapter", () => {
       signature: createHmac("sha256", key).update("ses_a").digest("hex"),
     })
     for (const tool of ["control_input", "terminal_step", "release_control"])
-      expect(p.plan("cosmos_terminal", tool, input, "ses_a").taskGranted).toBe(true)
-    expect(() => p.plan("cosmos_terminal", "terminal_step", input, "ses_b")).toThrow()
-    expect(() => p.plan("cosmos_terminal", "terminal_step", { ...input, pane: "%5" }, "ses_a")).toThrow()
-    expect(() => p.plan("cosmos_terminal", "terminal_step", input, "ses_a", "other-agent")).toThrow()
+      expect(p.plan("cosmos_terminal", tool, input, "ses_a").taskGranted).toBe(
+        true,
+      )
+    expect(() =>
+      p.plan("cosmos_terminal", "terminal_step", input, "ses_b"),
+    ).toThrow()
+    expect(() =>
+      p.plan(
+        "cosmos_terminal",
+        "terminal_step",
+        { ...input, pane: "%5" },
+        "ses_a",
+      ),
+    ).toThrow()
+    expect(() =>
+      p.plan("cosmos_terminal", "terminal_step", input, "ses_a", "other-agent"),
+    ).toThrow()
     const interrupt = p.plan(
       "cosmos_terminal",
       "control_input",
@@ -172,30 +244,71 @@ describe("Cosmos task adapter", () => {
       "ses_a",
     )
     expect(interrupt.taskGranted).toBe(false)
-    expect(p.plan("cosmos_terminal", "create_terminal", {}, "ses_a").taskGranted).toBeUndefined()
-    expect(new CosmosPermissions("").plan("cosmos_terminal", "control_input", {}, "ses_a").save).toEqual(["*"])
     expect(
-      (p.plan("cosmos_terminal", "observe", { _cosmos_context: "forged" }, "ses_real").args._cosmos_context as any)
-        .session,
+      p.plan("cosmos_terminal", "create_terminal", {}, "ses_a").taskGranted,
+    ).toBeUndefined()
+    expect(
+      new CosmosPermissions("").plan(
+        "cosmos_terminal",
+        "control_input",
+        {},
+        "ses_a",
+      ).save,
+    ).toEqual(["*"])
+    expect(
+      (
+        p.plan(
+          "cosmos_terminal",
+          "observe",
+          { _cosmos_context: "forged" },
+          "ses_real",
+        ).args._cosmos_context as any
+      ).session,
     ).toBe("ses_real")
   })
   test("pause/partial delivery/release discard grant; same task reacquisition cannot reuse confirmation", () => {
-    for (const failure of [reply("paused", true), reply({ delivery: "partial" })]) {
+    for (const failure of [
+      reply("paused", true),
+      reply({ delivery: "partial" }),
+    ]) {
       const p = new CosmosPermissions(key)
       const first = acquire(p)
-      p.finish(p.plan("cosmos_terminal", "terminal_step", input, "ses_a"), failure)
-      expect(() => p.plan("cosmos_terminal", "terminal_step", input, "ses_a")).toThrow()
-      const next = p.plan("cosmos_terminal", "acquire_control", { pane: "%4", task: "Plot" }, "ses_a")
+      p.finish(
+        p.plan("cosmos_terminal", "terminal_step", input, "ses_a"),
+        failure,
+      )
+      expect(() =>
+        p.plan("cosmos_terminal", "terminal_step", input, "ses_a"),
+      ).toThrow()
+      const next = p.plan(
+        "cosmos_terminal",
+        "acquire_control",
+        { pane: "%4", task: "Plot" },
+        "ses_a",
+      )
       expect(next.taskGranted).toBe(false)
       expect(next.resources).not.toEqual(first.resources)
-      expect(p.plan("cosmos_terminal", "release_control", input, "ses_a").taskGranted).toBe(true)
+      expect(
+        p.plan("cosmos_terminal", "release_control", input, "ses_a")
+          .taskGranted,
+      ).toBe(true)
     }
     const p = new CosmosPermissions(key)
     acquire(p)
-    p.finish(p.plan("cosmos_terminal", "release_control", input, "ses_a"), reply({ state: "ended" }))
-    expect(() => p.plan("cosmos_terminal", "terminal_step", input, "ses_a")).toThrow()
+    p.finish(
+      p.plan("cosmos_terminal", "release_control", input, "ses_a"),
+      reply({ state: "ended" }),
+    )
+    expect(() =>
+      p.plan("cosmos_terminal", "terminal_step", input, "ses_a"),
+    ).toThrow()
     acquire(p)
-    const replacement = p.plan("cosmos_terminal", "acquire_control", { pane: "%4", task: "Other" }, "ses_a")
+    const replacement = p.plan(
+      "cosmos_terminal",
+      "acquire_control",
+      { pane: "%4", task: "Other" },
+      "ses_a",
+    )
     p.finish(
       replacement,
       reply({
@@ -205,68 +318,127 @@ describe("Cosmos task adapter", () => {
         task_id: "task-two",
       }),
     )
-    expect(() => p.plan("cosmos_terminal", "terminal_step", input, "ses_a")).toThrow()
+    expect(() =>
+      p.plan("cosmos_terminal", "terminal_step", input, "ses_a"),
+    ).toThrow()
   })
 })
 describe("Real Cosmos task permission service", () => {
-  it.effect("another Always decision cannot auto-approve a pending resume confirmation", () =>
-    Effect.gen(function* () {
-      yield* setup([{action:"cosmos_terminal_*",resource:"*",effect:"ask"}])
-      const service=yield* Permission.Service
-      const action="cosmos_terminal_request_resume"
-      const resume=yield* service.ask(assertion({id:Permission.ID.create("per_resume_pending"),action,resources:["resume/task"],transient:true,forceAsk:true,save:[]}))
-      const other=yield* service.ask(assertion({id:Permission.ID.create("per_regular_allow"),action,resources:["other"],save:["*"]}))
-      yield* service.reply({requestID:other.id,reply:"always"})
-      expect((yield* service.get(resume.id))?.id).toBe(resume.id)
-    }),
+  it.effect(
+    "another Always decision cannot auto-approve a pending resume confirmation",
+    () =>
+      Effect.gen(function* () {
+        yield* setup([
+          { action: "cosmos_terminal_*", resource: "*", effect: "ask" },
+        ])
+        const service = yield* Permission.Service
+        const action = "cosmos_terminal_request_resume"
+        const resume = yield* service.ask(
+          assertion({
+            id: Permission.ID.create("per_resume_pending"),
+            action,
+            resources: ["resume/task"],
+            transient: true,
+            forceAsk: true,
+            save: [],
+          }),
+        )
+        const other = yield* service.ask(
+          assertion({
+            id: Permission.ID.create("per_regular_allow"),
+            action,
+            resources: ["other"],
+            save: ["*"],
+          }),
+        )
+        yield* service.reply({ requestID: other.id, reply: "always" })
+        expect((yield* service.get(resume.id))?.id).toBe(resume.id)
+      }),
   )
-  it.effect("resume always asks even under explicit allow and cannot persist approval", () =>
-    Effect.gen(function* () {
-      yield* setup([{action:"cosmos_terminal_*",resource:"*",effect:"allow"}])
-      const service=yield* Permission.Service
-      const saved=yield* PermissionSaved.Service
-      const before=yield* saved.list({projectID:Project.ID.global})
-      const input=assertion({action:"cosmos_terminal_request_resume",resources:["resume/task/pane"],save:[],transient:true,forceAsk:true})
-      const asked=yield* service.ask(input)
-      expect(asked.effect).toBe("ask")
-      yield* service.reply({requestID:asked.id,reply:"always"})
-      expect(yield* saved.list({projectID:Project.ID.global})).toEqual(before)
-      expect((yield* service.ask(input)).effect).toBe("ask")
-    }),
+  it.effect(
+    "resume always asks even under explicit allow and cannot persist approval",
+    () =>
+      Effect.gen(function* () {
+        yield* setup([
+          { action: "cosmos_terminal_*", resource: "*", effect: "allow" },
+        ])
+        const service = yield* Permission.Service
+        const saved = yield* PermissionSaved.Service
+        const before = yield* saved.list({ projectID: Project.ID.global })
+        const input = assertion({
+          action: "cosmos_terminal_request_resume",
+          resources: ["resume/task/pane"],
+          save: [],
+          transient: true,
+          forceAsk: true,
+        })
+        const asked = yield* service.ask(input)
+        expect(asked.effect).toBe("ask")
+        yield* service.reply({ requestID: asked.id, reply: "always" })
+        expect(yield* saved.list({ projectID: Project.ID.global })).toEqual(
+          before,
+        )
+        expect((yield* service.ask(input)).effect).toBe("ask")
+      }),
   )
 
-  it.effect("directory-scoped search approvals preserve legacy pattern denies", () =>
-    Effect.gen(function* () {
-      yield* setup([{action:"grep",resource:"*",effect:"allow"},{action:"grep",resource:"SECRET",effect:"deny"}])
-      const service=yield* Permission.Service
-      expect((yield* service.ask(assertion({action:"grep",resources:["/approved/"],denyResources:["SECRET"],save:["/approved/*"]}))).effect).toBe("deny")
-    }),
+  it.effect(
+    "directory-scoped search approvals preserve legacy pattern denies",
+    () =>
+      Effect.gen(function* () {
+        yield* setup([
+          { action: "grep", resource: "*", effect: "allow" },
+          { action: "grep", resource: "SECRET", effect: "deny" },
+        ])
+        const service = yield* Permission.Service
+        expect(
+          (yield* service.ask(
+            assertion({
+              action: "grep",
+              resources: ["/approved/"],
+              denyResources: ["SECRET"],
+              save: ["/approved/*"],
+            }),
+          )).effect,
+        ).toBe("deny")
+      }),
   )
-  it.effect("another Always approval cannot auto-approve a waiting transient task", () =>
-    Effect.gen(function* () {
-      yield* setup([{ action: "cosmos_terminal_*", resource: "*", effect: "ask" }])
-      const service = yield* Permission.Service
-      const action = "cosmos_terminal_acquire_control"
-      const task = yield* service.ask(
-        assertion({
-          id: Permission.ID.create("per_task_waiting"),
-          action,
-          resources: ["conversation/task/pane"],
-          transient: true,
-          save: [],
-        }),
-      )
-      const other = yield* service.ask(
-        assertion({ id: Permission.ID.create("per_other"), action, resources: ["other-resource"], save: ["*"] }),
-      )
-      yield* service.reply({ requestID: other.id, reply: "always" })
-      expect((yield* service.get(task.id))?.id).toBe(task.id)
-    }),
+  it.effect(
+    "another Always approval cannot auto-approve a waiting transient task",
+    () =>
+      Effect.gen(function* () {
+        yield* setup([
+          { action: "cosmos_terminal_*", resource: "*", effect: "ask" },
+        ])
+        const service = yield* Permission.Service
+        const action = "cosmos_terminal_acquire_control"
+        const task = yield* service.ask(
+          assertion({
+            id: Permission.ID.create("per_task_waiting"),
+            action,
+            resources: ["conversation/task/pane"],
+            transient: true,
+            save: [],
+          }),
+        )
+        const other = yield* service.ask(
+          assertion({
+            id: Permission.ID.create("per_other"),
+            action,
+            resources: ["other-resource"],
+            save: ["*"],
+          }),
+        )
+        yield* service.reply({ requestID: other.id, reply: "always" })
+        expect((yield* service.get(task.id))?.id).toBe(task.id)
+      }),
   )
 
   it.effect("ignores saved wildcard; Always cannot persist task approval", () =>
     Effect.gen(function* () {
-      yield* setup([{ action: "cosmos_terminal_*", resource: "*", effect: "ask" }])
+      yield* setup([
+        { action: "cosmos_terminal_*", resource: "*", effect: "ask" },
+      ])
       const saved = yield* PermissionSaved.Service
       const action = "cosmos_terminal_acquire_control"
       yield* saved.add({
@@ -285,13 +457,17 @@ describe("Real Cosmos task permission service", () => {
       const asked = yield* service.ask(input)
       expect(asked.effect).toBe("ask")
       yield* service.reply({ requestID: asked.id, reply: "always" })
-      expect(yield* saved.list({ projectID: Project.ID.global })).toEqual(before)
+      expect(yield* saved.list({ projectID: Project.ID.global })).toEqual(
+        before,
+      )
       expect((yield* service.ask(input)).effect).toBe("ask")
     }),
   )
   it.effect("task grant skips repeated ask but preserves explicit deny", () =>
     Effect.gen(function* () {
-      yield* setup([{ action: "cosmos_terminal_*", resource: "*", effect: "ask" }])
+      yield* setup([
+        { action: "cosmos_terminal_*", resource: "*", effect: "ask" },
+      ])
       const service = yield* Permission.Service
       const input = assertion({
         action: "cosmos_terminal_control_input",
@@ -302,7 +478,9 @@ describe("Real Cosmos task permission service", () => {
       })
       yield* service.assert(input)
       expect(yield* service.list()).toEqual([])
-      yield* setRules([{ action: "cosmos_terminal_*", resource: "*", effect: "deny" }])
+      yield* setRules([
+        { action: "cosmos_terminal_*", resource: "*", effect: "deny" },
+      ])
       expect((yield* service.ask(input)).effect).toBe("deny")
       expect((yield* Effect.exit(service.assert(input)))._tag).toBe("Failure")
     }),
@@ -332,62 +510,135 @@ testEffect(Layer.empty).effect(
               call: {
                 type: "tool-call",
                 id: "call_" + checks.length,
-                name: "cosmos_terminal_" + name,
+                name: "cosmos_" + name,
                 input,
               },
             })
+          const observed = yield* run("observe", {
+            target: "%4",
+            layers: ["text"],
+          })
+          expect(observed.status).toBe("completed")
+          // Handles come from the actual registry output; the model never supplies a token.
+          const findHandle = (value: any): string | undefined => {
+            if (!value || typeof value !== "object") return undefined
+            if (typeof value.observation === "string") return value.observation
+            for (const child of Object.values(value)) {
+              if (typeof child === "string") {
+                try {
+                  const parsed = findHandle(JSON.parse(child))
+                  if (parsed) return parsed
+                } catch {}
+              }
+              const found = findHandle(child)
+              if (found) return found
+            }
+          }
+          const handle = findHandle(observed)
+          expect(handle).toBeDefined()
+          const begun = yield* run("task", {operation:"begin",target:"%4",observation:handle,task:"Plot"})
+          expect(begun.status).toBe("completed")
+          expect(JSON.stringify(begun)).not.toContain(lease.token)
+          expect(JSON.stringify(begun)).toContain("context")
           expect(
-            (yield* run("acquire_control", {
-              pane: "%4",
-              task: "Plot",
-              snapshot_id: "fresh",
-            })).status,
+            (yield* run("step", { target: "%4", text: "pwd" })).status,
           ).toBe("completed")
-          expect((yield* run("terminal_step", input)).status).toBe("completed")
-          expect((yield* run("terminal_step", input, "ses_b")).status).toBe("error")
-          expect((yield* run("release_control", input)).status).toBe("completed")
-          expect((yield* run("terminal_step", input)).status).toBe("error")
-          expect(checks.map((c) => c.taskGranted)).toEqual([false, true, true])
-          expect(checks.every((c) => c.save?.length === 0 && c.transient)).toBe(true)
-          expect(sent.length).toBe(3)
+          expect(
+            (yield* run("step", { target: "%4", text: "pwd" }, "ses_b")).status,
+          ).toBe("error")
+          expect(
+            (yield* run("task", { operation: "release", target: "%4" })).status,
+          ).toBe("completed")
+          expect(
+            (yield* run("step", { target: "%4", text: "pwd" })).status,
+          ).toBe("error")
+          const taskChecks = checks.filter((c) => c.transient)
+          expect(taskChecks.map((c) => c.taskGranted)).toEqual([
+            false,
+            true,
+            true,
+          ])
+          expect(taskChecks.every((c) => c.save?.length === 0)).toBe(true)
+          expect(sent.length).toBe(8)
           expect(sent[0].args._cosmos_context.session).toBe("ses_a")
-          expect(sent[0].args._cosmos_context.signature).toBe(createHmac("sha256", key).update("ses_a").digest("hex"))
+          expect(sent[0].args._cosmos_context.signature).toBe(
+            createHmac("sha256", key).update("ses_a").digest("hex"),
+          )
         }).pipe(
           Effect.provide(
             Layer.fresh(
-              AppNodeBuilder.build(LayerNode.group([Tool.node, McpTool.node, Bus.node]), [
-                Mcp.node.replace(
-                  Layer.mock(Mcp.Service, {
-                    tools: () =>
-                      Effect.succeed(
-                        ["acquire_control", "terminal_step", "release_control"].map((name) => ({
-                          server: Mcp.ServerName.make("cosmos_terminal"),
-                          name,
-                          codemode: false,
-                          inputSchema: { type: "object", properties: {} },
-                        })),
-                      ),
-                    callTool: (request) =>
-                      Effect.sync(() => {
-                        sent.push(request)
-                        return {
-                          server: Mcp.ServerName.make(request.server),
-                          tool: request.name,
-                          ...reply(request.name === "acquire_control" ? lease : { delivery: "delivered" }),
-                        }
-                      }),
-                  }),
-                ),
-                Permission.node.replace(
-                  Layer.mock(Permission.Service, {
-                    assert: (input) =>
-                      Effect.sync(() => {
-                        checks.push(input)
-                      }),
-                  }),
-                ),
-                Image.node.replace(imagePassthrough),
-              ]),
+              AppNodeBuilder.build(
+                LayerNode.group([Tool.node, McpTool.node, Bus.node]),
+                [
+                  Mcp.node.replace(
+                    Layer.mock(Mcp.Service, {
+                      tools: () =>
+                        Effect.succeed(
+                          [
+                            "context",
+                            "observe",
+                            "acquire_control",
+                            "terminal_step",
+                            "release_control",
+                          ].map((name) => ({
+                            server: Mcp.ServerName.make("cosmos_terminal"),
+                            name,
+                            codemode: false,
+                            inputSchema: {
+                              type: "object",
+                              properties: {
+                                pane: { type: "string" },
+                                task: { type: "string" },
+                                text: { type: "string" },
+                                layers: {
+                                  type: "array",
+                                  items: { type: "string" },
+                                },
+                              },
+                            },
+                          })),
+                        ),
+                      callTool: (request) =>
+                        Effect.sync(() => {
+                          sent.push(request)
+                          return {
+                            server: Mcp.ServerName.make(request.server),
+                            tool: request.name,
+                            ...reply(
+                              request.name === "acquire_control"
+                                ? lease
+                                : request.name === "observe"
+                                  ? {
+                                      pane: "%4",
+                                      snapshot_id: "fresh",
+                                      text: [],
+                                    }
+                                  : request.name === "context"
+                                    ? {
+                                        status: "ready",
+                                        target: {
+                                          pane: "%4",
+                                          display_id: "1:4",
+                                        },
+                                        tasks: [],
+                                      }
+                                    : { delivery: "delivered" },
+                            ),
+                          }
+                        }),
+                    }),
+                  ),
+                  Permission.node.replace(
+                    Layer.mock(Permission.Service, {
+                      assert: (input) =>
+                        Effect.sync(() => {
+                          checks.push(input)
+                        }),
+                    }),
+                  ),
+                  Image.node.replace(imagePassthrough),
+                ],
+              ),
             ),
           ),
         ),
@@ -403,12 +654,131 @@ testEffect(Layer.empty).effect(
 )
 
 test("resume plan signs one task and state, with no input capability or remembered grant", () => {
-  const permissions=new CosmosPermissions(key)
-  const input={id:"task_fixture",pane:"%4",revision:3,resume_challenge:"state",reason:"Continue user task"}
-  const plan=permissions.plan("cosmos_terminal","request_resume",input,"ses_a")
-  expect(plan.forceAsk).toBe(true);expect(plan.transient).toBe(true);expect(plan.save).toEqual([])
+  const permissions = new CosmosPermissions(key)
+  const input = {
+    id: "task_fixture",
+    pane: "%4",
+    revision: 3,
+    resume_challenge: "state",
+    reason: "Continue user task",
+  }
+  const plan = permissions.plan(
+    "cosmos_terminal",
+    "request_resume",
+    input,
+    "ses_a",
+  )
+  expect(plan.forceAsk).toBe(true)
+  expect(plan.transient).toBe(true)
+  expect(plan.save).toEqual([])
   expect(plan.taskGranted).toBeUndefined()
-  const payload="cosmos-resume-v1\nses_a\ntask_fixture\n%4\n3\nstate\nContinue user task"
-  expect(plan.args._cosmos_resume_approval).toBe(createHmac("sha256",key).update(payload).digest("hex"))
+  const payload =
+    "cosmos-resume-v1\nses_a\ntask_fixture\n%4\n3\nstate\nContinue user task"
+  expect(plan.args._cosmos_resume_approval).toBe(
+    createHmac("sha256", key).update(payload).digest("hex"),
+  )
   expect(plan.metadata.cosmos_resume).toBe(true)
 })
+
+it.effect(
+  "directory read approvals share one revocable scope without granting Shell",
+  () =>
+    Effect.gen(function* () {
+      const previous = process.env.COSMOS_AGENT
+      process.env.COSMOS_AGENT = "1"
+      try {
+        yield* setup()
+        const permissions = yield* Permission.Service
+        const saved = yield* PermissionSaved.Service
+        const first = yield* permissions.ask({
+          action: "read",
+          resources: ["fixture-data/file.txt"],
+          save: ["fixture-data/*"],
+          sessionID: Session.ID.make("ses_test"),
+          source: {
+            type: "tool",
+            messageID: toolIdentity.messageID,
+            id: "directory-read",
+          },
+        })
+        expect(first.effect).toBe("ask")
+        yield* permissions.reply({ requestID: first.id, reply: "always" })
+        const rows = yield* saved.list({ projectID: Project.ID.global })
+        const rule = rows.find(
+          (r) =>
+            r.action === "cosmos_directory_read" &&
+            r.resource === "fixture-data/*",
+        )!
+        expect(rule).toBeDefined()
+        const next = yield* permissions.ask({
+          action: "grep",
+          resources: ["fixture-data/"],
+          save: ["fixture-data/*"],
+          sessionID: Session.ID.make("ses_test"),
+          source: {
+            type: "tool",
+            messageID: toolIdentity.messageID,
+            id: "directory-search",
+          },
+        })
+        expect(next.effect).toBe("allow")
+        const shell = yield* permissions.ask({
+          action: "shell",
+          resources: ["python3 file.py"],
+          save: [],
+          sessionID: Session.ID.make("ses_test"),
+          source: {
+            type: "tool",
+            messageID: toolIdentity.messageID,
+            id: "directory-shell",
+          },
+        })
+        expect(shell.effect).toBe("ask")
+        yield* saved.remove(rule.id)
+        const revoked = yield* permissions.ask({
+          action: "grep",
+          resources: ["fixture-data/"],
+          save: ["fixture-data/*"],
+          sessionID: Session.ID.make("ses_test"),
+          source: {
+            type: "tool",
+            messageID: toolIdentity.messageID,
+            id: "directory-revoked",
+          },
+        })
+        expect(revoked.effect).toBe("ask")
+      } finally {
+        if (previous === undefined) delete process.env.COSMOS_AGENT
+        else process.env.COSMOS_AGENT = previous
+      }
+    }),
+)
+
+it.effect("public short alias denies survive a captured task executor", () =>
+  Effect.gen(function* () {
+    yield* setup([
+      { action: "cosmos_step", resource: "*", effect: "deny" },
+      {
+        action: "cosmos_terminal_terminal_step",
+        resource: "*",
+        effect: "allow",
+      },
+    ])
+    const permission = yield* Permission.Service
+    const result = yield* permission.ask({
+      action: "cosmos_terminal_terminal_step",
+      aliases: ["cosmos_step"],
+      resources: ["terminal"],
+      save: [],
+      transient: true,
+      taskGranted: true,
+      sessionID: Session.ID.make("ses_test"),
+      source: {
+        type: "tool",
+        messageID: toolIdentity.messageID,
+        id: "alias-deny",
+      },
+    })
+    expect(result.effect).toBe("deny")
+  }),
+)

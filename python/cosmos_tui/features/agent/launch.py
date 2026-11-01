@@ -102,6 +102,7 @@ def environment(socket, source_pane):
         env["COSMOS_AGENT_API_KEY"] = keys[settings["provider"]]
     env.update(
         COSMOS_AGENT="1",
+        COSMOS_AGENT_SOURCE_PANE=source_pane,
         COSMOS_TASKS_HOME=str(task_store.path.parent),
         COSMOS_AGENT_TASK_DB=str(task_store.path),
         COSMOS_AGENT_TASK_DIR=str(registry(socket)),

@@ -137,3 +137,6 @@ Cosmos's private profile.
 Persistent tasks and their popup, schedule API, cancellation and recovery are documented in [Agent tasks](agent-tasks.md). Restart an existing Agent frontend to load new native patches; retained ordinary terminal sessions need not stop.
 
 [Cosmos workspace interface](agent-workspace.md) defines opaque service identity, service-replacement rejection, compatibility handles, and the separate host Shell permission boundary.
+
+
+The native model catalog exposes nine short tools: `cosmos_context`, `cosmos_observe`, `cosmos_step`, `cosmos_task`, `cosmos_workspace`, `cosmos_open`, `cosmos_history`, `cosmos_actions` and `cosmos_watch`. See [Agent tools and permissions](agent-tools.md) for their operations, opaque handles, context returns and saved-approval management. Internal MCP names remain transport compatibility APIs rather than duplicate model tools.

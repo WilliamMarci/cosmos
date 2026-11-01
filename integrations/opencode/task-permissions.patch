@@ -1,8 +1,8 @@
 diff --git a/packages/core/src/permission.ts b/packages/core/src/permission.ts
-index 37d5811..51330a2 100644
+index 37d5811..b667366 100644
 --- a/packages/core/src/permission.ts
 +++ b/packages/core/src/permission.ts
-@@ -33,6 +33,13 @@ export type Reply = typeof Reply.Type
+@@ -33,6 +33,14 @@ export type Reply = typeof Reply.Type
  export interface AssertInput extends Omit<Request, "id" | "message"> {
    readonly id?: ID
    readonly agent?: Agent.ID
@@ -13,10 +13,11 @@ index 37d5811..51330a2 100644
 +  readonly forceAsk?: boolean
 +  /** Compatibility deny checks when a Cosmos search changes its approval resource to a directory. */
 +  readonly denyResources?: string[]
++  readonly aliases?: string[]
  }
  
  export interface ReplyInput {
-@@ -100,6 +107,8 @@ export interface Interface {
+@@ -100,6 +108,8 @@ export interface Interface {
  export class Service extends Context.Service<Service, Interface>()("@opencode/Permission") {}
  
  interface Pending {
@@ -25,30 +26,81 @@ index 37d5811..51330a2 100644
    readonly request: Request
    readonly agent?: Agent.ID
    readonly deferred: Deferred.Deferred<void, DeclinedError | CorrectedError>
-@@ -159,10 +168,10 @@ const layer = Layer.effect(
+@@ -159,10 +169,28 @@ const layer = Layer.effect(
  
      const evaluateInput = Effect.fnUntraced(function* (input: AssertInput) {
        const rules = yield* configured(input.sessionID, input.agent)
 -      if (denied(input, rules)) return { effect: "deny" as const, rules }
 -      const all = [...rules, ...(yield* savedRules())]
-+      if (denied(input, rules) || (input.denyResources?.some((resource) => evaluate(input.action, resource, rules).effect === "deny") ?? false)) return { effect: "deny" as const, rules }
-+      const all = [...rules, ...(input.transient ? [] : yield* savedRules())]
++      if (
++        denied(input, rules) ||
++        (process.env.COSMOS_AGENT === "1" &&
++          ["read", "list", "grep", "glob"].includes(input.action) &&
++          denied({ ...input, action: "cosmos_directory_read" }, rules)) ||
++        input.aliases?.some((action) => denied({ ...input, action }, rules)) ||
++        (input.denyResources?.some((resource) => evaluate(input.action, resource, rules).effect === "deny") ?? false)
++      )
++        return { effect: "deny" as const, rules }
++      const remembered = input.transient ? [] : yield* savedRules()
++      const directoryRead = process.env.COSMOS_AGENT === "1" && ["read", "list", "grep", "glob"].includes(input.action)
++      // Shared read capability never overrides an explicit configured deny above.
++      const all = [
++        ...rules,
++        ...remembered,
++        ...(directoryRead
++          ? remembered.filter((r) => r.action === "cosmos_directory_read").map((r) => ({ ...r, action: input.action }))
++          : []),
++      ]
        const effects = input.resources.map((resource) => evaluate(input.action, resource, all).effect)
 -      const effect: Permission.Effect = effects.includes("ask") ? "ask" : "allow"
-+      const effect: Permission.Effect = input.forceAsk || (effects.includes("ask") && !input.taskGranted) ? "ask" : "allow"
++      const effect: Permission.Effect =
++        input.forceAsk || (effects.includes("ask") && !input.taskGranted) ? "ask" : "allow"
        const event = yield* hooks.trigger("permission", "evaluate", {
          sessionID: input.sessionID,
          agent: input.agent,
-@@ -172,7 +181,7 @@ const layer = Layer.effect(
+@@ -172,7 +200,11 @@ const layer = Layer.effect(
          source: input.source,
          effect,
        })
 -      return { effect: event.effect, message: event.message, rules: all }
-+      return { effect: input.forceAsk && event.effect !== "deny" ? "ask" as const : event.effect, message: event.message, rules: all }
++      return {
++        effect: input.forceAsk && event.effect !== "deny" ? ("ask" as const) : event.effect,
++        message: event.message,
++        rules: all,
++      }
      })
  
      function request(input: AssertInput, message?: string): Request {
-@@ -192,11 +201,11 @@ const layer = Layer.effect(
+@@ -181,22 +213,36 @@ const layer = Layer.effect(
+         sessionID: input.sessionID,
+         action: input.action,
+         resources: input.resources,
+-        save: input.save,
++        save:
++          process.env.COSMOS_AGENT === "1" && ["shell", "edit", "write", "patch"].includes(input.action)
++            ? []
++            : input.save,
+         // Tools copy optional inputs straight into metadata; undefined values are not JSON and would
+         // fail the HttpApi response encoder when clients list pending requests.
+-        metadata:
+-          input.metadata &&
+-          Object.fromEntries(Object.entries(input.metadata).filter(([, value]) => value !== undefined)),
++        metadata: Object.fromEntries(
++          Object.entries({
++            ...input.metadata,
++            ...(process.env.COSMOS_AGENT === "1"
++              ? {
++                  cosmos_scope: (["read", "list", "grep", "glob"].includes(input.action)
++                    ? (input.save ?? [])
++                    : input.resources
++                  ).join(", "),
++                  cosmos_once: !["read", "list", "grep", "glob"].includes(input.action),
++                }
++              : {}),
++          }).filter(([, value]) => value !== undefined),
++        ),
+         source: input.source,
+         message,
        }
      }
  
@@ -62,7 +114,7 @@ index 37d5811..51330a2 100644
            if (closed) {
              yield* Deferred.fail(deferred, new DeclinedError())
              return item
-@@ -215,7 +224,7 @@ const layer = Layer.effect(
+@@ -215,7 +261,7 @@ const layer = Layer.effect(
        if (closed) return { id: input.id ?? ID.create(), effect: "deny" as const }
        const result = yield* evaluateInput(input)
        const value = request(input, result.message)
@@ -71,7 +123,7 @@ index 37d5811..51330a2 100644
        return { id: value.id, effect: result.effect }
      })
  
-@@ -234,7 +243,7 @@ const layer = Layer.effect(
+@@ -234,7 +280,7 @@ const layer = Layer.effect(
                })
              }
              if (result.effect === "allow") return
@@ -80,15 +132,34 @@ index 37d5811..51330a2 100644
              return yield* restore(Deferred.await(item.deferred)).pipe(
                // Deliberate defect tunnel: leaves wrap execution in blanket `mapError`, which
                // must not convert a user's decline into model-facing tool output. The decline
-@@ -299,7 +308,7 @@ const layer = Layer.effect(
+@@ -290,7 +336,10 @@ const layer = Layer.effect(
+           if (input.reply === "always" && existing.request.save?.length) {
+             yield* saved.add({
+               projectID: location.project.id,
+-              action: existing.request.action,
++              action:
++                process.env.COSMOS_AGENT === "1" && ["read", "list", "grep", "glob"].includes(existing.request.action)
++                  ? "cosmos_directory_read"
++                  : existing.request.action,
+               resources: existing.request.save,
+             })
+           }
+@@ -299,9 +348,12 @@ const layer = Layer.effect(
            if (input.reply !== "always" || !existing.request.save?.length) return
  
            for (const [id, item] of pending) {
 -            const result = yield* evaluateInput({ ...item.request, agent: item.agent }).pipe(
-+            const result = yield* evaluateInput({ ...item.request, agent: item.agent, transient: item.transient, forceAsk: item.forceAsk }).pipe(
-               Effect.catchTag("Session.NotFoundError", () => Effect.undefined),
-             )
+-              Effect.catchTag("Session.NotFoundError", () => Effect.undefined),
+-            )
++            const result = yield* evaluateInput({
++              ...item.request,
++              agent: item.agent,
++              transient: item.transient,
++              forceAsk: item.forceAsk,
++            }).pipe(Effect.catchTag("Session.NotFoundError", () => Effect.undefined))
              if (result?.effect !== "allow") continue
+             yield* bus.publish(Permission.Event.Replied, {
+               sessionID: item.request.sessionID,
 diff --git a/packages/core/src/session.ts b/packages/core/src/session.ts
 index cb21826..ca9f1fb 100644
 --- a/packages/core/src/session.ts
@@ -163,45 +234,76 @@ index fb7a9d3..2b0b7ef 100644
        settled: (sessionID, exit, reason) =>
          reportLifecycle(
 diff --git a/packages/core/src/tool/mcp.ts b/packages/core/src/tool/mcp.ts
-index 6d1b8cc..4694182 100644
+index 6d1b8cc..11b803c 100644
 --- a/packages/core/src/tool/mcp.ts
 +++ b/packages/core/src/tool/mcp.ts
-@@ -1,5 +1,9 @@
+@@ -1,5 +1,11 @@
  export * as McpTool from "./mcp.js"
  
 +import { bindPermissions } from "../cosmos/runtime.js"
++
++import { CosmosInterface } from "./cosmos-interface.js"
 +
 +import { CosmosPermissions } from "./cosmos-permissions.js"
 +
  import { ToolFailure } from "@opencode/ai"
  import { McpEvent } from "@opencode/schema/mcp-event"
  import { Context, Effect, Fiber, type JsonSchema, Layer, Option, PubSub, Schema, Semaphore, Stream } from "effect"
-@@ -39,6 +43,8 @@ export const layer = Layer.effect(
+@@ -39,6 +45,9 @@ export const layer = Layer.effect(
      const toolOutput = yield* ToolOutput.Service
      const lock = Semaphore.makeUnsafe(1)
      let discovered: Mcp.Tool[] = []
 +    const cosmosPermissions = new CosmosPermissions()
++    const cosmosInterface = new CosmosInterface()
 +    const runCosmos = Effect.runPromiseWith(yield* Effect.context())
  
      // Register once after initial discovery; only subsequent updates need a debounced reload.
      const initial = yield* lock
-@@ -55,11 +61,22 @@ export const layer = Layer.effect(
+@@ -46,20 +55,47 @@ export const layer = Layer.effect(
+         Effect.gen(function* () {
+           discovered = yield* mcp.tools()
+           yield* tools.transform((editor) => {
+-            for (const tool of discovered) {
++            for (const tool of cosmosInterface.catalog(discovered)) {
+               editor.add({
+                 name: tool.name,
+-                options: { namespace: namespace(tool.server), codemode: tool.codemode !== false },
++                options: {
++                  namespace: tool.cosmos ? "cosmos" : namespace(tool.server),
++                  codemode: tool.cosmos ? false : tool.codemode !== false,
++                },
+                 description: tool.description ?? "",
+                 input: (tool.inputSchema ?? { type: "object", properties: {} }) as JsonSchema.JsonSchema,
                  output: (tool.outputSchema ?? {}) as JsonSchema.JsonSchema,
                  execute: (input, context) =>
                    Effect.gen(function* () {
++                    const call = yield* Effect.try({
++                      try: () =>
++                        cosmosInterface.prepare(
++                          tool,
++                          (input ?? {}) as Record<string, unknown>,
++                          context.sessionID,
++                          context.agent,
++                        ),
++                      catch: (error) => new ToolFailure({ message: String(error) }),
++                    })
 +                    const plan = yield* Effect.try({
-+                      try: () => cosmosPermissions.plan(tool.server, tool.name, (input ?? {}) as Record<string, unknown>, context.sessionID, context.agent),
++                      try: () =>
++                        cosmosPermissions.plan(call.server, call.name, call.args, context.sessionID, context.agent),
 +                      catch: (error) => new ToolFailure({ message: String(error) }),
 +                    })
 +                    bindPermissions(context.sessionID, {
-+                      list: async () => [...await runCosmos(permission.forSession(context.sessionID))],
-+                      reply: (id, decision) => runCosmos(permission.reply({ requestID: Permission.ID.make(id), reply: decision })),
++                      list: async () => [...(await runCosmos(permission.forSession(context.sessionID)))],
++                      reply: (id, decision) =>
++                        runCosmos(permission.reply({ requestID: Permission.ID.make(id), reply: decision })),
 +                    })
                      yield* permission.assert({
-                       action: name(tool.server, tool.name),
+-                      action: name(tool.server, tool.name),
 -                      resources: ["*"],
 -                      save: ["*"],
 -                      metadata: { input: input ?? {} },
++                      action: name(call.server, call.name),
++                      aliases: tool.cosmos ? ["cosmos_" + tool.cosmos] : undefined,
 +                      resources: plan.resources,
 +                      save: plan.save,
 +                      transient: plan.transient,
@@ -211,16 +313,39 @@ index 6d1b8cc..4694182 100644
                        sessionID: context.sessionID,
                        agent: context.agent,
                        source: {
-@@ -72,16 +89,18 @@ export const layer = Layer.effect(
+@@ -68,20 +104,91 @@ export const layer = Layer.effect(
+                         id: context.id,
+                       },
+                     })
+-                    const result = yield* mcp
++                    const contextPlan =
++                      tool.cosmos && call.name !== "context"
++                        ? cosmosPermissions.plan("cosmos_terminal", "context", {}, context.sessionID, context.agent)
++                        : undefined
++                    if (contextPlan)
++                      yield* permission.assert({
++                        action: "cosmos_terminal_context",
++                        aliases: ["cosmos_context"],
++                        resources: contextPlan.resources,
++                        save: [],
++                        sessionID: context.sessionID,
++                        agent: context.agent,
++                        source: { type: "tool", messageID: context.messageID, id: context.id },
++                      })
++                    let result = yield* mcp
                        .callTool({
-                         server: tool.server,
-                         name: tool.name,
+-                        server: tool.server,
+-                        name: tool.name,
 -                        args: (input ?? {}) as Record<string, unknown>,
++                        server: call.server,
++                        name: call.name,
 +                        args: plan.args,
                          sessionID: context.sessionID,
                        })
                        .pipe(
-+                        Effect.tapError(() => Effect.sync(() => cosmosPermissions.finish(plan, { isError: true, content: [] }))),
++                        Effect.tapError(() =>
++                          Effect.sync(() => cosmosPermissions.finish(plan, { isError: true, content: [] })),
++                        ),
                          Effect.catchTags({
                            "MCP.NotFoundError": (error) =>
                              new ToolFailure({ message: `MCP server "${error.server}" is not available` }),
@@ -228,6 +353,59 @@ index 6d1b8cc..4694182 100644
                          }),
                        )
 +                    cosmosPermissions.finish(plan, result)
++                    if (tool.cosmos) {
++                      const parse = (r: typeof result) => {
++                        const text = r.content.flatMap((p) => (p.type === "text" ? [p.text] : [])).join("\n")
++                        try {
++                          return JSON.parse(text)
++                        } catch {
++                          return { message: text }
++                        }
++                      }
++                      const raw = parse(result)
++                      const safe = cosmosInterface.finish(call, raw, context.sessionID, context.agent, result.isError)
++                      let updated: any = undefined
++                      if (contextPlan) {
++                        const request = cosmosInterface.prepare(
++                          { ...tool, cosmos: "context", server: "cosmos_terminal" },
++                          {},
++                          context.sessionID,
++                          context.agent,
++                        )
++                        const refreshed = yield* mcp
++                          .callTool({
++                            server: "cosmos_terminal",
++                            name: "context",
++                            args: { ...request.args, ...contextPlan.args },
++                            sessionID: context.sessionID,
++                          })
++                          .pipe(
++                            Effect.catchTags({
++                              "MCP.NotFoundError": () => Effect.succeed(undefined),
++                              "MCP.ToolCallError": () => Effect.succeed(undefined),
++                            }),
++                          )
++                        if (refreshed && !refreshed.isError)
++                          updated = cosmosInterface.finish(request, parse(refreshed), context.sessionID, context.agent)
++                      }
++                      result = {
++                        ...result,
++                        structured: undefined,
++                        content: [
++                          {
++                            type: "text",
++                            text: JSON.stringify(
++                              contextPlan
++                                ? {
++                                    result: safe,
++                                    context: updated ?? { status: "unavailable", next: "cosmos_context" },
++                                  }
++                                : safe,
++                            ),
++                          },
++                        ],
++                      }
++                    }
                      if (result.isError)
                        return yield* new ToolFailure({
                          message:

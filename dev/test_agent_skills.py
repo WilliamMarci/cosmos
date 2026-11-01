@@ -57,7 +57,7 @@ class SkillTests(unittest.TestCase):
             learned = config["commands"]["agent-learn"]["template"]
             self.assertIn("$ARGUMENTS", learned)
             self.assertIn("isolated Cosmos profile", learned)
-            self.assertIn("request_resume", learned)
+            self.assertIn("cosmos_task", learned)
             self.assertIn("cosmos-export-skill", config["commands"])
             self.assertIn(
                 "$ARGUMENTS", config["commands"]["cosmos-export-skill"]["template"]

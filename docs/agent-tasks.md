@@ -1,5 +1,7 @@
 # Persistent Agent tasks
 
+The default model-facing entry points are `cosmos_task` and `cosmos_watch`; see [Agent tools and permissions](agent-tools.md). Detailed method names below describe the internal compatibility transport, not additional model catalog entries.
+
 Cosmos Agent supports terminal-event wakeups, one-time schedules, intervals and daily wall-clock schedules. The scheduler is a detached local Python process; model execution stays in the patched native Agent Session service. Plain system OpenCode has no task integration.
 
 ## User interface

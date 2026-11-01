@@ -1,19 +1,37 @@
 diff --git a/packages/tui/src/routes/session/permission.tsx b/packages/tui/src/routes/session/permission.tsx
-index 07338ab..52b8858 100644
+index 07338ab..f579186 100644
 --- a/packages/tui/src/routes/session/permission.tsx
 +++ b/packages/tui/src/routes/session/permission.tsx
-@@ -200,8 +200,8 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+@@ -167,7 +167,10 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+           )
+           const presentationBody = () =>
+             props.request.action === "edit" ? (
+-              <EditBody file={current.file} diff={current.diff} patch={current.patch} />
++              <box flexDirection="column">
++                <EditBody file={current.file} diff={current.diff} patch={current.patch} />
++                <For each={current.lines}>{(line) => <text fg={theme.text.muted}>{line}</text>}</For>
++              </box>
+             ) : props.request.action === "external_directory" ? (
+               <Show when={current.lines.length > 0}>
+                 <box paddingLeft={1} gap={1}>
+@@ -200,8 +203,14 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
            const header = () => (
              <box flexDirection="column" gap={0}>
                <box flexDirection="row" gap={1} flexShrink={0}>
 -                <text fg={theme.text.feedback.warning.base}>{"△"}</text>
 -                <text fg={theme.text.base}>Permission required</text>
-+                <text fg={current.variant === "resume" ? theme.text.feedback.info.base : theme.text.feedback.warning.base}>{current.variant === "resume" ? "▶" : "△"}</text>
-+                <text fg={theme.text.base}>{current.variant === "resume" ? "Task resume confirmation" : "Permission required"}</text>
++                <text
++                  fg={current.variant === "resume" ? theme.text.feedback.info.base : theme.text.feedback.warning.base}
++                >
++                  {current.variant === "resume" ? "▶" : "△"}
++                </text>
++                <text fg={theme.text.base}>
++                  {current.variant === "resume" ? "Task resume confirmation" : "Permission required"}
++                </text>
                </box>
                <Show when={props.request.action !== "shell" && current.title}>
                  <box flexDirection="row" gap={1} paddingLeft={2} flexShrink={0}>
-@@ -216,7 +216,8 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+@@ -216,7 +225,8 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
  
            const body = (
              <SessionQuestion
@@ -23,18 +41,35 @@ index 07338ab..52b8858 100644
                semanticLabel={permissionSemanticLabel(props.request.action, current.title)}
                instance={props.request.id}
                header={header()}
-@@ -230,7 +231,9 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+@@ -226,17 +236,20 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
+                     <For each={permissionAlwaysLines(props.request)}>
+                       {(line, index) => <text fg={index() === 0 ? theme.text.muted : theme.text.base}>{line}</text>}
+                     </For>
++                    <For each={current.lines.filter(line=>/^(Category|Scope|Lifetime|Writes):/.test(line))}>{line=><text fg={theme.text.muted}>{line}</text>}</For>
+                   </box>
                  </Show>
                )}
                options={
 -                props.request.save?.length
+-                  ? {
+-                      once: permissionOptionLabel("once"),
+-                      always: permissionOptionLabel("always"),
+-                      reject: permissionOptionLabel("reject"),
+-                    }
+-                  : { once: permissionOptionLabel("once"), reject: permissionOptionLabel("reject") }
 +                current.variant === "resume"
 +                  ? { reject: "Keep paused", once: "Resume task" }
 +                  : props.request.save?.length
-                   ? {
-                       once: permissionOptionLabel("once"),
-                       always: permissionOptionLabel("always"),
-@@ -246,7 +249,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
++                    ? {
++                        once: permissionOptionLabel("once"),
++                        always: permissionOptionLabel("always"),
++                        reject: permissionOptionLabel("reject"),
++                      }
++                    : { once: permissionOptionLabel("once"), reject: permissionOptionLabel("reject") }
+               }
+               escapeKey="reject"
+               fullscreen
+@@ -246,7 +259,7 @@ export function PermissionPrompt(props: { request: PermissionRequest; directory?
                    return
                  }
                  if (option === "reject") {
@@ -43,7 +78,7 @@ index 07338ab..52b8858 100644
                      setStore("stage", "reject")
                      return
                    }
-@@ -406,6 +409,7 @@ function RejectPrompt(props: {
+@@ -406,6 +419,7 @@ function RejectPrompt(props: {
  
  export function SessionQuestion<const T extends Record<string, string>>(props: {
    title: string
@@ -51,7 +86,7 @@ index 07338ab..52b8858 100644
    semanticLabel?: string
    instance: string
    id?: string
-@@ -509,7 +513,7 @@ export function SessionQuestion<const T extends Record<string, string>>(props: {
+@@ -509,7 +523,7 @@ export function SessionQuestion<const T extends Record<string, string>>(props: {
        }))}
        backgroundColor={theme.background.raised.base}
        border={["left"]}
@@ -61,7 +96,7 @@ index 07338ab..52b8858 100644
        {...(store.expanded
          ? { top: dimensions().height * -1 + 1, bottom: 1, left: 2, right: 2, position: "absolute" }
 diff --git a/packages/tui/src/util/permission.ts b/packages/tui/src/util/permission.ts
-index 09d607f..7bac824 100644
+index 09d607f..78df574 100644
 --- a/packages/tui/src/util/permission.ts
 +++ b/packages/tui/src/util/permission.ts
 @@ -5,6 +5,7 @@ type Dict = Record<string, unknown>
@@ -72,18 +107,104 @@ index 09d607f..7bac824 100644
    title: string
    lines: string[]
    diff?: string
-@@ -29,6 +30,14 @@ export function permissionPresentation(
+@@ -20,7 +21,7 @@ export type PermissionPresentationInput = {
+   toolMetadata?: unknown
+ }
+ 
+-export function permissionPresentation(
++function basePermissionPresentation(
+   source: PermissionPresentationInput,
+   formatPath: (value: string) => string = (value) => value,
+ ): PermissionPresentation {
+@@ -29,6 +30,20 @@ export function permissionPresentation(
    const metadata = { ...dict(source.toolMetadata), ...dict(source.metadata) }
    const resources = source.resources.filter((item): item is string => typeof item === "string")
  
 +  if (source.action === "cosmos_terminal_request_resume" && metadata.cosmos_resume === true) {
-+    return { variant:"resume", icon:"▶", title:"Resume paused task", lines:[
-+      `Terminal: ${text(metadata.pane)}`, text(metadata.reason),
-+      "Resume this task once. Fresh observation and terminal control permission are still required.",
-+      "Keep paused leaves the terminal and task unchanged.",
-+    ].filter(Boolean) }
++    return {
++      variant: "resume",
++      icon: "▶",
++      title: "Resume paused task",
++      lines: [
++        `Terminal: ${text(metadata.pane)}`,
++        text(metadata.reason),
++        "Resume this task once. Fresh observation and terminal control permission are still required.",
++        "Keep paused leaves the terminal and task unchanged.",
++      ].filter(Boolean),
++    }
 +  }
 +
    if (action === "edit") {
      const file = text(input.path) || resources[0] || ""
      const first = dict(Array.isArray(metadata.files) ? metadata.files[0] : undefined)
+@@ -143,6 +158,70 @@ export function permissionPresentation(
+   }
+ }
+ 
++export function cosmosPermissionCategory(action: string, metadata: Dict = {}) {
++  if (["read", "list", "grep", "glob", "cosmos_directory_read"].includes(canonicalToolName(action)))
++    return "Read directory"
++  if (metadata.interrupt === true || /close|kill|interrupt|privacy/.test(action))
++    return "Destructive / interrupt (separate confirmation)"
++  if (
++    /acquire_workspace|release_workspace|create_terminal|create_session|rename_target|focus_pane|open_file|invoke_action/.test(
++      action,
++    )
++  )
++    return "Workspace management"
++  if (
++    /acquire_control|release_control|control_input|terminal_step|request_resume|schedule_task|finish_task/.test(action)
++  )
++    return "Terminal task"
++  return "Host writes / execution"
++}
++
++export function permissionPresentation(
++  source: PermissionPresentationInput,
++  formatPath: (value: string) => string = (value) => value,
++): PermissionPresentation {
++  const base = basePermissionPresentation(source, formatPath)
++  const metadata = { ...dict(source.toolMetadata), ...dict(source.metadata) }
++  const input = normalizeInput(canonicalToolName(source.action), source.input)
++  if (metadata.cosmos_scope === undefined && !metadata.capability && !metadata.cosmos_resume) return base
++  const category = cosmosPermissionCategory(source.action, metadata)
++  const read = category === "Read directory"
++  const scope =
++    text(metadata.pane) ||
++    text(metadata.cosmos_scope) ||
++    source.resources.filter((r) => typeof r === "string").join(", ") ||
++    "Current project"
++  const duration = metadata.cosmos_resume
++    ? "One resume confirmation; no terminal input permission"
++    : metadata.capability
++      ? "This conversation + task + terminal; ends on release, finish or pause"
++      : read
++        ? "Once, or remember this directory for the project"
++        : "This request; existing saved/configured rules are managed separately"
++  const writes = read
++    ? "No"
++    : metadata.cosmos_resume
++      ? "No terminal input; resumes task state only"
++      : category === "Terminal task"
++        ? "Yes: terminal input can run commands and modify files"
++        : category === "Workspace management"
++          ? "Workspace state; close/interrupt require separate approval"
++          : "Yes or possible: inspect command, directory and changes"
++  return {
++    ...base,
++    lines: [
++      ...(base.variant === "resume" ? base.lines.slice(0, 2) : base.lines),
++      ...(metadata.task ? [`Task: ${text(metadata.task)}`] : []),
++      `Category: ${category}`,
++      ...(read ? ["Includes: file reads, directory listing and text search; no execution"] : []),
++      `Scope: ${formatPath(scope)}`,
++      `Lifetime: ${duration}`,
++      `Writes: ${writes}`,
++      ...(input.workdir || metadata.workdir ? [`Directory: ${text(input.workdir) || text(metadata.workdir)}`] : []),
++    ],
++  }
++}
++
+ function wildcardDirectory(value: string) {
+   const wildcard = value.indexOf("*")
+   if (wildcard === -1) return value

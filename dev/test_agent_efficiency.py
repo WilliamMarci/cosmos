@@ -124,6 +124,7 @@ class ContextTests(unittest.IsolatedAsyncioTestCase):
             tools.control_tokens = {}
             tools.conversation = "session"
             tools.redact = lambda value: value
+            tools.observe = AsyncMock(return_value=snapshot("context", ["prompt"]))
             tools.panes = AsyncMock(
                 return_value=[
                     dict(
@@ -199,3 +200,78 @@ class ContextTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             json.loads(result["content"][0]["text"])["status"], "owned_by_other"
         )
+
+
+class ContextSummaryTests(unittest.IsolatedAsyncioTestCase):
+    async def test_active_client_target_summary_and_private_boundary(self):
+        from cosmos_tui.features.agent.context import ContextTools
+        from cosmos_tui.features.agent.actions import ActionTools
+
+        with (
+            tempfile.TemporaryDirectory() as directory,
+            patch.dict(os.environ, XDG_RUNTIME_DIR=directory),
+        ):
+            tools = ContextTools()
+            tools.backend = SimpleNamespace(argv=["tmux", "-L", "context-summary"])
+            tools.binding = object()
+            tools.owner = "ours"
+            tools.control_tokens = {}
+            tools.redact = lambda value: value
+            row = dict(
+                pane_id="%1",
+                display_id="0:1",
+                session_name="main",
+                private=False,
+                pane_current_path="/tmp",
+                pane_current_command="bash",
+            )
+            tools.panes = AsyncMock(return_value=[row])
+            tools.observe = AsyncMock(
+                return_value=snapshot("recent", ["x" * 200 for _ in range(20)])
+            )
+            with (
+                patch.object(
+                    ActionTools,
+                    "clients",
+                    AsyncMock(return_value={"desktop": "socket"}),
+                ),
+                patch.object(
+                    ActionTools,
+                    "client_context",
+                    AsyncMock(return_value=dict(active_pane="%1", context="workspace")),
+                ),
+            ):
+                result = await tools.context()
+                self.assertEqual(result["target"]["pane"], "%1")
+                self.assertLessEqual(
+                    sum(len(r["text"].encode()) for r in result["recent"]["text"]), 1024
+                )
+                self.assertLessEqual(len(result["recent"]["text"]), 8)
+                self.assertIn(
+                    "cosmos_task", [r["tool"] for r in result["allowed_next"]]
+                )
+                row["private"] = True
+                row["pane_current_path"] = row["pane_current_command"] = ""
+                tools.observe.reset_mock()
+                private = await tools.context()
+                self.assertEqual(private["status"], "private")
+                self.assertIsNone(private["recent"])
+                self.assertEqual(private["allowed_next"], [])
+                tools.observe.assert_not_awaited()
+            row["private"] = False
+            with (
+                patch.object(
+                    ActionTools,
+                    "clients",
+                    AsyncMock(return_value={"desktop": "socket", "mobile": "socket2"}),
+                ),
+                patch.object(
+                    ActionTools,
+                    "client_context",
+                    AsyncMock(side_effect=OSError("connection refused")),
+                ),
+            ):
+                disconnected = await tools.context(client="desktop")
+                self.assertEqual(disconnected["clients"], ["mobile"])
+                self.assertIsNone(disconnected["client"])
+                self.assertIn("connection refused", disconnected["client_error"])

@@ -14,13 +14,27 @@ export function CosmosLogo() {
           {(line) => (
             <text selectable={false}>
               <For each={Array.from(line)}>
-                {(char) => <span fg={char === "░" ? theme.text.muted : theme.text.base}>{char}</span>}
+                {(char) => (
+                  <span
+                    style={{
+                      fg: char === "░" ? theme.text.muted : theme.text.base,
+                    }}
+                  >
+                    {char}
+                  </span>
+                )}
               </For>
             </text>
           )}
         </For>
-      ) : <text fg={theme.text.base} selectable={false}>COSMOS</text>}
-      <text fg={theme.text.muted} selectable={false}>powered by opencode</text>
+      ) : (
+        <text fg={theme.text.base} selectable={false}>
+          COSMOS
+        </text>
+      )}
+      <text fg={theme.text.muted} selectable={false}>
+        powered by opencode
+      </text>
     </box>
   )
 }

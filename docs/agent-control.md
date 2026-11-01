@@ -1,5 +1,7 @@
 # Pane input ownership
 
+The default native model catalog now uses the [short Cosmos Agent interface](agent-tools.md). Names such as `acquire_control` below document the internal MCP compatibility contract; tokens and resume credentials are held by the native adapter and are not model-facing arguments.
+
 This increment implements cross-process input ownership and user revocation. The shared Taking over/PAUSED top row is implemented. A distinct cyan mouse pointer and background terminal watches are implemented. Native model cancellation and persistent task wakeups are implemented; see [Agent tasks](agent-tasks.md).
 
 ## Tools
