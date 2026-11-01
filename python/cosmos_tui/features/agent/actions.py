@@ -32,7 +32,7 @@ class ActionTools(TerminalTools):
         if client is None:
             if len(clients) != 1:
                 raise ValueError(
-                    "specify a client from list_actions; no unique connected Cosmos UI"
+                    "specify a client from list_clients; no unique connected Cosmos UI"
                 )
             client = next(iter(clients))
         if client not in clients:
@@ -62,19 +62,38 @@ class ActionTools(TerminalTools):
                 writer.close()
                 await writer.wait_closed()
 
-    async def list_actions(self, client=None):
-        service = await rpc.call("actions.list")
+    async def list_clients(self):
+        return dict(clients=list(await self.clients()))
+
+    async def client_context(self, client=None):
+        return await self.ui_call(client, dict(operation="context"))
+
+    async def open_file(self, path, target, client=None):
+        row = await self.resolve_target(target)
+        return await self.ui_call(
+            client, dict(operation="open_file", path=path, pane=row["pane_id"])
+        )
+
+    async def list_actions(self, client=None, scope=None, category=None):
+        if scope not in (None, "service", "ui"):
+            raise ValueError("scope must be service or ui")
+        if category is not None and (not isinstance(category, str) or not category):
+            raise ValueError("category must be a nonempty action ID prefix")
+        service = await rpc.call("actions.list") if scope != "ui" else []
         clients = await self.clients()
         result = dict(
             service_actions=[
                 dict(row, scope="service", requires_ui=row.get("kind") == "menu")
                 for row in service
+                if category is None or row["id"].startswith(category)
             ],
             clients=list(clients),
             ui=None,
         )
-        if client is not None or len(clients) == 1:
-            result["ui"] = await self.ui_call(client, dict(operation="list"))
+        if scope != "service" and (client is not None or len(clients) == 1):
+            result["ui"] = await self.ui_call(
+                client, dict(operation="list", category=category)
+            )
         return result
 
     async def invoke_action(self, id, scope, client=None, params=None):

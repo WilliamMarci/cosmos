@@ -17,6 +17,48 @@ from cosmos_tui.features.agent.sessions import WorkspaceTools as TerminalTools
     shutil.which("tmux") and shutil.which("vim"), "requires tmux and vim"
 )
 class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
+    async def test_terminal_step_and_mid_step_revocation(self):
+        from unittest.mock import AsyncMock, patch
+
+        observed = await self.tools.observe(self.pane, ["text"])
+        lease = await self.tools.acquire_control(
+            self.pane, observed["snapshot_id"], "step test"
+        )
+        try:
+            result = await self.tools.terminal_step(
+                self.pane, lease["token"], ":echo 'STEP_OK'", submit=True
+            )
+            self.assertEqual(result["delivered"], ["text", "Enter"])
+            self.assertIn("STEP_OK", json.dumps(result["observation"]))
+            self.assertFalse(result["task_complete"])
+            with patch.object(
+                self.tools,
+                "input_dispatch",
+                AsyncMock(side_effect=[{}, PermissionError("manually paused")]),
+            ) as send:
+                partial = await self.tools.terminal_step(
+                    self.pane, lease["token"], "hello", submit=True
+                )
+                self.assertEqual(partial["delivery"], "partial")
+                self.assertEqual(partial["delivered"], ["text"])
+                self.assertEqual(send.await_count, 2)
+            with patch.object(self.tools, "input_dispatch", AsyncMock()) as send:
+                with self.assertRaises(ValueError):
+                    await self.tools.terminal_step(
+                        self.pane, lease["token"], "a\nb", submit=True
+                    )
+                send.assert_not_awaited()
+        finally:
+            await self.tools.release_control(self.pane, lease["token"])
+
+    async def test_display_target_resolution(self):
+        row = (await self.tools.panes())[0]
+        resolved = await self.tools.resolve_target(row["display_id"])
+        self.assertEqual(resolved["pane_id"], self.pane)
+        self.assertNotIn("text", resolved)
+        with self.assertRaises(ValueError):
+            await self.tools.resolve_target("999999:999999")
+
     async def asyncSetUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.socket = "cosmos-agent-test-" + uuid.uuid4().hex
@@ -271,7 +313,7 @@ class AgentTerminalTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(process.returncode, 0, err)
         replies = [json.loads(line) for line in out.splitlines()]
         self.assertEqual(len(replies), 4)
-        self.assertEqual(len(replies[1]["result"]["tools"]), 19)
+        self.assertEqual(len(replies[1]["result"]["tools"]), 21)
         self.assertIn("row 000", replies[2]["result"]["content"][0]["text"])
         self.assertTrue(replies[3]["result"]["isError"])
 

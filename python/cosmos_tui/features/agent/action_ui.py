@@ -4,7 +4,7 @@ from cosmos_tui.input import keymap
 from cosmos_tui.core import rpc
 
 
-def catalog(app):
+def catalog(app, category=None):
     context = app.key_context()
     commands = [
         c for c in keymap.COMMANDS if c.context == context or c.context == "global"
@@ -16,6 +16,7 @@ def catalog(app):
         actions=[
             dict(id=c.id, label=c.label, scope="ui", context=c.context)
             for c in commands
+            if category is None or c.id.startswith(category)
         ],
     )
 
@@ -24,14 +25,44 @@ async def handle(app, request):
     if request.get("client") != app.client:
         raise ValueError("request targets a different UI client")
     if request.get("operation") == "list":
-        return catalog(app)
-    if request.get("operation") == "focus":
+        return catalog(app, request.get("category"))
+    if request.get("operation") == "context":
+        return dict(
+            client=app.client,
+            context=app.key_context(),
+            active_pane=app.active().id if app.active() else None,
+        )
+    if request.get("operation") in ("focus", "open_file"):
         from cosmos_tui.features.agent.terminal import TerminalTools
         from cosmos_tui.terminal import targets
 
         if app.screen is not app._workspace_screen:
             raise ValueError("Close the current UI dialog before switching sessions")
         row = await TerminalTools(app.backend.argv[2]).pane(request.get("pane"))
+        state = None
+        kind = None
+        if request["operation"] == "open_file":
+            from pathlib import Path
+            from cosmos_tui.features.reader.opener import SUPPORTED
+
+            raw = request.get("path")
+            if not isinstance(raw, str) or not raw:
+                raise ValueError("path must be a nonempty local file or directory")
+            path = Path(raw).expanduser()
+            if not path.is_absolute():
+                path = Path(row["pane_current_path"]) / path
+            path = path.resolve(strict=True)
+            if path.is_dir():
+                kind, state = "files", dict(kind="files", path=str(path), cursor=0)
+            elif path.is_file() and path.suffix.lower() in SUPPORTED:
+                kind = (
+                    "image"
+                    if path.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}
+                    else "document"
+                )
+                state = dict(path=str(path), page=0, zoom=1, pan=[0, 0])
+            else:
+                raise ValueError("unsupported Reader/Files format")
         await targets.select(
             app.backend,
             dict(
@@ -43,7 +74,24 @@ async def handle(app, request):
             ),
         )
         app.panes = await app.backend.snapshot()
+        if state is not None:
+            pane = next((p for p in app.panes if p.id == row["pane_id"]), None)
+            if pane is None:
+                raise ValueError("target pane disappeared before opening")
+            await app.reader_ui.update_viewer(pane, state)
+            return dict(
+                client=app.client,
+                pane=row["pane_id"],
+                display_id=row.get("display_id"),
+                path=state["path"],
+                view=kind,
+                status="opened",
+                loading="pending",
+                complete=False,
+            )
         return dict(
+            context=app.key_context(),
+            display_id=row.get("display_id"),
             client=app.client,
             pane=row["pane_id"],
             session=row["session_id"],

@@ -45,6 +45,60 @@ class AgentActionTests(unittest.IsolatedAsyncioTestCase):
                         "workspace.palette",
                         {row["id"] for row in catalog["ui"]["actions"]},
                     )
+                    self.assertEqual(
+                        await tools.list_clients(), dict(clients=[app.client])
+                    )
+                    context = await tools.client_context()
+                    self.assertNotIn("actions", context)
+                    subset = await tools.list_actions(
+                        scope="ui", category="workspace.split"
+                    )
+                    self.assertEqual(subset["service_actions"], [])
+                    self.assertTrue(
+                        all(
+                            r["id"].startswith("workspace.split")
+                            for r in subset["ui"]["actions"]
+                        )
+                    )
+                    import tempfile
+                    from pathlib import Path
+
+                    with tempfile.TemporaryDirectory() as directory:
+                        target = app.active()
+                        metadata = dict(
+                            pane_id=target.id,
+                            window_id="@0",
+                            session_id="$0",
+                            session_name="main",
+                            pane_current_path=directory,
+                            display_id="0:0",
+                        )
+                        with (
+                            patch.object(
+                                tools,
+                                "resolve_target",
+                                AsyncMock(return_value=metadata),
+                            ),
+                            patch(
+                                "cosmos_tui.features.agent.terminal.TerminalTools.pane",
+                                AsyncMock(return_value=metadata),
+                            ),
+                            patch("cosmos_tui.terminal.targets.select", AsyncMock()),
+                            patch.object(
+                                app.reader_ui, "update_viewer", AsyncMock()
+                            ) as opened,
+                        ):
+                            result = await tools.open_file(directory, "0:0")
+                            self.assertEqual(result["view"], "files")
+                            self.assertEqual(result["loading"], "pending")
+                            self.assertFalse(result["complete"])
+                            self.assertEqual(
+                                opened.await_args.args[1]["path"], directory
+                            )
+                            bad = Path(directory) / "unsupported.xyz"
+                            bad.write_text("test")
+                            with self.assertRaisesRegex(RuntimeError, "unsupported"):
+                                await tools.open_file(str(bad), "0:0")
                     from cosmos_tui.features.agent.sessions import WorkspaceTools
 
                     row = dict(
@@ -107,5 +161,12 @@ class AgentActionTests(unittest.IsolatedAsyncioTestCase):
     async def test_action_mcp_catalog(self):
         result = await dispatch(None, dict(method="tools/list"), ACTION_TOOLS)
         self.assertEqual(
-            {row["name"] for row in result["tools"]}, {"list_actions", "invoke_action"}
+            {row["name"] for row in result["tools"]},
+            {
+                "list_actions",
+                "invoke_action",
+                "list_clients",
+                "client_context",
+                "open_file",
+            },
         )

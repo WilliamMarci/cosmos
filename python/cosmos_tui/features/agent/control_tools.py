@@ -162,3 +162,49 @@ class ControlledInput:
             task_complete=False,
             result=result,
         )
+
+    async def terminal_step(self, pane, token, text, submit=False, wait_ms=100):
+        """One literal paste, optional Enter, then a bounded fresh observation."""
+        if (
+            not isinstance(text, str)
+            or len(text) > 32768
+            or any(c in text for c in "\n\r\x00")
+        ):
+            raise ValueError("text must be a single line of at most 32768 characters")
+        if (
+            type(submit) is not bool
+            or type(wait_ms) is not int
+            or not 0 <= wait_ms <= 2000
+        ):
+            raise ValueError("submit must be boolean; wait_ms must be 0–2000")
+        delivered = []
+        try:
+            if text:
+                await self.input_dispatch(pane, "send_text", dict(text=text), token)
+                delivered.append("text")
+            if submit:
+                # Separate guarded delivery lets manual input revoke between stages.
+                await self.input_dispatch(
+                    pane, "send_keys", dict(keys=["Enter"]), token
+                )
+                delivered.append("Enter")
+            await asyncio.sleep(wait_ms / 1000)
+            observation = await self.observe(pane, ["text"])
+        except (OSError, RuntimeError, ValueError) as error:
+            if not delivered:
+                raise
+            return dict(
+                delivery="partial",
+                delivered=delivered,
+                error=str(error),
+                action_complete=False,
+                task_complete=False,
+                retry="Observe before retrying; do not repeat delivered input",
+            )
+        return dict(
+            delivery="delivered",
+            delivered=delivered,
+            observation=observation,
+            action_complete=False,
+            task_complete=False,
+        )

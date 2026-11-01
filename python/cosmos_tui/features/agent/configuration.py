@@ -57,12 +57,24 @@ def configuration(socket, source_pane):
         },
         "permissions": [
             {"action": "cosmos_actions_*", "resource": "*", "effect": "ask"},
+            *[
+                dict(action=name, resource="*", effect="allow")
+                for name in (
+                    "cosmos_actions_list_clients",
+                    "cosmos_actions_client_context",
+                )
+            ],
             {
                 "action": "cosmos_actions_list_actions",
                 "resource": "*",
                 "effect": "allow",
             },
             {"action": "cosmos_terminal_*", "resource": "*", "effect": "ask"},
+            {
+                "action": "cosmos_terminal_resolve_target",
+                "resource": "*",
+                "effect": "allow",
+            },
             {
                 "action": "cosmos_terminal_control_status",
                 "resource": "*",

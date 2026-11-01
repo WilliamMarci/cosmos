@@ -43,3 +43,27 @@ Service actions can operate without a UI when the underlying registered action s
 OpenCode permission defaults allow `cosmos_actions_list_actions` and ask for `cosmos_actions_invoke_action`. Terminal input remains a separate permission namespace. An Action denial is not permission to synthesize equivalent keystrokes or shell calls.
 
 `dev/test_agent_actions.py` exercises real Unix-socket requests against a running Cosmos test UI: discovery, opening settings, opening a registered service menu, rejecting stale-context actions, service RPC forwarding and requiring explicit selection for multiple clients. Coordinator calls use an isolated fixture, so the checks do not mutate a user's live settings. Existing navigation tests cover the shared dispatcher after extraction.
+
+
+### Compact discovery and file routing
+
+`cosmos_terminal.resolve_target(target)` accepts `%ID` or `session:pane`, such as
+`1:4` (stable session `$1`, pane `%4`, not pane index). It returns IDs, cwd,
+program and dimensions without terminal text. Private panes are denied.
+`list_panes` includes `display_id`.
+
+`cosmos_actions.list_clients()` returns only connected client IDs.
+`client_context(client?)` returns client, UI context and active pane without actions.
+`list_actions(client?, scope?, category?)` can restrict scope to `ui` or `service`
+and filter by action ID prefix. Focus results include the resulting UI context.
+
+`open_file(path, target, client?)` resolves the target, checks the path against
+Reader/Files formats, selects that pane and uses the Reader controller to open it.
+Relative paths resolve against target cwd. Directories open Files. Unsupported
+formats fail instead of launching a desktop application. Multiple clients require
+explicit selection. The result contains actual pane, display ID, path and view
+kind, with `loading: pending` and `complete: false`: it acknowledges routing,
+not successful decoding. This operation can move focus and remains permission-gated.
+
+Task-scoped combined permissions are not implemented by these APIs. Existing
+mutating-tool permissions remain in force.

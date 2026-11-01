@@ -227,11 +227,47 @@ TOOLS.extend(
 )
 
 
+TOOLS.append(
+    dict(
+        name="resolve_target",
+        description="Resolve %pane or status-bar session:pane (1:4 means stable session $1 and pane %4, not pane index). Returns compact metadata; private panes denied.",
+        inputSchema=schema(dict(target=dict(type="string")), ("target",)),
+        annotations=dict(readOnlyHint=True),
+    )
+)
+
+
+TOOLS.append(
+    dict(
+        name="terminal_step",
+        description="One token-validated literal single-line paste, optional explicit Enter, then fresh bounded text observation. Checks revocation before each input. Partial results identify delivered stages: never blindly repeat them. Delivery is not task completion.",
+        inputSchema=schema(
+            dict(
+                pane=PANE,
+                token=dict(type="string"),
+                text=dict(type="string", maxLength=32768),
+                submit=dict(type="boolean"),
+                wait_ms=dict(type="integer", minimum=0, maximum=2000),
+            ),
+            ("pane", "token", "text"),
+        ),
+    )
+)
+
+
 ACTION_TOOLS = [
     dict(
         name="list_actions",
         description="Discover Cosmos service/Mod actions and connected UI clients. Pass client to inspect that client's current context actions. Multiple clients require explicit selection before UI operations.",
-        inputSchema=schema(dict(client=dict(type="string"))),
+        inputSchema=schema(
+            dict(
+                client=dict(type="string"),
+                scope=dict(type="string", enum=["service", "ui"]),
+                category=dict(
+                    type="string", description="Action ID prefix, e.g. viewer."
+                ),
+            )
+        ),
         annotations=dict(readOnlyHint=True),
     ),
     dict(
@@ -248,6 +284,36 @@ ACTION_TOOLS = [
         ),
     ),
 ]
+
+
+ACTION_TOOLS.extend(
+    [
+        dict(
+            name="list_clients",
+            description="List connected client IDs without an action catalog.",
+            inputSchema=schema({}),
+            annotations=dict(readOnlyHint=True),
+        ),
+        dict(
+            name="client_context",
+            description="Read selected client context and active pane without listing actions.",
+            inputSchema=schema(dict(client=dict(type="string"))),
+            annotations=dict(readOnlyHint=True),
+        ),
+        dict(
+            name="open_file",
+            description="Open a supported local file in Reader or directory in Files at %pane or session:pane. Relative paths resolve against target cwd. Selects target client focus. Returns actual target and pending loading acknowledgement, not proof loading completed. Requires a connected client.",
+            inputSchema=schema(
+                dict(
+                    path=dict(type="string"),
+                    target=dict(type="string"),
+                    client=dict(type="string"),
+                ),
+                ("path", "target"),
+            ),
+        ),
+    ]
+)
 
 
 async def dispatch(tools, message, catalog=TOOLS):

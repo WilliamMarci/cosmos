@@ -80,6 +80,7 @@ class TerminalTools(ControlledInput, TerminalWatches):
             if row["private"]:
                 row["pane_current_path"] = ""
                 row["pane_current_command"] = ""
+            row["display_id"] = row["session_id"][1:] + ":" + row["pane_id"][1:]
             result.append(row)
         return result
 
@@ -92,6 +93,32 @@ class TerminalTools(ControlledInput, TerminalWatches):
                     raise PermissionError("Pane is private; Agent access is disabled")
                 return row
         raise ValueError(f"pane no longer exists in this Cosmos service: {ident}")
+
+    async def resolve_target(self, target):
+        """Resolve stable IDs; display IDs use pane ID, never pane index."""
+        if not isinstance(target, str) or not re.fullmatch(
+            r"(?:%[0-9]+|[0-9]+:[0-9]+)", target
+        ):
+            raise ValueError("target must be %pane or session:pane, e.g. 1:4")
+        for row in await self.panes():
+            if target in (row["pane_id"], row["display_id"]):
+                if row["private"]:
+                    raise PermissionError("Pane is private; Agent access is disabled")
+                return {
+                    key: row[key]
+                    for key in (
+                        "pane_id",
+                        "session_id",
+                        "window_id",
+                        "display_id",
+                        "session_name",
+                        "pane_current_path",
+                        "pane_current_command",
+                        "pane_width",
+                        "pane_height",
+                    )
+                }
+        raise ValueError("target no longer exists in this Cosmos service")
 
     async def read_screen(self, pane, history=0, wait_ms=0):
         if type(history) is not int or not 0 <= history <= 2000:

@@ -42,3 +42,15 @@ Acquisition re-observes after reservation and returns the resulting `snapshot_id
 After successful controlled mouse input, all Cosmos clients display a cyan diamond at the one-based application-content cell, independently of the application cursor. It blinks through the existing terminal renderer; reduced motion leaves it steady. Pausing control, releasing it, changing the geometry or sending non-mouse controlled input removes the pointer. Header and pointer animation refresh only their affected rows/cells. The pointer is character chrome, not an image-pixel inspection facility.
 
 For background waits, [terminal watches](agent-monitor.md) can release the owner's control token/header and collect evidence independently; they do not automatically wake the model.
+
+
+### Bounded terminal step
+
+`terminal_step(pane, token, text, submit=false, wait_ms=100)` pastes one literal
+single line, optionally sends Enter, then returns a fresh text observation.
+The wait is bounded to 0–2000 ms. Each input uses its own ownership/revocation
+check so manual input can stop submission after paste. Newlines and NUL are
+rejected before any delivery. On failure after delivery, the response reports
+`delivery: partial` and the delivered stages; never blindly repeat that input.
+Successful delivery still sets `action_complete` and `task_complete` to false.
+This tool retains the normal mutating-tool permission gate.
