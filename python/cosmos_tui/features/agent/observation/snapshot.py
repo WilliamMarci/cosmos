@@ -49,6 +49,8 @@ def build(row, raw, layers, region=None):
     if min(x, y, w, h) < 1 or x + w - 1 > width or y + h - 1 > height:
         raise ValueError("region is outside the application content area")
     lines, styled, controls = [], [], []
+    # Shared decoder expands captured tabs before region crops, styled spans
+    # and inferred click rectangles are measured in application cells.
     decoded = decode_grid(tuple(raw.splitlines()))
     for index in range(y - 1, min(y + h - 1, len(decoded))):
         segments = cell_slice(decoded[index], x - 1, w)

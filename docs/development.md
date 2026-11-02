@@ -54,6 +54,6 @@ vendor 下保留 README、sources.json 和 sync.py，按固定 commit 记录参�
 
 首个开发版为 Arche · 0.1.0，历史发布范围见 v0.1.0 标签中的 RELEASE.md。当前 Python 展示元数据位于 core/metadata.py，Rust Cargo 应用版本保持与其 VERSION 一致；CLI --version 与 About 同时展示代号、版本和 development 渠道。构建脚本从 Python 元数据生成含当前版本和代号的目录名，并包含发布说明。应用版本不改变协议 1.4 或配置格式 1。正式 docs 描述已实现接口，待办与历史实现保持在 design。
 
-下一版开发分支为 codex/reader-cache-calendar，应用版本暂定 0.2.0-dev.1，保留 Arche 代号；未建立新的正式发布标签。v0.1.0 与原构建包保持不变。
+下一版开发分支为 codex/reader-cache-calendar，应用版本为 0.2.1，保留 Arche 代号；未建立新的正式发布标签。v0.1.0 与原构建包保持不变。
 
 开发阶段按功能提交源码、正式文档与相关测试；当前不执行构建包流程，待功能与综合测试完善后再构建。

@@ -1,4 +1,4 @@
-# Cosmos — Arche 0.2.0-dev.1
+# Cosmos — Arche 0.2.1
 
 **下一版开发中 · 2026-10-23 · Author: William Marci**
 
@@ -70,4 +70,4 @@ COSMOS_TEST_TMUX=1 cargo test --locked --offline
 ./packaging/build.sh
 ```
 
-按变更范围执行检查；真实 PTY、图形与 SSH 验收不能由静态测试代替。构建产物为 `dist/cosmos-0.2.0-dev.1-arche-linux-x86_64.tar.gz`，附校验值、许可证与依赖说明。开发流程见 [Git 管理](docs/development.md)。
+按变更范围执行检查；真实 PTY、图形与 SSH 验收不能由静态测试代替。构建产物为 `dist/cosmos-0.2.1-arche-linux-x86_64.tar.gz`，附校验值、许可证与依赖说明。开发流程见 [Git 管理](docs/development.md)。

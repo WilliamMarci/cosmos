@@ -70,3 +70,32 @@ class RealTmuxTabsTests(unittest.TestCase):
                 self.assertTrue(all("\t" not in row.plain for row in rows))
             finally:
                 subprocess.run(command + ["kill-server"], env=env, timeout=4, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+class AgentTabCoordinatesTests(unittest.IsolatedAsyncioTestCase):
+    async def test_observed_button_and_mouse_packet_use_same_display_column(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+        from cosmos_tui.features.agent.observation.snapshot import build
+        from cosmos_tui.features.agent.terminal import TerminalTools
+
+        row = dict(pane_id="%19", pane_width=40, pane_height=2, cursor_x=0, cursor_y=0,
+                   pane_current_command="fixture", pane_in_mode=False, alternate_on=False,
+                   mouse_any_flag=True, mouse_button_flag=True, mouse_all_flag=False,
+                   mouse_utf8_flag=False, mouse_sgr_flag=True)
+        for prefix in ("A", "中", "e\u0301"):
+            raw = prefix + "\t\x1b[32m[OK]\x1b[0m"
+            result = build(row, raw, ["text", "presentation", "controls"])
+            button = result["controls"][0]["region"]
+            self.assertEqual(button, dict(x=9, y=1, width=4, height=1))
+            self.assertNotIn("\t", result["text"][0]["text"])
+            cropped = build(row, raw, ["text", "controls"], dict(x=9, y=1, width=4, height=1))
+            self.assertEqual(cropped["text"][0]["text"], "[OK]")
+            self.assertEqual(cropped["controls"][0]["region"], button)
+            tools = SimpleNamespace(pane=AsyncMock(return_value=row), _prepare_input=AsyncMock(return_value=False), backend=SimpleNamespace(argv=["tmux", "-L", "fixture"], cli=AsyncMock()))
+            with patch("cosmos_tui.features.agent.control.ControlStore"):
+                await TerminalTools._mouse(tools, "%19", button["x"], button["y"])
+            args = tools.backend.cli.call_args.args
+            self.assertEqual(args[:4], ("send-keys", "-H", "-t", "%19"))
+            packet = bytes(int(value, 16) for value in args[4:])
+            self.assertEqual(packet, b"\x1b[<0;9;1M\x1b[<0;9;1m")
