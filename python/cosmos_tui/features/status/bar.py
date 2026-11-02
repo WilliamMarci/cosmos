@@ -82,6 +82,7 @@ class StatusBar(Static):
             self.start_width = min(width, start.cell_len)
             self.hits[0] = (0, self.start_width, "start")
         left = start + divide(start_end, session_bg)
+        identity_start = left.cell_len
         if identity is not None and "·" in identity:
             session, _, position = identity.rpartition("·")
             left += Text(" " + session, style=Style(color=palette["fg"], bgcolor=session_bg))
@@ -95,6 +96,7 @@ class StatusBar(Static):
             left += Text(pane, style=Style(color=palette["accl"], bgcolor=session_bg))
         else:
             left += Text(f" {index}", style=Style(color="#e8a662", bgcolor=session_bg))
+        identity_end = left.cell_len
         left += Text(f" {name} ", style=Style(color=palette["fg"], bgcolor=session_bg))
         if getattr(app.inputs, "keyboard_passthrough", False):
             left += Text(
@@ -213,6 +215,8 @@ class StatusBar(Static):
         left.truncate(
             max(self.start_width, width - right.cell_len), overflow="ellipsis"
         )
+        if identity is not None and identity_start < min(identity_end, left.cell_len):
+            self.hits.append((identity_start, min(identity_end, left.cell_len), "switch"))
         right_x = max(left.cell_len, width - right.cell_len)
         middle = Text(" " * max(0, right_x - left.cell_len), style=base)
         center_text = path_text.copy() if alignment == "center" else Text(style=base)
@@ -248,7 +252,11 @@ class StatusBar(Static):
         if action == "clock":
             return self.app.ui_mods.activate_status("clock")
         if action:
-            if action == "start":
+            if action == "switch":
+                from cosmos_tui.features.navigation.switcher import Switcher
+
+                self.app.push_screen(Switcher())
+            elif action == "start":
                 self.app.action_start_menu()
             else:
                 self.app.run_worker(

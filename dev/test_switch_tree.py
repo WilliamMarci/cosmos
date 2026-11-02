@@ -97,6 +97,25 @@ class Backend:
 
 
 class SwitchTreeTests(unittest.IsolatedAsyncioTestCase):
+    async def test_status_position_label_opens_existing_session_switcher(self):
+        from cosmos_tui.features.status.bar import StatusBar
+
+        with tempfile.TemporaryDirectory() as root:
+            app = BaseProbe()
+            async with app.run_test(size=(100, 30)) as pilot:
+                app.backend = Backend(root)
+                app.panes = [Pane("%8", 0, 0, 100, 29, True, [], "", (0, 0), index=0, window_id="@3", session_id="$7")]
+                await app.status.refresh()
+                bar = app.query_one("#status", StatusBar)
+                left, right, _ = next(hit for hit in bar.hits if hit[2] == "switch")
+                self.assertGreaterEqual(left, bar.start_width)
+                self.assertLessEqual(right, bar.size.width)
+                await pilot.click("#status", offset=(left + 1, 0))
+                self.assertIsInstance(app.screen, Switcher)
+                await app.screen.inventory_ready.wait()
+                self.assertTrue(app.screen.rows)
+
+
     async def test_more_mouse_down_with_stale_compositor_row(self):
         with tempfile.TemporaryDirectory() as root:
             app = BaseProbe()

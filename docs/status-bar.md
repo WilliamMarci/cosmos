@@ -2,7 +2,7 @@
 
 The bar is composed by `features/status/controller.py` and `features/status/bar.py`. Segments use distinct background levels and configurable separators. Defaults follow the Cosmos palette, rather than copying an external editor theme.
 
-- Left: clickable start button, then the current `session-name·window-index:pane-index` label and the window name (a session with only one window shows `session-name·pane-index`) on a separate background level. The index remains the actual backend index; it is not renumbered.
+- Left: clickable start button, then the current `session-name·window-index:pane-index` label and the window name (a session with only one window shows `session-name·pane-index`) on a separate background level. Click the session/position label to open the existing session/window Switch interface. The index remains the actual backend index; it is not renumbered.
 - Center: registered Mod status widgets, shown at the screen center when they fit without overlapping the left or right groups.
 - Right by default: a slightly brighter gray path block and a separate darker Git branch block in the accent foreground when available, independently clickable input language and width, then local time/date (`HH:MM Mon DD`). Home paths are abbreviated as `~`.
 
