@@ -70,6 +70,10 @@ const direct: Record<string, string> = {
   open: "open_file",
   history: "read_history",
 }
+const resultFormat = " Returns JSON {result, context}: result is the operation output; context is refreshed workspace state. If context.status=unavailable, refresh with cosmos_context before relying on workspace state."
+const screenFormat = " Screen observations contain an opaque observation handle, pane, dimensions, cursor, region, coordinate_space and positioned text rows {y,text,...}; coordinates are one-based terminal cells, not transcript offsets. Reuse observation handles only for the same target."
+const stepFormat = " result.observation.mode is snapshot (initial or incompatible baseline; compact screen), delta (positioned row replacements relative to base_observation), or full (full=true). In delta, replace rows by y and clear every row listed in cleared_rows; omitted rows are unchanged. In snapshot, blank_rows_omitted means blank rows were omitted; truncated means content was omitted, not that the screen ended. Recover omitted content with full=true or cosmos_observe. mode_cleared reports cleared Tmux copy/view mode. delivery=partial and delivered identify stages already sent: observe before retrying and never repeat delivered input. action_complete/task_complete=false do not establish completion."
+const workspaceFormat = " For terminal/session creation, result includes stable IDs, actual pane_current_path/program, startup, shell_ready (null means unknown), focus_changed and a compact snapshot with an observation handle reusable for control begin."
 export type PublicTool = Remote & { cosmos?: string }
 export class CosmosInterface {
   private states = new Map<string, State>()
@@ -229,6 +233,16 @@ export class CosmosInterface {
           additionalProperties: false,
         },
       })
+    }
+    for (const tool of other) {
+      tool.description = (tool.description ?? "") + (
+        tool.cosmos === "context"
+          ? " Returns workspace context directly (not a result/context wrapper): target, targets, clients, view, control/task state, allowed next steps and recent output when available."
+          : resultFormat
+      )
+      if (["observe", "step"].includes(tool.cosmos ?? "")) tool.description += screenFormat
+      if (tool.cosmos === "step") tool.description += stepFormat
+      if (tool.cosmos === "workspace") tool.description += workspaceFormat
     }
     return other
   }

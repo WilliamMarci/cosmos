@@ -50,6 +50,7 @@ test("public catalog hides raw tools and capability arguments", () => {
       "observe",
       "step",
       "task",
+      "workspace",
     ])
     for (const s of specs)
       for (const secret of [
@@ -214,4 +215,26 @@ test("display IDs resolve from context; workspace grant never supplies terminal 
       "cosmos",
     ).args.workspace_token,
   ).toBe("workspace")
+})
+
+test("public tools describe the adapted return format and positioned screen updates", () => {
+  const previous = { agent: process.env.COSMOS_AGENT, key: process.env.COSMOS_AGENT_CONTEXT_KEY }
+  process.env.COSMOS_AGENT = "1"
+  process.env.COSMOS_AGENT_CONTEXT_KEY = "fixture"
+  try {
+    const catalog = new CosmosInterface().catalog(["context", "observe", "terminal_step", "create_terminal"].map((name) => ({ server: "cosmos_terminal", name, inputSchema: { properties: {} } })))
+    const description = (name: string) => catalog.find((tool) => tool.cosmos === name)!.description!
+    expect(description("context")).toContain("context directly")
+    for (const name of ["observe", "step", "workspace"]) expect(description(name)).toContain("{result, context}")
+    for (const field of ["snapshot", "delta", "full=true", "base_observation", "cleared_rows", "blank_rows_omitted", "truncated", "delivered", "mode_cleared"]) expect(description("step")).toContain(field)
+    expect(description("observe")).toContain("{y,text,...}")
+    expect(description("workspace")).toContain("shell_ready (null means unknown)")
+    // Retain native JSON text decoding; do not introduce a misleading output contract.
+    expect(catalog.find((tool) => tool.cosmos === "step")!.outputSchema).toBeUndefined()
+  } finally {
+    if (previous.agent === undefined) delete process.env.COSMOS_AGENT
+    else process.env.COSMOS_AGENT = previous.agent
+    if (previous.key === undefined) delete process.env.COSMOS_AGENT_CONTEXT_KEY
+    else process.env.COSMOS_AGENT_CONTEXT_KEY = previous.key
+  }
 })
