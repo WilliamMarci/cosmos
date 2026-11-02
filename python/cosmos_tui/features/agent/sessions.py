@@ -21,6 +21,7 @@ class WorkspaceTools(TerminalTools):
                 dict(
                     pane=row["pane_id"],
                     window=row["window_id"],
+                    position=f"{row.get('window_index', '?')}:{row.get('pane_index', '?')}",
                     program=row["pane_current_command"],
                     pane_in_mode=row.get("pane_in_mode", False),
                     alternate_screen=row.get("alternate_on", False),

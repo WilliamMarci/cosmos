@@ -155,6 +155,7 @@ class ContextTools:
             if selected is None
             else dict(
                 pane=pane,
+                session=selected["session_name"],
                 display_id=selected["display_id"],
                 position=f"{selected.get('window_index', '?')}:{selected.get('pane_index', '?')}",
                 private=selected["private"],

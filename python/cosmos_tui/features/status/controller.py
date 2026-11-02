@@ -114,7 +114,8 @@ class StatusController(Controller):
                 break
         if pane:
             window_index = next((tab[1] for tab in app.backend.tabs if tab[0] == pane.window_id), index)
-            identity = f"{window_index}:{pane.index}"
+            position = f"{window_index}:{pane.index}" if len(app.backend.tabs) > 1 else str(pane.index)
+            identity = f"{app.backend.session}·{position}"
         center = [
             (row["text"], row.get("role", "mute"))
             for widget in getattr(app, "status_widgets", [])
