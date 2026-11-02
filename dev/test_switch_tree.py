@@ -109,7 +109,9 @@ class SwitchTreeTests(unittest.IsolatedAsyncioTestCase):
                 screen.query_one(ListView).index = 1
                 await pilot.pause()
                 widget = screen.query(SwitchRow)[1]
-                widget.render()
+                rendered = widget.render().plain
+                self.assertIn(str(widget.row["index"]), rendered)
+                self.assertNotIn(widget.row["window_id"], rendered)
                 x = widget.hits[-1][0] + 1
                 stale = SwitchRow(widget.row, False)
                 self.assertIsNone(stale.parent)
@@ -207,8 +209,10 @@ class SwitchTreeTests(unittest.IsolatedAsyncioTestCase):
             await pilot.press("ctrl+b", "q")
             self.assertTrue(app.workspace.identifying)
             text = app.query_one("#terminal").render_line(14).text
-            self.assertIn("%8", text)
-            self.assertIn("%19", text)
+            self.assertNotIn("%8", text)
+            self.assertNotIn("%19", text)
+            self.assertIn(" 0 ", text)
+            self.assertIn(" 1 ", text)
             app.backend.request.reset_mock()
             await pilot.press("1")
             self.assertFalse(app.workspace.identifying)

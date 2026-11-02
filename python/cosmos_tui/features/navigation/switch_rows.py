@@ -43,11 +43,11 @@ class SwitchRow(Widget):
         arrow = ("▾" if self.expanded else "▸") if level < 2 else " "
         row = self.row
         label = (
-            f"{row['session_id']} {row['session']}"
+            f"{row['session']}"
             if level == 0
-            else f"{row['index']} {row['name']} {row['window_id']}"
+            else f"{row['index']} {row['name']}"
             if level == 1
-            else f"{row['pane_index']} {row.get('pane_name') or row.get('program') or 'pane'} {row['pane_id']}"
+            else f"{row['pane_index']} {row.get('pane_name') or row.get('program') or 'pane'}"
         )
         left = Text(prefix + arrow + " " + label, style=f"{fg} on {bg}")
         if level < 2:

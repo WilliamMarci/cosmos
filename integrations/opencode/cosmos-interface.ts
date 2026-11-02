@@ -20,7 +20,7 @@ type State = {
 }
 const target = {
   type: "string",
-  description: "Cosmos terminal display ID (session:pane) or stable pane ID",
+  description: "Internal stable Cosmos target (session:pane or %pane); user-facing position numbers are available in context.position",
 }
 const str = { type: "string" }
 const groups: Record<string, Record<string, string>> = {

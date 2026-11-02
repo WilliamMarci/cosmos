@@ -144,6 +144,8 @@ class ContextTests(unittest.IsolatedAsyncioTestCase):
                     dict(
                         pane_id="%1",
                         display_id="0:1",
+                        window_index=4,
+                        pane_index=2,
                         session_name="main",
                         private=False,
                         pane_current_path="/tmp",
@@ -178,6 +180,8 @@ class ContextTests(unittest.IsolatedAsyncioTestCase):
             ):
                 result = await tools.context("0:1")
                 self.assertEqual(result["status"], "paused")
+                self.assertEqual(result["target"]["position"], "4:2")
+                self.assertEqual(result["target"]["pane"], "%1")
                 self.assertEqual(result["tasks"][0]["resume_challenge"], "challenge")
                 self.assertNotIn("runtime", result["tasks"][0])
                 self.assertIsNone(result["client"])

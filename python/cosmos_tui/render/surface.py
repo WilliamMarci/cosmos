@@ -99,7 +99,7 @@ class TerminalSurface(Widget):
                 getattr(getattr(self.app, "workspace", None), "identifying", False)
                 and row == pane.height // 2
             ):
-                label = f" {pane.index} · {pane.id} "
+                label = f" {pane.index} "
                 label = label[: pane.width]
                 left = max(0, (pane.width - len(label)) // 2)
                 badge = Strip(

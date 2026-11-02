@@ -83,14 +83,14 @@ class StatusBar(Static):
             self.hits[0] = (0, self.start_width, "start")
         left = start + divide(start_end, session_bg)
         if identity is not None and ":" in identity:
-            session, pane = identity.split(":", 1)
+            window, pane = identity.split(":", 1)
             left += Text(
-                " " + session.lstrip("$"),
+                " " + window,
                 style=Style(color="#e8a662", bgcolor=session_bg),
             )
             left += Text(":", style=Style(color=palette["mute"], bgcolor=session_bg))
             left += Text(
-                pane.lstrip("%"), style=Style(color=palette["accl"], bgcolor=session_bg)
+                pane, style=Style(color=palette["accl"], bgcolor=session_bg)
             )
         else:
             left += Text(f" {index}", style=Style(color="#e8a662", bgcolor=session_bg))

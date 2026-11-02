@@ -2,7 +2,7 @@
 
 The bar is composed by `features/status/controller.py` and `features/status/bar.py`. Segments use distinct background levels and configurable separators. Defaults follow the Cosmos palette, rather than copying an external editor theme.
 
-- Left: clickable start button, then the current Tmux window index in normal-size amber digits and its name on a separate background level. The index remains the actual backend index; it is not renumbered.
+- Left: clickable start button, then the current Tmux window:pane position indices in normal-size digits and the window name on a separate background level. The index remains the actual backend index; it is not renumbered.
 - Center: registered Mod status widgets, shown at the screen center when they fit without overlapping the left or right groups.
 - Right by default: a slightly brighter gray path block and a separate darker Git branch block in the accent foreground when available, independently clickable input language and width, then local time/date (`HH:MM Mon DD`). Home paths are abbreviated as `~`.
 
@@ -54,3 +54,5 @@ These fields are validated and persisted through settings.replace. Existing conf
 The clock segment is a generic UI-Mod action slot. The bundled calendar package registers it and displays its own popup; the status bar contains no calendar logic. Disabling that package removes the click action. See ui-mods.md for relocation and notification permissions.
 
 Git branch names have their own 24-cell maximum (including a trailing ellipsis), reduced further on narrow terminals. They do not consume the configured path-length limit. Both blocks follow path alignment and the chosen separators, with seam colors taken from the adjacent backgrounds.
+
+User-facing pane numbers and Switch labels use current position indices; sessions use their names. Stable session/window/pane IDs remain internal click and command targets, so splits, closes and renumbering never redirect an existing selection to a different pane.

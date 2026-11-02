@@ -13,6 +13,7 @@ class ContextTools:
             dict(
                 pane=r["pane_id"],
                 display_id=r["display_id"],
+                position=f"{r.get('window_index', '?')}:{r.get('pane_index', '?')}",
                 session=r["session_name"],
                 private=r["private"],
                 pane_in_mode=r.get("pane_in_mode", False),
@@ -155,6 +156,7 @@ class ContextTools:
             else dict(
                 pane=pane,
                 display_id=selected["display_id"],
+                position=f"{selected.get('window_index', '?')}:{selected.get('pane_index', '?')}",
                 private=selected["private"],
                 agent=selected.get("agent", False),
                 cwd=selected["pane_current_path"],

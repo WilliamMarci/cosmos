@@ -44,7 +44,7 @@ class LayoutPreview(Widget):
                     bgcolor=colors["acc"] if pane.active else colors["base"],
                     bold=pane.active,
                 )
-                text = Text(f" {pane.index} · {pane.id} {pane.name}", style=style)
+                text = Text(f" {pane.index} {pane.name}", style=style)
             else:
                 style = Style(color=colors["fg"], bgcolor=colors["bg"])
                 row = y - top - 1

@@ -17,6 +17,15 @@ from cosmos_tui.features.agent.tasks.lifecycle import action
 from cosmos_tui.features.agent.tasks import runtime
 
 
+async def pane_positions(socket):
+    from cosmos_tui.features.agent.terminal import TerminalTools
+
+    return {
+        row["pane_id"]: f"{row['session_name']} · {row['window_index']}:{row['pane_index']}"
+        for row in await TerminalTools(socket).panes()
+    }
+
+
 class TaskPopup(CosmosModal):
     preserve_workspace_graphics = True
 
@@ -123,7 +132,8 @@ class TaskPanel(TaskPopup):
         self.loading = True
         try:
             rows = self.store.list()
-            signature = [(r["id"], r["revision"], r["state"]) for r in rows]
+            positions = await pane_positions(self.app.backend.argv[2])
+            signature = [(r["id"], r["revision"], r["state"], positions.get(r["pane"])) for r in rows]
             if signature == self.signature:
                 return
             selected = self.selected()
@@ -138,7 +148,7 @@ class TaskPanel(TaskPopup):
                     style=self.app.role_colors["accl"],
                 )
                 text.append(
-                    f" {row['session_id']}:{row['pane']} · {row['goal'][:120]}",
+                    f" {positions.get(row['pane'], 'Unavailable terminal')} · {row['goal'][:120]}",
                     style=self.app.role_colors["fg"],
                 )
                 items.append(ListItem(Label(text)))
@@ -199,9 +209,10 @@ class TaskPanel(TaskPopup):
 
         async def entries():
             rows = await asyncio.to_thread(ControlStore(socket).status)
+            positions = await pane_positions(socket)
             return [
                 dict(
-                    label=f"{row['state']} · {row['pane']} · {row['task'][:80]}",
+                    label=f"{row['state']} · {positions.get(row['pane'], 'Unavailable terminal')} · {row['task'][:80]}",
                     pane=row["pane"],
                 )
                 for row in rows
@@ -222,7 +233,7 @@ class TaskPanel(TaskPopup):
                     return
                 await asyncio.to_thread(ControlStore(socket).change, row["pane"], "cancel")
                 await self.app.notification_events.publish(
-                    f"Agent control ended · {row['pane']}",
+                    "Agent control ended",
                     source="agent-tasks",
                     level="info",
                 )

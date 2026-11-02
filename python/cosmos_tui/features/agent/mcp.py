@@ -284,7 +284,7 @@ TOOLS.extend(
 TOOLS.append(
     dict(
         name="resolve_target",
-        description="Resolve %pane or status-bar session:pane (1:4 means stable session $1 and pane %4, not pane index). Returns compact metadata; private panes denied.",
+        description="Resolve %pane or internal stable session:pane (1:4 means stable session $1 and pane %4, not pane index). Returns compact metadata; private panes denied.",
         inputSchema=schema(dict(target=dict(type="string")), ("target",)),
         annotations=dict(readOnlyHint=True),
     )

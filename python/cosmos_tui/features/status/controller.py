@@ -71,9 +71,6 @@ class StatusController(Controller):
         identity = None
         history = ""
         if pane:
-            sid = pane.session_id or app.backend.session_id
-            if sid:
-                identity = f"{sid}:{pane.id}"
             if pane.copy_mode:
                 total = pane.history_size + pane.height
                 row = max(
@@ -115,6 +112,9 @@ class StatusController(Controller):
             if active == "1":
                 index, name = tab_index, tab_name
                 break
+        if pane:
+            window_index = next((tab[1] for tab in app.backend.tabs if tab[0] == pane.window_id), index)
+            identity = f"{window_index}:{pane.index}"
         center = [
             (row["text"], row.get("role", "mute"))
             for widget in getattr(app, "status_widgets", [])
