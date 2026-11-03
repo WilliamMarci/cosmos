@@ -156,10 +156,10 @@ def main(argv=None):
         # The final path is fixed before venv creation; no relocated shebangs.
         try:
             shutil.copytree(bundle, prefix, ignore=shutil.ignore_patterns("cosmos-*.tar.gz", "cosmos-*.tar.gz.sha256", "__pycache__"), symlinks=True)
-            for name, (archive, entry) in additions.items():
+            for name, (archive, component_entry) in additions.items():
                 # Extract checked components directly into the new install tree;
                 # do not keep a second unpacked copy on a quota-limited server.
-                extract(archive, prefix, entry["unpacked_size"])
+                extract(archive, prefix, component_entry["unpacked_size"])
             if "assistant" not in selected:
                 shutil.rmtree(prefix / "terminal_agent/.build", ignore_errors=True)
             for name in selected & {"pdf", "rime"}:

@@ -26,7 +26,7 @@ jobs:
         run: |
           dnf install -y dnf-plugins-core epel-release git tar gzip xz which findutils procps-ng
           if [[ $COSMOS_GLIBC_TIER == 2.28 ]]; then dnf config-manager --set-enabled powertools; else dnf config-manager --set-enabled crb; fi
-          dnf install -y gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ make autoconf automake bison cmake pkgconfig libevent-devel ncurses-devel readline-devel openssl-devel python3 rpm-build cpio boost-devel yaml-cpp-devel leveldb-devel lua-devel fontconfig-devel freetype-devel libjpeg-turbo-devel openjpeg2-devel libpng-devel libtiff-devel nss-devel patchelf
+          dnf install -y gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ make autoconf automake libtool bison cmake pkgconfig libevent-devel ncurses-devel readline-devel openssl-devel python3 rpm-build cpio boost-devel yaml-cpp-devel leveldb-devel lua-devel fontconfig-devel freetype-devel libjpeg-turbo-devel openjpeg2-devel libpng-devel libtiff-devel nss-devel patchelf
           if [[ $COSMOS_GLIBC_TIER == 2.28 ]]; then dnf install -y marisa-devel opencc-devel; fi
           echo /opt/rh/gcc-toolset-12/root/usr/bin >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
