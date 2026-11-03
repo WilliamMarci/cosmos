@@ -1,3 +1,9 @@
 [workspace]
 members = ["crates/cosmos"]
 resolver = "2"
+
+# Shipping binaries need neither debug sections nor unwinding machinery.
+[profile.release]
+opt-level = "s"
+lto = "thin"
+strip = true

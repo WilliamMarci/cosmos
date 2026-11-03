@@ -91,6 +91,10 @@ def decode(value):
 
 class Rime:
     def __init__(self):
+        from cosmos_tui.core.features import enabled
+
+        if not enabled("rime"):
+            raise RuntimeError("Rime was not selected during installation")
         bundled = PROJECT_ROOT / "lib/librime.so.1"
         library = os.getenv("COSMOS_RIME_LIBRARY") or (
             str(bundled) if bundled.exists() else find_library("rime")

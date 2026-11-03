@@ -3,17 +3,23 @@ import os
 from pathlib import Path
 import shutil
 import sys
+import subprocess
 import tomllib
 
 root = Path(__file__).resolve().parents[1]
 target = Path(sys.argv[1])
 registry = Path(os.environ.get('CARGO_HOME', Path.home() / '.cargo')) / 'registry/src'
 manifest = tomllib.loads((root / 'Cargo.lock').read_text())
+# Only Linux normal/build dependencies are linked into this release binary.
+used = subprocess.check_output(['cargo', 'tree', '--locked', '--offline', '--target', 'x86_64-unknown-linux-gnu', '--edges', 'normal,build', '--prefix', 'none', '--format', '{p}'], cwd=root, text=True)
+used = {line.split()[0] + '-' + line.split()[1].lstrip('v') for line in used.splitlines() if len(line.split()) >= 2}
 notices = []
 for package in manifest['package']:
     if 'source' not in package:
         continue
     name = f"{package['name']}-{package['version']}"
+    if name not in used:
+        continue
     sources = list(registry.glob(f'*/{name}'))
     if len(sources) != 1:
         raise RuntimeError(f'Cannot locate cached license for {name}')

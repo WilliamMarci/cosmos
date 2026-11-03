@@ -13,7 +13,7 @@ cosmos_bun=${cosmos_bun:-"$project_root/.build/agent-runtime/node_modules/.bin/b
 export PATH="$(dirname -- "$cosmos_bun"):$PATH"
 cd "$project_root/vendor/opencode"
 OPENCODE_CHANNEL=cosmos "$cosmos_bun" run packages/cli/script/build.ts \
-    --target=opencode-linux-x64 --skip-install --skip-web-ui --outdir="$project_root/.build/opencode-bundle"
-install -Dm755 "$project_root/.build/opencode-bundle/cli-linux-x64/bin/opencode" "$bundle_root/bin/cosmos-agent"
+    --target=opencode-linux-x64-baseline --skip-install --skip-web-ui --outdir="$project_root/.build/opencode-bundle"
+install -Dm755 "$project_root/.build/opencode-bundle/cli-linux-x64-baseline/bin/opencode" "$bundle_root/bin/cosmos-agent"
 install -Dm644 "$project_root/integrations/opencode/LICENSE-OpenCode" "$bundle_root/licenses/opencode/LICENSE"
 cp "$project_root/integrations/opencode/README.md" "$bundle_root/licenses/opencode/ORIGIN.md"

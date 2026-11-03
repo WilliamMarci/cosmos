@@ -1,7 +1,7 @@
 # Cosmos Arche · 0.2.1
 
 - Channel: development — next-version work, not a final release
-- Date: 2026-11-02
+- Date: 2026-11-03
 - Author: William Marci
 - Initial target: Linux x86_64
 
@@ -17,7 +17,7 @@ Python/Textual and Cosmos-owned UI surfaces; persistent Tmux sessions and pane o
 
 ## Requirements and limits
 
-The Linux archive includes the coordinator, Python sources, native Bash adapter source, examples, SDK, documentation, licenses and checksums. It does not include a ready Python virtual environment, system Tmux, Poppler, a complete Rime runtime/dictionary bundle or a precompiled Bash adapter. Setup is documented in README.md and python/README.md. Kitty/Ghostty image support has local verification; remote/mobile combinations and clean-machine installation are not universally validated.
+Release assets are split by architecture and glibc floor: Linux x86_64, glibc >= 2.28, x86-64-v2 CPU flags. The core includes portable CPython 3.12, pinned Python dependencies, Tmux, native file/Bash adapters and coordinator. Run install.sh for user-only installation with a small multi-select TUI; Agent, PDF and Rime + 雾凇 are separate checked downloads. Optional native libraries live in the install directory's vendor tree. Configuration, cache and state stay in XDG user directories. No sudo, build tools, global package installs or shell startup changes are required on the target. See docs/installation.md. Build artifacts and component manifests carry checksums and compatibility requirements; the workflow verifies a clean installation before publication.
 
 Not included: integrated Yazi file management/left panel, service-wide terminal search, PDF text selection/copy compatibility layer. OCR and SVG/EPS/ICO extensions are outside the current required scope. Future work belongs in design/.
 

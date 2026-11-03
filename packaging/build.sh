@@ -1,82 +1,43 @@
 #!/usr/bin/env bash
+# Build in an AlmaLinux 8 (glibc 2.28) environment for official release assets.
 set -euo pipefail
-project_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-cd "$project_root"
-with_agent=1
-for option in "$@"; do
-    case "$option" in
-        --with-agent) with_agent=1 ;;
-        --without-agent) with_agent=0 ;;
-        -h|--help)
-            echo 'Usage: packaging/build.sh [--with-agent | --without-agent]'
-            echo 'Default: build and bundle the Cosmos-branded OpenCode Agent.'
-            echo '--without-agent: omit it and use system OpenCode at runtime.'
-            exit 0 ;;
-        *) echo "Unknown build option: $option" >&2; exit 2 ;;
-    esac
-done
-cargo build --release --locked --offline
-read -r release_version release_codename < <(python3 -c 'import runpy; m=runpy.run_path("python/cosmos_tui/core/metadata.py"); print(m["VERSION"], m["CODENAME"].lower())')
-bundle_name="cosmos-$release_version-$release_codename-linux-x86_64"
-if [[ $(uname -s) != Linux || $(uname -m) != x86_64 ]]; then
-    echo 'This initial package recipe targets Linux x86_64 only.' >&2
-    exit 1
-fi
-mkdir -p "dist/$bundle_name/bin" "dist/$bundle_name/config"
-cp target/release/cosmos "dist/$bundle_name/bin/"
-cp config/config.toml config/cosmosrc config/terminal-agent-prompt.md "dist/$bundle_name/config/"
-cp config/cosmos-agent-prompt.md "dist/$bundle_name/config/"
-cp -R config/agent-commands "dist/$bundle_name/config/"
-rm -rf "dist/$bundle_name/skills"
-cp -R skills "dist/$bundle_name/"
-rm -rf "dist/$bundle_name/themes"
-cp -R themes "dist/$bundle_name/"
-cp README.md RELEASE.md "dist/$bundle_name/"
-cp cosmos "dist/$bundle_name/"
-mkdir -p "dist/$bundle_name/design"
-cp design/实施方案-v0.1.md design/实施进度.md design/实施设计与决策记录.md design/架构边界修订.md design/Python-Textual迁移.md design/UI分区与Agent接入.md "dist/$bundle_name/design/"
-mkdir -p "dist/$bundle_name/docs" "dist/$bundle_name/examples" "dist/$bundle_name/sdk/python"
-cp docs/framework.md docs/workspace.md docs/viewer.md docs/ui-api.md docs/shell.md docs/architecture.md docs/cli.md docs/input-method.md docs/status-bar.md docs/themes.md docs/mouse.md docs/settings.md docs/notifications.md docs/ui-mods.md docs/rich-reader.md "dist/$bundle_name/docs/"
-cp examples/demo.py examples/demo.mod.toml examples/surface.py examples/surface.mod.toml examples/ui-demo.py examples/ui-demo.mod.toml "dist/$bundle_name/examples/"
-cp sdk/python/cosmos_mod.py "dist/$bundle_name/sdk/python/"
-mkdir -p "dist/$bundle_name/python/cosmos_tui" "dist/$bundle_name/dev"
-cp python/README.md "dist/$bundle_name/python/"
-python3 - "dist/$bundle_name/python/cosmos_tui" <<'PY'
-from pathlib import Path
-import shutil
-import sys
-destination = Path(sys.argv[1])
-if destination.exists():
-    shutil.rmtree(destination)
-shutil.copytree('python/cosmos_tui', destination,
-                ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
-mod_destination = destination.parent.parent / 'mods'
-if mod_destination.exists():
-    shutil.rmtree(mod_destination)
-shutil.copytree('mods', mod_destination,
-                ignore=shutil.ignore_patterns('__pycache__', '*.pyc'))
-PY
-cp python/README.md python/requirements*.txt "dist/$bundle_name/python/"
-cp dev/cosmos-textual "dist/$bundle_name/dev/"
-mkdir -p "dist/$bundle_name/shell" "dist/$bundle_name/terminal_agent/terminal_agent" "dist/$bundle_name/terminal_agent/shell" "dist/$bundle_name/terminal_agent/native"
-mkdir -p "dist/$bundle_name/shell/completions"
-cp shell/completions/cosmos.bash "dist/$bundle_name/shell/completions/"
-cp shell/cosmos.bash "dist/$bundle_name/shell/"
-cp terminal_agent/terminal_agent/*.py "dist/$bundle_name/terminal_agent/terminal_agent/"
-cp terminal_agent/shell/agent.bash "dist/$bundle_name/terminal_agent/shell/"
-cp terminal_agent/native/readline.c "dist/$bundle_name/terminal_agent/native/"
-
-python3 packaging/licenses.py "dist/$bundle_name/licenses"
-cp docs/agent.md docs/agent-skills.md docs/agent-actions.md "dist/$bundle_name/docs/"
-if [[ $with_agent == 1 ]]; then
-    bash packaging/build_agent.sh "$project_root/dist/$bundle_name"
-else
-    rm -f "dist/$bundle_name/bin/cosmos-agent"
-    rm -rf "dist/$bundle_name/licenses/opencode"
-fi
-printf '%s\n' 'PDF viewing requires pdfinfo, pdftoppm, pdftotext (Poppler / poppler-utils) on PATH; not bundled.' > "dist/$bundle_name/pdf-dependencies.txt"
-ldd target/release/cosmos > "dist/$bundle_name/runtime-dependencies.txt"
-(cd "dist/$bundle_name" && find bin config skills themes licenses docs examples sdk design python dev shell terminal_agent mods -type f -exec sha256sum {} + > SHA256SUMS && sha256sum cosmos README.md RELEASE.md runtime-dependencies.txt pdf-dependencies.txt >> SHA256SUMS)
-tar -C dist -czf "dist/$bundle_name.tar.gz" "$bundle_name"
-sha256sum "dist/$bundle_name.tar.gz" > "dist/$bundle_name.tar.gz.sha256"
-printf '%s\n' "$project_root/dist/$bundle_name.tar.gz"
+root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$root"
+component=${1:-core}
+case "$component" in
+    core)
+        if [[ ! -x .build/tmux-install/bin/tmux ]]; then
+            git clone https://github.com/tmux/tmux.git .build/tmux-source
+            git -C .build/tmux-source checkout --detach 0dac7fe434d029a4f0b819cba8eb7963df291990
+            (cd .build/tmux-source && sh autogen.sh && ./configure --prefix="$root/.build/tmux-install" && make -j2 && make install)
+        fi
+        cargo build --release --locked
+        bash dev/build_files.sh
+        mkdir -p .build/release-native
+        cc -shared -fPIC -Wall -Wextra -Werror -Os terminal_agent/native/readline.c -o .build/release-native/terminal-agent-readline.so -ldl
+        strip target/release/cosmos .build/libcosmos_files.so .build/release-native/terminal-agent-readline.so
+        command -v uv >/dev/null || { echo 'Build dependency missing: uv' >&2; exit 1; }
+        export UV_PYTHON_INSTALL_DIR="$root/.build/release-python"
+        uv python install 3.12
+        python_runtime=$(uv python find --managed-python 3.12)
+        python_home=$(dirname -- "$(dirname -- "$python_runtime")")
+        [[ -x .venv/bin/python ]] || uv venv --python "$python_runtime" .venv
+        rm -rf .build/release-deps
+        uv pip install --python "$python_runtime" --target .build/release-deps --only-binary :all: --require-hashes -r packaging/requirements.lock
+        python3 packaging/assemble.py core "$python_home"
+        ;;
+    agent)
+        stage="$root/.build/release-agent"
+        mkdir -p "$stage"
+        bash packaging/build_agent.sh "$stage"
+        python3 packaging/assemble.py agent "$stage"
+        ;;
+    pdf|rime)
+        bash packaging/build_optional.sh "$component"
+        ;;
+    -h|--help)
+        echo 'Usage: packaging/build.sh [core|agent|pdf|rime]'
+        echo 'Build-time dependencies only; end-user archives contain Python and precompiled native components.'
+        ;;
+    *) echo "Unknown component: $component" >&2; exit 2 ;;
+esac

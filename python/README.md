@@ -13,7 +13,7 @@ uv pip install --python .venv/bin/python -r python/requirements.txt
 ./cosmos
 ```
 
-PDF 需要 `pdfinfo`、`pdftoppm`、`pdftotext`。IME 需要 librime、相应插件与已编译 Rime 数据；原生 Bash 助手首次加载需要 C 编译器。构建包没有预装 .venv、完整 Rime/Poppler 或预编译 Bash 模块。安装后可从任意目录执行入口或其符号链接；请从外层 Shell 连接。
+源码环境的 PDF 需要 Poppler，IME 需要 librime 和编译后的 Rime 数据，Bash 助手首次加载需要 C 编译器。Release 包已携带 Python/Tmux 和原生模块；可选 PDF/Rime 组件由 `install.sh` 下载到软件目录，默认使用 rime_ice，用户无需准备这些构建工具。见 [安装说明](../docs/installation.md)。
 
 ## 当前交互
 

@@ -24,6 +24,11 @@ class AssistantLauncher(Controller):
             await self.bridge.close()
 
     async def open_command_assistant(self):
+        from cosmos_tui.core.features import enabled
+
+        if not enabled("assistant"):
+            await self.app.action_error("assistant", RuntimeError("This optional feature was not selected during installation"))
+            return
         app = self.app
         pane = app.active()
         if pane and pane.copy_mode:
@@ -52,6 +57,11 @@ class AssistantLauncher(Controller):
         return
 
     async def open_agent(self):
+        from cosmos_tui.core.features import enabled
+
+        if not enabled("agent"):
+            await self.app.action_error("agent", RuntimeError("This optional feature was not selected during installation"))
+            return
         from cosmos_tui.features.agent.launch import arguments
 
         app = self.app

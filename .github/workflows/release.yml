@@ -1,0 +1,106 @@
+name: Build and release
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: cosmos-release
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    container: almalinux:8
+    timeout-minutes: 75
+    strategy:
+      fail-fast: false
+      matrix:
+        component: [core, agent, pdf, rime]
+    steps:
+      - name: Build dependencies (ephemeral AlmaLinux 8 container only)
+        run: |
+          dnf install -y dnf-plugins-core epel-release git curl tar gzip xz which findutils procps-ng
+          dnf config-manager --set-enabled powertools
+          dnf install -y gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ make autoconf automake bison cmake pkgconfig libevent-devel ncurses-devel openssl-devel python3 rpm-build cpio boost-devel yaml-cpp-devel leveldb-devel marisa-devel opencc-devel lua-devel fontconfig-devel freetype-devel libjpeg-turbo-devel openjpeg2-devel libpng-devel libtiff-devel nss-devel patchelf
+          echo /opt/rh/gcc-toolset-12/root/usr/bin >> "$GITHUB_PATH"
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.8'
+      - name: Portable packaging interpreter
+        run: |
+          export UV_PYTHON_INSTALL_DIR="$PWD/.build/release-python"
+          uv python install 3.12
+          echo "$(dirname "$(uv python find --managed-python 3.12)")" >> "$GITHUB_PATH"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        if: matrix.component == 'agent'
+        with:
+          node-version: '20'
+      - name: Prepare Agent source only
+        if: matrix.component == 'agent'
+        run: |
+          python3 - <<'PY'
+          import json, pathlib, subprocess
+          source = next(r for r in json.load(open('vendor/sources.json')) if r['name'] == 'opencode')
+          subprocess.run(['git', 'init', 'vendor/opencode'], check=True)
+          subprocess.run(['git', '-C', 'vendor/opencode', 'remote', 'add', 'origin', source['url']], check=True)
+          subprocess.run(['git', '-C', 'vendor/opencode', 'fetch', '--depth=1', 'origin', source['commit']], check=True)
+          subprocess.run(['git', '-C', 'vendor/opencode', 'checkout', '--detach', 'FETCH_HEAD'], check=True)
+          PY
+          uv venv --python 3.12 .venv
+      - name: Build component
+        run: |
+          source /opt/rh/gcc-toolset-12/enable
+          bash packaging/build.sh '${{ matrix.component }}'
+      - name: Agent compatibility smoke test
+        if: matrix.component == 'agent'
+        run: |
+          HOME=$(mktemp -d) OPENCODE_DISABLE_MODELS_FETCH=1 .build/release-agent/bin/cosmos-agent --version
+      - name: Core tests and clean installation
+        if: matrix.component == 'core'
+        run: |
+          source /opt/rh/gcc-toolset-12/enable
+          cargo fmt --all --check
+          cargo test --locked
+          export UV_PYTHON_INSTALL_DIR="$PWD/.build/release-python"
+          python_runtime=$(uv python find --managed-python 3.12)
+          PYTHONPATH=python:python-deps:.build/release-deps:dev "$python_runtime" -m unittest dev.test_installation dev.test_terminal_tabs dev.test_status_identity dev.test_status dev.test_cli
+          mkdir .build/install-smoke
+          tar -xzf dist/cosmos-*-core-linux-x86_64-glibc2.28.tar.gz -C .build/install-smoke
+          installer=$(find .build/install-smoke -name install.sh -print -quit)
+          # Container jobs are root; exercise the installer under an unprivileged user.
+          useradd -m cosmos-test
+          chmod -R a+rX .build/install-smoke
+          su cosmos-test -s /bin/bash -c "bash '$PWD/$installer' --yes --features core,assistant --prefix /home/cosmos-test/app --bin-dir /home/cosmos-test/bin"
+          su cosmos-test -s /bin/bash -c '/home/cosmos-test/bin/cosmos --version && /home/cosmos-test/bin/cosmos --help'
+          test ! -d /home/cosmos-test/app/__pycache__
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.component }}
+          path: dist/*
+          compression-level: 0
+  publish:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: dist
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Publish verified components
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 packaging/manifest.py
+          cd dist
+          sha256sum --check *.sha256
+          cd ..
+          version=$(python3 -c 'import runpy; print(runpy.run_path("python/cosmos_tui/core/metadata.py")["VERSION"])')
+          gh release create "v$version" dist/* --target "$GITHUB_SHA" --title "Cosmos Arche $version" --notes-file RELEASE.md --prerelease

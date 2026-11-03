@@ -11,4 +11,4 @@ export PATH="$(dirname -- "$cosmos_bun"):$PATH"
 cd "$cosmos_root/vendor/opencode"
 "$cosmos_bun" install --frozen-lockfile --ignore-scripts
 "$cosmos_bun" run --cwd packages/core fix-node-pty
-"$cosmos_root/.venv/bin/python" "$cosmos_root/dev/prepare_agent.py"
+"${COSMOS_BUILD_PYTHON:-$cosmos_root/.venv/bin/python}" "$cosmos_root/dev/prepare_agent.py"

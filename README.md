@@ -1,6 +1,6 @@
 # Cosmos — Arche 0.2.1
 
-**下一版开发中 · 2026-10-23 · Author: William Marci**
+**Arche · 2026-11-03 · Author: William Marci**
 
 Cosmos 是运行在工作主机上的终端工作壳。通过普通 SSH 登录后运行 Cosmos，即可创建或重连持续会话；连接电脑无需安装配套 Cosmos。首个开发版 Arche 0.1.0 已保留为本地 v0.1.0 标签；当前为下一版开发分支，不表示原定完整首版已经交付。版本范围与依赖见 [发布说明](RELEASE.md)。
 
@@ -8,7 +8,9 @@ Cosmos 是运行在工作主机上的终端工作壳。通过普通 SSH 登录�
 
 唯一 UI 入口为根目录 `./cosmos`，使用 Python + Textual 与 Cosmos 自绘接口；隔离 Tmux 服务负责持续会话和终端解析。Rust 保留协调服务与管理 CLI，旧 Rust UI 已停用。`dev/cosmos-textual` 仅为兼容跳转。
 
-源码或解压包需要 Python 3.11+、Tmux；PDF 另需 Poppler。源码首次运行：
+**安装 release**：下载 [GitHub Release](https://github.com/WilliamMarci/cosmos/releases) 的 core 包，解压后运行 `./install.sh`。简单多选界面可选择 Agent、Bash 助手、PDF、Rime＋雾凇；只下载选中的组件。默认用户态安装，不改全局环境。支持 Linux x86_64 / glibc ≥ 2.28 / x86-64-v2；不匹配的平台会明确拒绝。完整布局、离线安装和参数见 [安装说明](docs/installation.md)。
+
+源码开发需要 Python 3.11+、Tmux 和构建工具：
 
 ```bash
 cargo build --locked --offline --release
@@ -18,7 +20,7 @@ uv pip install --python .venv/bin/python -r python/requirements.txt
 ./cosmos
 ```
 
-解压包使用内置 `bin/cosmos` 协调服务，不需构建 Rust，但仍需初始化 Python 环境及安装系统依赖。原生 Bash 命令助手首次加载需要 C 编译器；IME 需要 librime 和已编译 Rime 数据。详见 [运行环境](python/README.md)。当前构建包尚未自包含这些依赖。
+Release core 包包含 Python 运行时、wheel 依赖、Tmux 和预编译原生模块，不需要用户准备 venv、CMake 或编译器。PDF、Rime＋雾凇和 Agent 是独立组件包，系统目录保持不变。
 
 ```bash
 cosmos attach -s work
@@ -70,4 +72,4 @@ COSMOS_TEST_TMUX=1 cargo test --locked --offline
 ./packaging/build.sh
 ```
 
-按变更范围执行检查；真实 PTY、图形与 SSH 验收不能由静态测试代替。构建产物为 `dist/cosmos-0.2.1-arche-linux-x86_64.tar.gz`，附校验值、许可证与依赖说明。开发流程见 [Git 管理](docs/development.md)。
+按变更范围执行检查；真实 PTY、图形与 SSH 验收不能由静态测试代替。构建产物为 `dist/cosmos-0.2.1-core-linux-x86_64-glibc2.28.tar.gz`，附校验值、许可证与依赖说明。开发流程见 [Git 管理](docs/development.md)。

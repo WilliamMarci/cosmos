@@ -56,4 +56,4 @@ vendor 下保留 README、sources.json 和 sync.py，按固定 commit 记录参�
 
 下一版开发分支为 codex/reader-cache-calendar，应用版本为 0.2.1，保留 Arche 代号；未建立新的正式发布标签。v0.1.0 与原构建包保持不变。
 
-开发阶段按功能提交源码、正式文档与相关测试；当前不执行构建包流程，待功能与综合测试完善后再构建。
+开发阶段按功能提交源码、正式文档与相关测试。发布通过 GitHub Actions 在 AlmaLinux 8 构建，按架构/glibc 兼容档拆分 core、Agent、PDF、Rime；安装布局与组件清单见 [installation](installation.md)。

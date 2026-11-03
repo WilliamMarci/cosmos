@@ -8,5 +8,18 @@ fi
 if [[ -d "$cosmos_root/lib" ]]; then
     export LD_LIBRARY_PATH="$cosmos_root/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
-export PYTHONPATH="$cosmos_root/python:$cosmos_root/terminal_agent${PYTHONPATH:+:$PYTHONPATH}"
+export PATH="$cosmos_root/bin:$cosmos_root/vendor/pdf/bin:$PATH"
+for cosmos_lib in "$cosmos_root/vendor/pdf/lib" "$cosmos_root/vendor/rime/lib"; do
+    if [[ -d $cosmos_lib ]]; then
+        export LD_LIBRARY_PATH="$cosmos_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    fi
+done
+if [[ -d $cosmos_root/vendor/rime/share/rime-data ]]; then
+    export COSMOS_RIME_DATA="${COSMOS_RIME_DATA:-$cosmos_root/vendor/rime/share/rime-data}"
+    export COSMOS_RIME_SCHEMA="${COSMOS_RIME_SCHEMA:-rime_ice}"
+    export COSMOS_RIME_LIBRARY="${COSMOS_RIME_LIBRARY:-$cosmos_root/vendor/rime/lib/librime.so.1}"
+fi
+export PYTHONPYCACHEPREFIX="${XDG_CACHE_HOME:-$HOME/.cache}/cosmos/python"
+export PYTHONPATH="$cosmos_root/python:$cosmos_root/terminal_agent:$cosmos_root/python-deps${PYTHONPATH:+:$PYTHONPATH}"
+export TERMINAL_AGENT_PYTHON="${TERMINAL_AGENT_PYTHON:-$cosmos_root/.venv/bin/python}"
 exec "$cosmos_root/.venv/bin/python" -m cosmos_tui "$@"
