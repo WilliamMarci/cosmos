@@ -2,6 +2,10 @@ name: Build and release
 on:
   workflow_dispatch:
     inputs:
+      rebuild_optional:
+        description: Ignore PDF/Rime build caches for this run
+        type: boolean
+        default: false
       repair_rime9:
         description: Rebuild only the AlmaLinux 9 Rime component
         type: boolean
@@ -61,7 +65,17 @@ jobs:
           PY
           uv venv --python 3.12 .venv
           uv pip install --python .venv/bin/python --require-hashes -r packaging/requirements.lock
+      - uses: actions/cache@v4
+        id: optional-cache
+        if: matrix.component == 'pdf' || matrix.component == 'rime'
+        with:
+          path: |
+            .build/optional-${{ matrix.component }}/stage
+            .build/optional-${{ matrix.component }}/corresponding-sources.tar.gz
+          key: optional-v1-${{ matrix.component }}-${{ matrix.tier }}-${{ hashFiles('packaging/build_optional.sh', 'packaging/assemble.py') }}${{ inputs.rebuild_optional && format('-forced-{0}', github.run_id) || '' }}
       - name: Build component
+        env:
+          COSMOS_OPTIONAL_CACHE_HIT: ${{ steps.optional-cache.outputs.cache-hit || 'false' }}
         run: |
           source /opt/rh/gcc-toolset-12/enable
           bash packaging/build.sh '${{ matrix.component }}'

@@ -4,10 +4,19 @@ set -euo pipefail
 tier=${COSMOS_GLIBC_TIER:-2.28}
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 kind=${1:?pdf or rime}
+version=$(python3 -c 'import runpy,sys; print(runpy.run_path(sys.argv[1])["VERSION"])' "$root/python/cosmos_tui/core/metadata.py")
 build_library_path=${LD_LIBRARY_PATH:-}
 work="$root/.build/optional-$kind"
 mkdir -p "$work/sources"
 stage="$work/stage"
+if [[ ${COSMOS_OPTIONAL_CACHE_HIT:-false} == true ]]; then
+    test -d "$stage/vendor/$kind"
+    test -s "$work/corresponding-sources.tar.gz"
+    mkdir -p "$root/dist"
+    cp "$work/corresponding-sources.tar.gz" "$root/dist/cosmos-$version-$kind-glibc$tier-sources.tar.gz"
+    python3 "$root/packaging/assemble.py" "$kind" "$stage"
+    exit
+fi
 rm -rf "$stage"
 mkdir -p "$stage/vendor/$kind" "$stage/licenses/$kind"
 prefix="$stage/vendor/$kind"
@@ -44,7 +53,7 @@ else
         clone https://github.com/s-yata/marisa-trie.git e54f296bb52d16693931c8b963744931ef1e37f7 "$work/sources/marisa"
         (cd "$work/sources/marisa" && autoreconf -i && ./configure --prefix="$prefix" --libdir="$prefix/lib" --disable-static && make -j2 && make install)
         clone https://github.com/BYVoid/OpenCC.git 556ed22496d650bd0b13b6c163be9814637970ae "$work/sources/opencc"
-        cmake -S "$work/sources/opencc" -B "$work/opencc-build" -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_PREFIX_PATH="$prefix" -DCMAKE_CXX_FLAGS="-I$prefix/include" -DUSE_SYSTEM_MARISA=ON -DENABLE_GTEST=OFF -DBUILD_DOCUMENTATION=OFF
+        cmake -S "$work/sources/opencc" -B "$work/opencc-build" -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_PREFIX_PATH="$prefix" -DCMAKE_CXX_FLAGS="-I$prefix/include" -DCMAKE_SHARED_LINKER_FLAGS="-L$prefix/lib" -DCMAKE_EXE_LINKER_FLAGS="-L$prefix/lib" -DUSE_SYSTEM_MARISA=ON -DENABLE_GTEST=OFF -DBUILD_DOCUMENTATION=OFF
         cmake --build "$work/opencc-build" --parallel 2
         cmake --install "$work/opencc-build"
         cp "$work/sources/marisa/COPYING.md" "$stage/licenses/rime/MARISA-LICENSE"
@@ -105,5 +114,6 @@ find "$prefix" -type f -name '*.a' -delete
 find "$prefix" -type f \( -name '*.so*' -o -path '*/bin/*' \) -exec env LD_LIBRARY_PATH="$build_library_path" strip --strip-unneeded {} +
 # Preserve corresponding source alongside GPL/other optional binaries.
 mkdir -p "$root/dist"
-tar -C "$work/sources" --exclude=.git --exclude='*/build' -czf "$root/dist/cosmos-0.2.1-$kind-glibc$tier-sources.tar.gz" .
+tar -C "$work/sources" --exclude=.git --exclude='*/build' -czf "$work/corresponding-sources.tar.gz" .
+cp "$work/corresponding-sources.tar.gz" "$root/dist/cosmos-$version-$kind-glibc$tier-sources.tar.gz"
 python3 "$root/packaging/assemble.py" "$kind" "$stage"
