@@ -92,7 +92,7 @@ jobs:
           cargo test --locked
           export UV_PYTHON_INSTALL_DIR="$PWD/.build/release-python"
           python_runtime=$(uv python find --managed-python 3.12)
-          PYTHONPATH=python:python-deps:.build/release-deps:dev "$python_runtime" -m unittest dev.test_installation dev.test_terminal_tabs dev.test_status_identity dev.test_status dev.test_cli
+          PYTHONPATH=python:python-deps:.build/release-deps:dev "$python_runtime" -m unittest dev.test_installation dev.test_release_cache dev.test_terminal_tabs dev.test_status_identity dev.test_status dev.test_cli
           mkdir .build/install-smoke
           tar -xzf dist/cosmos-*-core-linux-x86_64-glibc${{ matrix.tier }}.tar.gz -C .build/install-smoke
           installer=$(find .build/install-smoke -name install.sh -print -quit)
@@ -128,7 +128,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 packaging/manifest.py
-          cp packaging/bootstrap.sh dist/install.sh
           cd dist
           sha256sum --check *.sha256
           cd ..

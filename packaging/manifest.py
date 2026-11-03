@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import runpy
+import re
 import subprocess
 import tarfile
 
@@ -28,3 +29,10 @@ manifest = dict(schema=1, version=version, source_commit=subprocess.check_output
 # Same records for a dependency-free Bash bootstrap; no JSON parser is required.
 lines = ["\t".join(str(item[key]) if key != "cpu_flags" else ",".join(item[key]) for key in ("name", "version", "arch", "glibc_min", "cpu_flags", "filename", "url", "sha256", "size", "unpacked_size")) for item in entries]
 (root / "dist/components.tsv").write_text("\n".join(lines) + "\n")
+
+bootstrap = (root / "packaging/bootstrap.sh").read_text()
+bootstrap, count = re.subn(r"(?m)^version=.*$", "version=" + version, bootstrap, count=1)
+if count != 1:
+    raise RuntimeError("Bootstrap version field missing")
+(root / "dist/install.sh").write_text(bootstrap)
+(root / "dist/install.sh").chmod(0o755)

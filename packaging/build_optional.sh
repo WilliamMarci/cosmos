@@ -52,6 +52,7 @@ else
         # Build fixed upstream revisions privately, never on the user's host.
         clone https://github.com/s-yata/marisa-trie.git e54f296bb52d16693931c8b963744931ef1e37f7 "$work/sources/marisa"
         (cd "$work/sources/marisa" && autoreconf -i && ./configure --prefix="$prefix" --libdir="$prefix/lib" --disable-static && make -j2 && make install)
+        export LD_LIBRARY_PATH="$prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
         clone https://github.com/BYVoid/OpenCC.git 556ed22496d650bd0b13b6c163be9814637970ae "$work/sources/opencc"
         cmake -S "$work/sources/opencc" -B "$work/opencc-build" -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_PREFIX_PATH="$prefix" -DCMAKE_CXX_FLAGS="-I$prefix/include" -DCMAKE_SHARED_LINKER_FLAGS="-L$prefix/lib" -DCMAKE_EXE_LINKER_FLAGS="-L$prefix/lib" -DUSE_SYSTEM_MARISA=ON -DENABLE_GTEST=OFF -DBUILD_DOCUMENTATION=OFF
         cmake --build "$work/opencc-build" --parallel 2
