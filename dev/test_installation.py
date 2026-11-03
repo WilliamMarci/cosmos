@@ -63,6 +63,24 @@ class InstallationTests(unittest.TestCase):
             module.copy(library, library)
             self.assertEqual(library.read_bytes(), b"fixture")
 
+    def test_optional_component_install_preserves_command_entry_path(self):
+        with tempfile.TemporaryDirectory() as folder:
+            base = Path(folder)
+            bundle, prefix, bindir = base / "bundle", base / "app", base / "bin"
+            bundle.mkdir()
+            (bundle / "bundle.json").write_text(json.dumps(dict(version="0.2.1", glibc="2.28")))
+            (bundle / "components.json").write_text(json.dumps(dict(version="0.2.1", components=[])))
+            (bundle / "cosmos").write_text("fixture")
+            archive = base / "agent.tar.gz"
+            with tarfile.open(archive, "w:gz") as tar:
+                item = tarfile.TarInfo("bin/cosmos-agent")
+                item.size = 7
+                tar.addfile(item, io.BytesIO(b"fixture"))
+            with patch.object(installer.os, "getuid", return_value=1000), patch.object(installer.os, "confstr", return_value="glibc 2.28"), patch.object(installer, "verify"), patch.object(installer.subprocess, "run"), patch.object(installer, "component", return_value=(archive, dict(unpacked_size=7))):
+                installer.main(["--bundle", str(bundle), "--prefix", str(prefix), "--bin-dir", str(bindir), "--features", "core,agent", "--yes"])
+            self.assertEqual((bindir / "cosmos").resolve(), prefix / "cosmos")
+            self.assertEqual((prefix / "bin/cosmos-agent").read_bytes(), b"fixture")
+
     def test_glibc_tier_selection_rejects_unsupported_cpu_and_architecture(self):
         entries = [dict(name="core", arch="x86_64", glibc_min=tier, cpu_flags=["sse4_2"]) for tier in ("2.28", "2.34")]
         manifest = dict(components=entries)
