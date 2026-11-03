@@ -44,7 +44,7 @@ else
         clone https://github.com/s-yata/marisa-trie.git e54f296bb52d16693931c8b963744931ef1e37f7 "$work/sources/marisa"
         (cd "$work/sources/marisa" && autoreconf -i && ./configure --prefix="$prefix" --libdir="$prefix/lib" --disable-static && make -j2 && make install)
         clone https://github.com/BYVoid/OpenCC.git 556ed22496d650bd0b13b6c163be9814637970ae "$work/sources/opencc"
-        cmake -S "$work/sources/opencc" -B "$work/opencc-build" -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_PREFIX_PATH="$prefix" -DUSE_SYSTEM_MARISA=ON -DENABLE_GTEST=OFF -DBUILD_DOCUMENTATION=OFF
+        cmake -S "$work/sources/opencc" -B "$work/opencc-build" -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_INSTALL_LIBDIR=lib -DCMAKE_PREFIX_PATH="$prefix" -DCMAKE_CXX_FLAGS="-I$prefix/include" -DUSE_SYSTEM_MARISA=ON -DENABLE_GTEST=OFF -DBUILD_DOCUMENTATION=OFF
         cmake --build "$work/opencc-build" --parallel 2
         cmake --install "$work/opencc-build"
         cp "$work/sources/marisa/COPYING.md" "$stage/licenses/rime/MARISA-LICENSE"
