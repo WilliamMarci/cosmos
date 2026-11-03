@@ -52,3 +52,13 @@ class InstallationTests(unittest.TestCase):
             (Path(folder) / "installed-features.json").write_text(json.dumps(dict(features=["core", "pdf"])))
             self.assertFalse(features.enabled("rime"))
             self.assertTrue(features.enabled("pdf"))
+
+    def test_packager_keeps_already_collected_shared_library(self):
+        spec = importlib.util.spec_from_file_location("cosmos_assemble", ROOT / "packaging/assemble.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as folder:
+            library = Path(folder) / "libfixture.so"
+            library.write_bytes(b"fixture")
+            module.copy(library, library)
+            self.assertEqual(library.read_bytes(), b"fixture")

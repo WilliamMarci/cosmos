@@ -20,7 +20,7 @@ jobs:
         run: |
           dnf install -y dnf-plugins-core epel-release git curl tar gzip xz which findutils procps-ng
           dnf config-manager --set-enabled powertools
-          dnf install -y gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ make autoconf automake bison cmake pkgconfig libevent-devel ncurses-devel openssl-devel python3 rpm-build cpio boost-devel yaml-cpp-devel leveldb-devel marisa-devel opencc-devel lua-devel fontconfig-devel freetype-devel libjpeg-turbo-devel openjpeg2-devel libpng-devel libtiff-devel nss-devel patchelf
+          dnf install -y gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ make autoconf automake bison cmake pkgconfig libevent-devel ncurses-devel readline-devel openssl-devel python3 rpm-build cpio boost-devel yaml-cpp-devel leveldb-devel marisa-devel opencc-devel lua-devel fontconfig-devel freetype-devel libjpeg-turbo-devel openjpeg2-devel libpng-devel libtiff-devel nss-devel patchelf
           echo /opt/rh/gcc-toolset-12/root/usr/bin >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -48,6 +48,7 @@ jobs:
           subprocess.run(['git', '-C', 'vendor/opencode', 'checkout', '--detach', 'FETCH_HEAD'], check=True)
           PY
           uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python --require-hashes -r packaging/requirements.lock
       - name: Build component
         run: |
           source /opt/rh/gcc-toolset-12/enable
@@ -60,6 +61,7 @@ jobs:
         if: matrix.component == 'core'
         run: |
           source /opt/rh/gcc-toolset-12/enable
+          export PATH="$PWD/.build/tmux-install/bin:$PATH"
           cargo fmt --all --check
           cargo test --locked
           export UV_PYTHON_INSTALL_DIR="$PWD/.build/release-python"
@@ -103,4 +105,4 @@ jobs:
           sha256sum --check *.sha256
           cd ..
           version=$(python3 -c 'import runpy; print(runpy.run_path("python/cosmos_tui/core/metadata.py")["VERSION"])')
-          gh release create "v$version" dist/* --target "$GITHUB_SHA" --title "Cosmos Arche $version" --notes-file RELEASE.md --prerelease
+          gh release create "v$version" dist/* --target "$GITHUB_SHA" --title "Cosmos Arche $version" --notes-file RELEASE.md --prerelease --draft

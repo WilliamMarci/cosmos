@@ -17,5 +17,9 @@ for name in ("core", "agent", "pdf", "rime"):
     with tarfile.open(path) as tar:
         size = sum(item.size for item in tar.getmembers() if item.isfile())
     entries.append(dict(name=name, version=version, arch="x86_64", os="linux", glibc_min="2.28", cpu_flags=["sse4_1", "sse4_2", "ssse3", "popcnt", "cx16", "lahf_lm"], filename=filename, size=path.stat().st_size, unpacked_size=size, url=f"https://github.com/WilliamMarci/cosmos/releases/download/v{version}/{filename}", sha256=sha))
+for path in sorted((root / "dist").glob("*-sources.tar.gz")):
+    with path.open("rb") as source:
+        digest = hashlib.file_digest(source, "sha256").hexdigest()
+    path.with_name(path.name + ".sha256").write_text(digest + "  " + path.name + "\n")
 manifest = dict(schema=1, version=version, source_commit=subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(), components=entries)
 (root / "dist/components.json").write_text(json.dumps(manifest, indent=2) + "\n")

@@ -16,6 +16,8 @@ DIST = ROOT / "dist"
 
 
 def copy(source, destination):
+    if source.resolve() == destination.resolve():
+        return
     if source.is_dir():
         shutil.copytree(source, destination, symlinks=True, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".git"), dirs_exist_ok=True)
     else:
@@ -36,6 +38,11 @@ def closure(binary, destination):
             continue
         path = Path(rest.split(" (", 1)[0])
         copy(path.resolve(), destination / name)
+        owner = subprocess.run(["rpm", "-qf", str(path.resolve()), "--qf", "%{NAME}"], text=True, capture_output=True)
+        if owner.returncode == 0:
+            notices = Path("/usr/share/licenses") / owner.stdout
+            if notices.is_dir():
+                copy(notices, destination.parent / "licenses" / owner.stdout)
 
 
 def archive(stage, name, rooted=False):
@@ -88,6 +95,7 @@ def main(kind, source):
         closure(stage / "bin/cosmos", stage / "lib")
         closure(stage / ".build/libcosmos_files.so", stage / "lib")
         copy(ROOT / "packaging/notices", stage / "licenses/integrations")
+        copy(ROOT / "native/files/LICENSE-Yazi", stage / "licenses/integrations/Yazi-MIT.txt")
         subprocess.run([sys.executable, str(ROOT / "packaging/licenses.py"), str(stage / "licenses/rust")], check=True)
         # Each wheel retains its dist-info license files and METADATA.
         (stage / "licenses/PYTHON.txt").write_text("Python runtime license: runtime/LICENSE*; Python wheel licenses and provenance: python-deps/*.dist-info/. Bundled tmux license: licenses/tmux-COPYING.\n")

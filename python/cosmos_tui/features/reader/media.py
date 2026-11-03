@@ -139,6 +139,10 @@ class Media:
                 self.revision += 1
 
     def info(self, path):
+        from cosmos_tui.core.features import enabled
+
+        if not enabled("pdf"):
+            raise RuntimeError("PDF was not selected during installation")
         key = self.identity(path) + ("metadata",)
         epoch = self.epoch
         result = self.documents.get(key)

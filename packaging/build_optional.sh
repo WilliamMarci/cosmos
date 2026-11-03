@@ -27,7 +27,7 @@ if [[ $kind == pdf ]]; then
     rpm -i --define "_topdir $work/rpm" "$source_rpm"
     rpmbuild -bp --nodeps --define "_topdir $work/rpm" "$work/rpm/SPECS/poppler.spec"
     source=$(find "$work/rpm/BUILD" -mindepth 1 -maxdepth 1 -type d -name 'poppler-*' | head -1)
-    cmake -S "$source" -B "$work/build" -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_INSTALL_PREFIX="$prefix" \
+    cmake -S "$source" -B "$work/build" -DCMAKE_BUILD_TYPE=MinSizeRel -DCMAKE_INSTALL_PREFIX="$prefix" -DCMAKE_INSTALL_LIBDIR=lib \
         -DENABLE_UTILS=ON -DENABLE_CPP=OFF -DENABLE_GLIB=OFF -DENABLE_QT5=OFF -DENABLE_QT6=OFF \
         -DBUILD_GTK_TESTS=OFF -DBUILD_QT5_TESTS=OFF -DBUILD_QT6_TESTS=OFF -DBUILD_CPP_TESTS=OFF \
         -DENABLE_NSS3=OFF -DENABLE_GPGME=OFF -DENABLE_LIBCURL=OFF -DENABLE_GOBJECT_INTROSPECTION=OFF
@@ -64,9 +64,11 @@ BOOST
     "$prefix/bin/rime_deployer" --build "$prefix/share/rime-data" "$prefix/share/rime-data" "$prefix/share/rime-data/build"
     test -f "$prefix/share/rime-data/build/rime_ice.schema.yaml"
     cp "$work/sources/librime/LICENSE" "$stage/licenses/rime/LIBRIME-LICENSE"
+    cp "$work/sources/librime/plugins/lua/LICENSE" "$stage/licenses/rime/LIBRIME-LUA-LICENSE"
     find "$work/sources/rime-ice" -maxdepth 1 -iname '*license*' -exec cp {} "$stage/licenses/rime/" \;
     rm -rf "$prefix/bin" "$prefix/include" "$prefix/lib/pkgconfig" "$prefix/lib/cmake"
 fi
+export LD_LIBRARY_PATH="$prefix/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 python3 - "$root" "$stage" "$kind" <<'PY'
 from pathlib import Path
 import sys

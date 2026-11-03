@@ -37,6 +37,8 @@ def extract(archive, destination, maximum=1024**3):
                 raise ValueError("Unsafe component archive member: " + item.name)
             if item.mode & 0o7000:
                 raise ValueError("Privileged archive member")
+            if item.isfile() and path.exists():
+                raise ValueError("Component would overwrite an existing file")
         tar.extractall(destination, members=members, filter="data")
 
 
@@ -67,12 +69,8 @@ def component(bundle, name, version, temporary, manifest):
         actual = hashlib.file_digest(source, "sha256").hexdigest()
     if actual != entry["sha256"] or archive.stat().st_size != entry["size"]:
         raise ValueError("Component checksum/size mismatch: " + name)
-    destination = temporary / name
-    destination.mkdir()
-    extract(archive, destination, entry["unpacked_size"])
-    if sum(p.stat().st_size for p in destination.rglob("*") if p.is_file()) > entry["unpacked_size"]:
-        raise ValueError("Component exceeds declared unpacked size")
-    return destination
+    return archive, entry
+
 
 
 def main(argv=None):
@@ -148,8 +146,10 @@ def main(argv=None):
         # The final path is fixed before venv creation; no relocated shebangs.
         try:
             shutil.copytree(bundle, prefix, ignore=shutil.ignore_patterns("cosmos-*.tar.gz", "cosmos-*.tar.gz.sha256", "__pycache__"), symlinks=True)
-            for name, folder in additions.items():
-                shutil.copytree(folder, prefix, dirs_exist_ok=True)
+            for name, (archive, entry) in additions.items():
+                # Extract checked components directly into the new install tree;
+                # do not keep a second unpacked copy on a quota-limited server.
+                extract(archive, prefix, entry["unpacked_size"])
             if "assistant" not in selected:
                 shutil.rmtree(prefix / "terminal_agent/.build", ignore_errors=True)
             for name in selected & {"pdf", "rime"}:
