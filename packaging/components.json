@@ -1,19 +1,13 @@
 {
   "schema": 1,
   "version": "0.2.1",
-  "status": "build-pending",
+  "source_commit": "919a21adbcf971b99dce13d89d32575bc5dfb445",
   "components": [
-    "core",
-    "agent",
-    "pdf",
-    "rime"
-  ],
-  "published_manifest": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.1/components.json",
-  "note": "Build generates immutable version, URL, SHA256 and compressed/unpacked size entries from the actual release assets; no placeholder digest is accepted by the installer.",
-  "platforms": [
     {
-      "os": "linux",
+      "name": "core",
+      "version": "0.2.1",
       "arch": "x86_64",
+      "os": "linux",
       "glibc_min": "2.28",
       "cpu_flags": [
         "sse4_1",
@@ -22,11 +16,86 @@
         "popcnt",
         "cx16",
         "lahf_lm"
-      ]
+      ],
+      "filename": "cosmos-0.2.1-core-linux-x86_64-glibc2.28.tar.gz",
+      "size": 52314193,
+      "unpacked_size": 158379525,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.1/cosmos-0.2.1-core-linux-x86_64-glibc2.28.tar.gz",
+      "sha256": "9f6913120a14d3c4c2f6ace5230af293f3d979c3513dbbfec45be7a7667dd255",
+      "build_source_commit": "5a2bc08df748418f3393fa9e5b9051576afb89fc",
+      "build_run": "https://github.com/WilliamMarci/cosmos/actions/runs/41646628042"
     },
     {
-      "os": "linux",
+      "name": "agent",
+      "version": "0.2.1",
       "arch": "x86_64",
+      "os": "linux",
+      "glibc_min": "2.28",
+      "cpu_flags": [
+        "sse4_1",
+        "sse4_2",
+        "ssse3",
+        "popcnt",
+        "cx16",
+        "lahf_lm"
+      ],
+      "filename": "cosmos-0.2.1-agent-linux-x86_64-glibc2.28.tar.gz",
+      "size": 75268423,
+      "unpacked_size": 190530707,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.1/cosmos-0.2.1-agent-linux-x86_64-glibc2.28.tar.gz",
+      "sha256": "660becbee56b483b5110b4b4272dedf5c8975b317d4f01e92904015e224c76d3",
+      "build_source_commit": "5a2bc08df748418f3393fa9e5b9051576afb89fc",
+      "build_run": "https://github.com/WilliamMarci/cosmos/actions/runs/41646628042"
+    },
+    {
+      "name": "pdf",
+      "version": "0.2.1",
+      "arch": "x86_64",
+      "os": "linux",
+      "glibc_min": "2.28",
+      "cpu_flags": [
+        "sse4_1",
+        "sse4_2",
+        "ssse3",
+        "popcnt",
+        "cx16",
+        "lahf_lm"
+      ],
+      "filename": "cosmos-0.2.1-pdf-linux-x86_64-glibc2.28.tar.gz",
+      "size": 5648105,
+      "unpacked_size": 16344074,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.1/cosmos-0.2.1-pdf-linux-x86_64-glibc2.28.tar.gz",
+      "sha256": "451e7f380ca0c21bd82015dc53af259b0a9fc2a27b6d89471a4569bf1910b783",
+      "build_source_commit": "5a2bc08df748418f3393fa9e5b9051576afb89fc",
+      "build_run": "https://github.com/WilliamMarci/cosmos/actions/runs/41646628042"
+    },
+    {
+      "name": "rime",
+      "version": "0.2.1",
+      "arch": "x86_64",
+      "os": "linux",
+      "glibc_min": "2.28",
+      "cpu_flags": [
+        "sse4_1",
+        "sse4_2",
+        "ssse3",
+        "popcnt",
+        "cx16",
+        "lahf_lm"
+      ],
+      "filename": "cosmos-0.2.1-rime-linux-x86_64-glibc2.28.tar.gz",
+      "size": 51600614,
+      "unpacked_size": 140295296,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.1/cosmos-0.2.1-rime-linux-x86_64-glibc2.28.tar.gz",
+      "sha256": "456256d2fad852b931ba20899a1e78f21784bb4232d2176fb8b3d2386e41bba8",
+      "build_source_commit": "5a2bc08df748418f3393fa9e5b9051576afb89fc",
+      "build_run": "https://github.com/WilliamMarci/cosmos/actions/runs/41646628042"
+    },
+    {
+      "name": "core",
+      "version": "0.2.1",
+      "arch": "x86_64",
+      "os": "linux",
       "glibc_min": "2.34",
       "cpu_flags": [
         "sse4_1",
@@ -35,7 +104,80 @@
         "popcnt",
         "cx16",
         "lahf_lm"
-      ]
+      ],
+      "filename": "cosmos-0.2.1-core-linux-x86_64-glibc2.34.tar.gz",
+      "size": 50852663,
+      "unpacked_size": 155199659,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.1/cosmos-0.2.1-core-linux-x86_64-glibc2.34.tar.gz",
+      "sha256": "ab1cfc350589de2199733ed120d108133d95fac074622bdf8bd792bb188a81dc",
+      "build_source_commit": "5a2bc08df748418f3393fa9e5b9051576afb89fc",
+      "build_run": "https://github.com/WilliamMarci/cosmos/actions/runs/41646628042"
+    },
+    {
+      "name": "agent",
+      "version": "0.2.1",
+      "arch": "x86_64",
+      "os": "linux",
+      "glibc_min": "2.34",
+      "cpu_flags": [
+        "sse4_1",
+        "sse4_2",
+        "ssse3",
+        "popcnt",
+        "cx16",
+        "lahf_lm"
+      ],
+      "filename": "cosmos-0.2.1-agent-linux-x86_64-glibc2.34.tar.gz",
+      "size": 75268400,
+      "unpacked_size": 190530707,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.1/cosmos-0.2.1-agent-linux-x86_64-glibc2.34.tar.gz",
+      "sha256": "1bff2ce8f3f3d91d836312ae3df9ff1edb205acc5ee681b414f7d73d21b49f95",
+      "build_source_commit": "5a2bc08df748418f3393fa9e5b9051576afb89fc",
+      "build_run": "https://github.com/WilliamMarci/cosmos/actions/runs/41646628042"
+    },
+    {
+      "name": "pdf",
+      "version": "0.2.1",
+      "arch": "x86_64",
+      "os": "linux",
+      "glibc_min": "2.34",
+      "cpu_flags": [
+        "sse4_1",
+        "sse4_2",
+        "ssse3",
+        "popcnt",
+        "cx16",
+        "lahf_lm"
+      ],
+      "filename": "cosmos-0.2.1-pdf-linux-x86_64-glibc2.34.tar.gz",
+      "size": 8663551,
+      "unpacked_size": 23067350,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.1/cosmos-0.2.1-pdf-linux-x86_64-glibc2.34.tar.gz",
+      "sha256": "b7984940dfae0f3f70c3549b260163c11ce4569d0a9f9e63cf498dbf1bd42f22",
+      "build_source_commit": "5a2bc08df748418f3393fa9e5b9051576afb89fc",
+      "build_run": "https://github.com/WilliamMarci/cosmos/actions/runs/41646628042"
+    },
+    {
+      "name": "rime",
+      "version": "0.2.1",
+      "arch": "x86_64",
+      "os": "linux",
+      "glibc_min": "2.34",
+      "cpu_flags": [
+        "sse4_1",
+        "sse4_2",
+        "ssse3",
+        "popcnt",
+        "cx16",
+        "lahf_lm"
+      ],
+      "filename": "cosmos-0.2.1-rime-linux-x86_64-glibc2.34.tar.gz",
+      "size": 52406109,
+      "unpacked_size": 142068050,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.1/cosmos-0.2.1-rime-linux-x86_64-glibc2.34.tar.gz",
+      "sha256": "5ee697a6cb8b986e64a3742e1e3463e1205e8d4f4d4bbee6c83bb2930b399fce",
+      "build_source_commit": "919a21adbcf971b99dce13d89d32575bc5dfb445",
+      "build_run": "https://github.com/WilliamMarci/cosmos/actions/runs/41649951287"
     }
   ]
 }
