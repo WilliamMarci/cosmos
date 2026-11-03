@@ -8,7 +8,7 @@ Cosmos 是运行在工作主机上的终端工作壳。通过普通 SSH 登录�
 
 唯一 UI 入口为根目录 `./cosmos`，使用 Python + Textual 与 Cosmos 自绘接口；隔离 Tmux 服务负责持续会话和终端解析。Rust 保留协调服务与管理 CLI，旧 Rust UI 已停用。`dev/cosmos-textual` 仅为兼容跳转。
 
-**安装 release**：下载 [GitHub Release](https://github.com/WilliamMarci/cosmos/releases) 的 core 包，解压后运行 `./install.sh`。简单多选界面可选择 Agent、Bash 助手、PDF、Rime＋雾凇；只下载选中的组件。默认用户态安装，不改全局环境。支持 Linux x86_64 / glibc ≥ 2.28 / x86-64-v2；不匹配的平台会明确拒绝。完整布局、离线安装和参数见 [安装说明](docs/installation.md)。
+**安装 release**：下载 [GitHub Release](https://github.com/WilliamMarci/cosmos/releases) 的 core 包，解压后运行 `./install.sh`。简单多选界面可选择 Agent、Bash 助手、PDF、Rime＋雾凇；只下载选中的组件。默认用户态安装，不改全局环境。提供 AlmaLinux 8 构建的 glibc ≥ 2.28 档及 AlmaLinux 9 构建的 glibc ≥ 2.34 档，均为 Linux x86_64 / x86-64-v2；不匹配的平台会明确拒绝。完整布局、离线安装和参数见 [安装说明](docs/installation.md)。
 
 源码开发需要 Python 3.11+、Tmux 和构建工具：
 

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Executed by release builders, never by the user's installer.
 set -euo pipefail
+tier=${COSMOS_GLIBC_TIER:-2.28}
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 kind=${1:?pdf or rime}
+build_library_path=${LD_LIBRARY_PATH:-}
 work="$root/.build/optional-$kind"
 mkdir -p "$work/sources"
 stage="$work/stage"
@@ -86,8 +88,8 @@ for binary in list((prefix / 'bin').glob('*')) + list((prefix / 'lib').glob('*.s
         check_abi(binary)
 PY
 find "$prefix" -type f -name '*.a' -delete
-find "$prefix" -type f \( -name '*.so*' -o -path '*/bin/*' \) -exec strip --strip-unneeded {} +
+find "$prefix" -type f \( -name '*.so*' -o -path '*/bin/*' \) -exec env LD_LIBRARY_PATH="$build_library_path" strip --strip-unneeded {} +
 # Preserve corresponding source alongside GPL/other optional binaries.
 mkdir -p "$root/dist"
-tar -C "$work/sources" --exclude=.git --exclude='*/build' -czf "$root/dist/cosmos-0.2.1-$kind-sources.tar.gz" .
+tar -C "$work/sources" --exclude=.git --exclude='*/build' -czf "$root/dist/cosmos-0.2.1-$kind-glibc$tier-sources.tar.gz" .
 python3 "$root/packaging/assemble.py" "$kind" "$stage"

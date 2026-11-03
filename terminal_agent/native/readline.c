@@ -1,12 +1,15 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
 #define _XOPEN_SOURCE 700
 #define _DEFAULT_SOURCE
+#include <stdio.h>  /* Readline 7 headers require FILE to be declared first. */
 #include <readline/readline.h>
 #include <readline/keymaps.h>
 #include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <signal.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>

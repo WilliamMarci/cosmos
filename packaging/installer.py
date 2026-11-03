@@ -53,10 +53,20 @@ def download(url, path, limit):
             output.write(chunk)
 
 
-def component(bundle, name, version, temporary, manifest):
-    entry = next((item for item in manifest["components"] if item["name"] == name and item["arch"] == "x86_64" and item["glibc_min"] == "2.28"), None)
-    if entry is None:
+def select_component(manifest, name, arch, glibc, flags):
+    matches = [item for item in manifest["components"] if item["name"] == name and item["arch"] == arch
+               and tuple(map(int, item["glibc_min"].split("."))) <= glibc
+               and set(item["cpu_flags"]).issubset(flags)]
+    if not matches:
         raise ValueError("No compatible component: " + name)
+    return max(matches, key=lambda item: tuple(map(int, item["glibc_min"].split("."))))
+
+
+def component(bundle, name, version, temporary, manifest):
+    actual_glibc = tuple(map(int, os.confstr("CS_GNU_LIBC_VERSION").split()[-1].split(".")))
+    processors = [set(line.partition(":")[2].split()) for line in Path("/proc/cpuinfo").read_text().splitlines() if line.startswith("flags")]
+    flags = set.intersection(*processors) if processors else set()
+    entry = select_component(manifest, name, os.uname().machine, actual_glibc, flags)
     filename = entry["filename"]
     if Path(filename).name != filename or entry["url"] != f"https://github.com/WilliamMarci/cosmos/releases/download/v{version}/{filename}":
         raise ValueError("Invalid component URL or filename")

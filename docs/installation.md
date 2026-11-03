@@ -1,8 +1,8 @@
 # User installation
 
-Download the `core` Linux x86_64 / glibc 2.28 archive from the [GitHub release](https://github.com/WilliamMarci/cosmos/releases). Extract it and run `./install.sh`. Do not use sudo. The GitHub-generated source archives are for development and are not installable binary packages.
+Download the `core` Linux x86_64 / glibc 2.28 or 2.34 archive from the [GitHub release](https://github.com/WilliamMarci/cosmos/releases). Extract it and run `./install.sh`. Do not use sudo. The GitHub-generated source archives are for development and are not installable binary packages.
 
-The installer checks Linux/CPU architecture, glibc, required x86-64-v2 CPU flags, writable directories, free space and archive checksums before installing. This compatibility tier targets AlmaLinux/Rocky/RHEL 8 and newer compatible glibc distributions. ARM64 and musl/Alpine have no matching package yet and are rejected. Being an SSH server does not change these requirements.
+The installer checks Linux/CPU architecture, glibc, required x86-64-v2 CPU flags, writable directories, free space and archive checksums before installing. The glibc 2.28 tier is built on AlmaLinux 8; the glibc 2.34 tier is built on AlmaLinux 9. These target AlmaLinux/Rocky/RHEL 8 and newer compatible glibc distributions. The single-file release `install.sh` bootstrap uses the published TSV form of the same manifest to select the highest compatible core tier without a JSON parser; core archives can also be downloaded manually. ARM64 and musl/Alpine have no matching package yet and are rejected. Being an SSH server does not change these requirements.
 
 The line-based Bash TUI supports multi-selection with numeric toggles and Enter; it needs no dialog/fzf/ncurses UI dependency. Core is required; Agent, Bash command assistant, PDF and Rime are selectable. Only selected Agent/PDF/Rime archives are downloaded, checked against `components.json` (version, compatibility, URL, SHA256, compressed and unpacked size), then extracted. There is no end-user compilation, package-manager use or system package installation.
 
@@ -30,4 +30,4 @@ Install upgrades to a new versioned directory. Older installations/configuration
 
 # Building releases
 
-`packaging/build.sh core|agent|pdf|rime` runs in the AlmaLinux 8 container used by `.github/workflows/release.yml`. Build tools and development libraries are installed only in this ephemeral builder. Native binaries are checked with `readelf` against glibc 2.28. The build collects third-party notices and sources, generates checksums, tests an unprivileged clean installation, and publishes separate GitHub Release assets plus a compatibility manifest. Source trees, node_modules, Python environments and generated binaries are excluded from Git.
+`packaging/build.sh core|agent|pdf|rime` runs in the matching AlmaLinux 8/9 container used by `.github/workflows/release.yml`. Build tools and development libraries are installed only in this ephemeral builder. Native binaries are checked with `readelf` against their glibc 2.28/2.34 tier. The build collects third-party notices and sources, generates checksums, tests an unprivileged clean installation, and publishes separate GitHub Release assets plus a compatibility manifest. Source trees, node_modules, Python environments and generated binaries are excluded from Git.

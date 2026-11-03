@@ -62,3 +62,12 @@ class InstallationTests(unittest.TestCase):
             library.write_bytes(b"fixture")
             module.copy(library, library)
             self.assertEqual(library.read_bytes(), b"fixture")
+
+    def test_glibc_tier_selection_rejects_unsupported_cpu_and_architecture(self):
+        entries = [dict(name="core", arch="x86_64", glibc_min=tier, cpu_flags=["sse4_2"]) for tier in ("2.28", "2.34")]
+        manifest = dict(components=entries)
+        self.assertEqual(installer.select_component(manifest, "core", "x86_64", (2, 28), {"sse4_2"})["glibc_min"], "2.28")
+        self.assertEqual(installer.select_component(manifest, "core", "x86_64", (2, 34), {"sse4_2"})["glibc_min"], "2.34")
+        for arch, glibc, flags in [("aarch64", (2, 34), {"sse4_2"}), ("x86_64", (2, 27), {"sse4_2"}), ("x86_64", (2, 34), set())]:
+            with self.assertRaisesRegex(ValueError, "No compatible"):
+                installer.select_component(manifest, "core", arch, glibc, flags)

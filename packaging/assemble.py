@@ -13,6 +13,7 @@ import tarfile
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = runpy.run_path(str(ROOT / "python/cosmos_tui/core/metadata.py"))["VERSION"]
 DIST = ROOT / "dist"
+TIER = os.getenv("COSMOS_GLIBC_TIER", "2.28")
 
 
 def copy(source, destination):
@@ -60,12 +61,13 @@ def archive(stage, name, rooted=False):
     print(target)
 
 
-def check_abi(binary, maximum="2.28"):
+def check_abi(binary, maximum=None):
+    maximum = maximum or TIER
     import re
     output = subprocess.check_output(["readelf", "--version-info", str(binary)], text=True)
     versions = [tuple(map(int, value.split("."))) for value in re.findall(r"GLIBC_([0-9.]+)", output)]
     if versions and max(versions) > tuple(map(int, maximum.split("."))):
-        raise RuntimeError(f"{binary} needs glibc {'.'.join(map(str, max(versions)))}; build this tier on AlmaLinux 8")
+        raise RuntimeError(f"{binary} needs glibc {'.'.join(map(str, max(versions)))}; build this tier in its matching AlmaLinux container")
 
 
 def main(kind, source):
@@ -104,7 +106,7 @@ def main(kind, source):
             copy(tmux_notice, stage / "licenses/tmux-COPYING")
         else:
             raise RuntimeError("Missing tmux copyright notice")
-        glibc = "2.28"
+        glibc = TIER
         # Reject accidentally building a public compatibility tier on a newer host.
         for binary in [stage / "bin/cosmos", stage / "bin/tmux", stage / ".build/libcosmos_files.so", stage / "terminal_agent/.build/terminal-agent-readline.so"]:
             check_abi(binary, glibc)
@@ -118,7 +120,7 @@ def main(kind, source):
         (stage / "SHA256SUMS").write_text("\n".join(checksums) + "\n")
     else:
         copy(source, stage)
-    archive(stage, f"cosmos-{VERSION}-{kind}-linux-x86_64-glibc2.28", rooted=kind == "core")
+    archive(stage, f"cosmos-{VERSION}-{kind}-linux-x86_64-glibc{TIER}", rooted=kind == "core")
 
 
 if __name__ == "__main__":
