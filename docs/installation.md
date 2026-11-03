@@ -4,18 +4,18 @@ Download the `core` Linux x86_64 / glibc 2.28 or 2.34 archive from the [GitHub r
 
 The installer checks Linux/CPU architecture, glibc, required x86-64-v2 CPU flags, writable directories, free space and archive checksums before installing. The glibc 2.28 tier is built on AlmaLinux 8; the glibc 2.34 tier is built on AlmaLinux 9. These target AlmaLinux/Rocky/RHEL 8 and newer compatible glibc distributions. The single-file release `install.sh` bootstrap uses the published TSV form of the same manifest to select the highest compatible core tier without a JSON parser; core archives can also be downloaded manually. ARM64 and musl/Alpine have no matching package yet and are rejected. Being an SSH server does not change these requirements.
 
-The line-based Bash TUI supports multi-selection with numeric toggles and Enter; it needs no dialog/fzf/ncurses UI dependency. Core is required; Agent, Bash command assistant, PDF and Rime are selectable. Only selected Agent/PDF/Rime archives are downloaded, checked against `components.json` (version, compatibility, URL, SHA256, compressed and unpacked size), then extracted. There is no end-user compilation, package-manager use or system package installation.
+The line-based Bash TUI supports multi-selection with numeric toggles, `p` to edit the software installation directory, `b` to edit the command directory, and Enter to continue; it needs no dialog/fzf/ncurses UI dependency. Core is required; Agent, Bash command assistant, PDF and Rime are selectable. Only selected Agent/PDF/Rime archives are downloaded, checked against `components.json` (version, compatibility, URL, SHA256, compressed and unpacked size), then extracted. There is no end-user compilation, package-manager use or system package installation.
 
 ```bash
 ./install.sh
 ./install.sh --yes --features core,assistant,pdf,rime \
-  --prefix "$HOME/apps/cosmos-0.2.1" --bin-dir "$HOME/.local/bin"
+  --prefix "$HOME/apps/cosmos-0.2.2" --bin-dir "$HOME/.local/bin"
 ./install.sh --check --features core
 ```
 
 Defaults:
 
-- Software: `${XDG_DATA_HOME:-~/.local/share}/cosmos/0.2.1`.
+- Software: `${XDG_DATA_HOME:-~/.local/share}/cosmos/0.2.2`.
 - Command: `~/.local/bin/cosmos` symlink; `--bin-dir` overrides it. Existing unmanaged commands are never overwritten.
 - Configuration: `${XDG_CONFIG_HOME:-~/.config}/cosmos`.
 - Cache: `${XDG_CACHE_HOME:-~/.cache}/cosmos` (including Python bytecode).
@@ -40,3 +40,5 @@ PDF/Rime build outputs and their corresponding sources are cached separately for
 The installer reports byte counts/percentages for downloads, integrity checks, core copying and component extraction, followed by environment/entry setup. Feedback uses plain lines, including redirected logs and SSH sessions.
 
 `cosmos update` discovers the newest published numeric version on GitHub (including the development/prerelease channel), retains the installed feature selection and command directory, installs to a new sibling version directory, and switches the command symlink only after successful validation. An optional component is copied from the existing installation only when its file contents and permissions match the new release's payload fingerprint; modified or incompatible components are downloaded and SHA256-checked instead. Older manifests without payload fingerprints safely fall back to downloads. The old installation and running sessions remain available; stop the previous coordinator before reopening the updated application. Source checkouts should be updated with Git.
+
+On a build-cache miss, the developer workflow can restore PDF/Rime from a published release only when both the native build recipe and ABI/packaging collector match byte for byte; binary and corresponding-source hashes are checked before reuse. `--rebuild-optional` bypasses this fallback as well as caches.

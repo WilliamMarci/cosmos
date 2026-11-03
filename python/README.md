@@ -1,4 +1,4 @@
-# Cosmos Arche 0.2.1 — Python UI
+# Cosmos Arche 0.2.2 — Python UI
 
 根目录 `./cosmos` 是唯一 UI 入口；`dev/cosmos-textual` 仅为兼容跳转，旧 Rust UI 已停用。Python + Textual 负责事件循环，Cosmos 自绘控件经同一 compositor 输出字符与 Kitty 图形；Tmux 提供持续会话与解析后的终端画面。Rust 协调服务继续负责 IPC、Mod、配置及服务事件。
 

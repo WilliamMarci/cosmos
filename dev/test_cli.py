@@ -40,7 +40,7 @@ class CLITests(unittest.TestCase):
             [str(ROOT / "cosmos"), "--version"], text=True, capture_output=True
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.strip(), "Cosmos Arche 0.2.1 (development)")
+        self.assertEqual(result.stdout.strip(), "Cosmos Arche 0.2.2 (development)")
 
     def test_symlink_help_and_all_subcommand_help(self):
         with tempfile.TemporaryDirectory() as directory:

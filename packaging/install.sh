@@ -27,10 +27,23 @@ for flag in sse4_1 sse4_2 ssse3 popcnt cx16 lahf_lm; do
 done
 [[ -x $bundle/runtime/bin/python3 ]] || { echo 'Portable Python runtime missing; use the binary release archive, not GitHub source.zip.' >&2; exit 1; }
 features=core,agent,assistant
+location_args=()
 explicit=0
 for arg in "$@"; do [[ $arg == --features || $arg == --features=* || $arg == --yes || $arg == --check ]] && explicit=1; done
 if (( ! explicit )); then
     [[ -t 0 && -t 1 ]] || { echo 'Non-interactive install requires --yes or --features.' >&2; exit 2; }
+    version=$("$bundle/runtime/bin/python3" -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$bundle/bundle.json")
+    prefix=${XDG_DATA_HOME:-$HOME/.local/share}/cosmos/$version
+    bin_dir=$HOME/.local/bin
+    arguments=("$@")
+    for ((i=0; i<${#arguments[@]}; i++)); do
+        case "${arguments[i]}" in
+            --prefix) i=$((i+1)); prefix=${arguments[i]:-} ;;
+            --prefix=*) prefix=${arguments[i]#*=} ;;
+            --bin-dir) i=$((i+1)); bin_dir=${arguments[i]:-} ;;
+            --bin-dir=*) bin_dir=${arguments[i]#*=} ;;
+        esac
+    done
     selected=(1 1 0 0)
     labels=('Cosmos Agent (separate archive)' 'Bash command assistant' 'PDF reader (private Poppler)' 'Rime input method (private librime + rime_ice)')
     while true; do
@@ -39,17 +52,27 @@ if (( ! explicit )); then
             mark=' '; [[ ${selected[i]} == 1 ]] && mark=x
             printf '  %d [%s] %s\n' "$((i+1))" "$mark" "${labels[i]}"
         done
-        printf 'Toggle numbers separated by spaces; Enter confirms; q cancels: '
+        printf '  p Installation directory: %s\n  b Command directory: %s\n' "$prefix" "$bin_dir"
+        printf 'Toggle 1–4; p/b edits directories; Enter continues; q cancels: '
         read -r answer || exit 1
         [[ $answer == q ]] && exit 0
         [[ -z $answer ]] && break
+        if [[ $answer == p || $answer == b ]]; then
+            printf 'New directory (empty keeps current): '
+            read -r directory || exit 1
+            if [[ -n $directory ]]; then
+                if [[ $answer == p ]]; then prefix=$directory; else bin_dir=$directory; fi
+            fi
+            continue
+        fi
         for number in $answer; do
             case "$number" in 1|2|3|4) i=$((number-1)); selected[i]=$((1-selected[i])) ;; *) echo "Invalid choice: $number" ;; esac
         done
     done
+    location_args=(--prefix "$prefix" --bin-dir "$bin_dir")
     names=(agent assistant pdf rime)
     features=core
     for i in 0 1 2 3; do [[ ${selected[i]} == 1 ]] && features+=,${names[i]}; done
 fi
 # -I ignores the caller's Python environment; all installation code is bundled.
-exec "$bundle/runtime/bin/python3" -I "$bundle/installer.py" --bundle "$bundle" --default-features "$features" "$@"
+exec "$bundle/runtime/bin/python3" -I "$bundle/installer.py" --bundle "$bundle" --default-features "$features" "$@" "${location_args[@]}"

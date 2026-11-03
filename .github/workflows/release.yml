@@ -73,9 +73,15 @@ jobs:
             .build/optional-${{ matrix.component }}/stage
             .build/optional-${{ matrix.component }}/corresponding-sources.tar.gz
           key: optional-v1-${{ matrix.component }}-${{ matrix.tier }}-${{ hashFiles('packaging/build_optional.sh', 'packaging/assemble.py') }}${{ inputs.rebuild_optional && format('-forced-{0}', github.run_id) || '' }}
+      - name: Restore unchanged published optional component
+        id: published-optional
+        if: (matrix.component == 'pdf' || matrix.component == 'rime') && steps.optional-cache.outputs.cache-hit != 'true' && !inputs.rebuild_optional
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 packaging/reuse_optional.py '${{ matrix.component }}'
       - name: Build component
         env:
-          COSMOS_OPTIONAL_CACHE_HIT: ${{ steps.optional-cache.outputs.cache-hit || 'false' }}
+          COSMOS_OPTIONAL_CACHE_HIT: ${{ steps.optional-cache.outputs.cache-hit == 'true' && 'true' || steps.published-optional.outputs.restored || 'false' }}
         run: |
           source /opt/rh/gcc-toolset-12/enable
           bash packaging/build.sh '${{ matrix.component }}'
@@ -92,7 +98,7 @@ jobs:
           cargo test --locked
           export UV_PYTHON_INSTALL_DIR="$PWD/.build/release-python"
           python_runtime=$(uv python find --managed-python 3.12)
-          PYTHONPATH=python:python-deps:.build/release-deps:dev "$python_runtime" -m unittest dev.test_installation dev.test_update dev.test_standalone_reader dev.test_release_cache dev.test_terminal_tabs dev.test_status_identity dev.test_status dev.test_cli
+          PYTHONPATH=python:python-deps:.build/release-deps:dev "$python_runtime" -m unittest dev.test_installation dev.test_installer_tui dev.test_release_reuse dev.test_update dev.test_standalone_reader dev.test_release_cache dev.test_terminal_tabs dev.test_status_identity dev.test_status dev.test_cli
           mkdir .build/install-smoke
           tar -xzf dist/cosmos-*-core-linux-x86_64-glibc${{ matrix.tier }}.tar.gz -C .build/install-smoke
           installer=$(find .build/install-smoke -name install.sh -print -quit)

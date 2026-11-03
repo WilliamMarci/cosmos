@@ -93,7 +93,7 @@ The flat commands, their common aliases, nested session operations, uniform sess
 
 `cosmos --mouse-mode auto|cell|pixel` sets this connection's mouse mode. The option also works on `attach`, `new`, and their `session` group forms. Auto defaults to Cell until capability and geometry are confirmed; Cell is intended for compatibility with remote/mobile clients. Settings → Input → Mouse mode changes the current client immediately. No coordinator setting is modified, and mouse selection is independent of image rendering. See mouse.md for negotiation and fallback details.
 
-`cosmos --version` prints `Cosmos Arche 0.2.1 (development)`. The codename/channel identify the development release; session command and protocol version semantics are unchanged.
+`cosmos --version` prints `Cosmos Arche 0.2.2 (development)`. The codename/channel identify the development release; session command and protocol version semantics are unchanged.
 
 `cosmos cache-clear` now clears the persistent Python Reader cache with the same lock/generation protocol as Settings → Reader; running clients keep their in-memory frames. The older viewer.cache.clear RPC remains the legacy Rust cache operation.
 
