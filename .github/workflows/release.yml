@@ -1,6 +1,11 @@
 name: Build and release
 on:
   workflow_dispatch:
+    inputs:
+      repair_rime9:
+        description: Rebuild only the AlmaLinux 9 Rime component
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -18,9 +23,7 @@ jobs:
     timeout-minutes: 75
     strategy:
       fail-fast: false
-      matrix:
-        component: [core, agent, pdf, rime]
-        tier: ['2.28', '2.34']
+      matrix: ${{ fromJSON(inputs.repair_rime9 && '{"include":[{"component":"rime","tier":"2.34"}]}' || '{"component":["core","agent","pdf","rime"],"tier":["2.28","2.34"]}') }}
     steps:
       - name: Build dependencies (ephemeral AlmaLinux container only)
         run: |
@@ -91,6 +94,7 @@ jobs:
           path: dist/*
           compression-level: 0
   publish:
+    if: ${{ !inputs.repair_rime9 }}
     needs: build
     runs-on: ubuntu-22.04
     permissions:
