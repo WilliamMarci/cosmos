@@ -115,6 +115,9 @@ async def save_choice(controller, state, field):
         "inline_rows": "viewer_inline_image_rows",
     }
     value = str(state[field]) if field == "columns" else state[field]
+    if hasattr(controller.app, "save_reader_state"):
+        controller.app.settings[keys[field]] = value
+        return True
     try:
         settings = await rpc.call("settings.get")
         settings[keys[field]] = value

@@ -50,7 +50,9 @@ done < "$work/components.tsv"
 [[ $selected == cosmos-$version-core-linux-$arch-glibc[0-9]*.tar.gz && $selected != */* ]] || { echo 'Invalid manifest filename.' >&2; exit 1; }
 printf 'Selected Linux %s / glibc >= %s.%s\n' "$arch" "$best_major" "$best_minor"
 fetch "$base/$selected" "$work/$selected"
+printf 'Verifying core archive…\n'
 (cd "$work" && printf '%s  %s\n' "$expected" "$selected" | sha256sum --check --status)
+printf 'Extracting core archive…\n'
 tar --no-same-owner --no-same-permissions -xzf "$work/$selected" -C "$work"
 installer=$work/${selected%.tar.gz}/install.sh
 [[ -f $installer ]] || { echo 'Core archive is missing install.sh.' >&2; exit 1; }

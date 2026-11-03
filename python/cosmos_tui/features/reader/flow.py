@@ -176,9 +176,8 @@ def render(doc, pane, state, palette, cell):
             text = row.text.copy()
             if state.get("query"):
                 text.highlight_regex(
-                    re.escape(state["query"]),
+                    re.compile(re.escape(state["query"]), re.IGNORECASE),
                     f"black on {palette['accl']}",
-                    re_flags=re.IGNORECASE,
                 )
             if row.block == selected:
                 text.stylize(f"on {palette['base']}")

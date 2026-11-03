@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import shlex
+import subprocess
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -632,3 +633,15 @@ class Tmux:
             except TimeoutError:
                 self.process.kill()
                 await self.process.wait()
+
+
+def in_cosmos_pane():
+    """Detect the actual backend socket without starting a server."""
+    actual = os.getenv("TMUX", "").split(",")[0]
+    if not actual or not re.fullmatch(r"%[0-9]+", os.getenv("TMUX_PANE", "")):
+        return False
+    try:
+        result = subprocess.run([os.getenv("COSMOS_TMUX", "tmux"), "-L", os.getenv("COSMOS_TMUX_SOCKET", "cosmos"), "display-message", "-p", "#{socket_path}"], capture_output=True, text=True, timeout=3)
+        return result.returncode == 0 and bool(result.stdout.strip()) and os.path.realpath(actual) == os.path.realpath(result.stdout.strip())
+    except (OSError, subprocess.TimeoutExpired):
+        return False

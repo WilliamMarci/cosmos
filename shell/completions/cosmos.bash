@@ -1,7 +1,7 @@
 # Bash completion for the public Cosmos entry point. No daemon is started.
 _cosmos_complete() {
     local cur=${COMP_WORDS[COMP_CWORD]} command=${COMP_WORDS[1]} previous=${COMP_WORDS[COMP_CWORD-1]}
-    local commands='agent ag attach a new n list l ls sessions kill k exists ex has rename re history hi session daemon da stop st doctor do config con events ev cache-clear ca mod m action ac rpc rp open o completion com help he'
+    local commands='agent ag attach a new n list l ls sessions kill k exists ex has rename re history hi session daemon da stop st doctor do config con events ev cache-clear ca mod m action ac rpc rp open o update u completion com help he'
     COMPREPLY=()
     if (( COMP_CWORD == 1 )); then
         mapfile -t COMPREPLY < <(compgen -W "$commands --help --version --debug --log-level --log-file --mouse-mode" -- "$cur")
@@ -19,7 +19,7 @@ _cosmos_complete() {
     case "$previous" in
         --mouse-mode) mapfile -t COMPREPLY < <(compgen -W "auto cell pixel" -- "$cur"); return ;;
         --log-level) mapfile -t COMPREPLY < <(compgen -W 'DEBUG INFO WARNING ERROR' -- "$cur"); return ;;
-        --log-file|--cwd|-c|--output|-o|open|add) mapfile -t COMPREPLY < <(compgen -f -- "$cur"); compopt -o filenames; return ;;
+        --bin-dir|--log-file|--cwd|-c|--output|-o|open|add) mapfile -t COMPREPLY < <(compgen -f -- "$cur"); compopt -o filenames; return ;;
         -s|--session) return ;;
     esac
     case "$command" in
@@ -41,6 +41,7 @@ _cosmos_complete() {
         ac) command=action ;;
         rp) command=rpc ;;
         o) command=open ;;
+        u) command=update ;;
         com) command=completion ;;
         he) command=help ;;
     esac
@@ -54,6 +55,7 @@ _cosmos_complete() {
                 mapfile -t COMPREPLY < <(compgen -W '--output --help' -- "$cur")
             fi ;;
         help) mapfile -t COMPREPLY < <(compgen -W "$commands" -- "$cur") ;;
+        update) mapfile -t COMPREPLY < <(compgen -W '--bin-dir --help' -- "$cur") ;;
         completion) mapfile -t COMPREPLY < <(compgen -W 'bash' -- "$cur") ;;
         mod)
             if (( position == 2 )); then

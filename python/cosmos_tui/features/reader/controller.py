@@ -388,7 +388,10 @@ class ReaderController(Controller):
         }
         wire = base64.b64encode(json.dumps(saved).encode()).decode()
         self.revisions[pane.id] = self.revisions.get(pane.id, 0) + 1
-        await app.backend.request(f"set-option -p -t {pane.id} @cosmos_viewer {wire}")
+        if hasattr(app, "save_reader_state"):
+            await app.save_reader_state(pane, wire)
+        else:
+            await app.backend.request(f"set-option -p -t {pane.id} @cosmos_viewer {wire}")
         pane.viewer = wire
         self.events.replaced(pane.id, wire)
 
@@ -692,7 +695,10 @@ class ReaderController(Controller):
             self.clear_cache()
             pane.viewer = ""
             self.events.replaced(pane.id, None)
-            await app.backend.request(f"set-option -pu -t {pane.id} @cosmos_viewer")
+            if hasattr(app, "save_reader_state"):
+                await app.save_reader_state(pane, "")
+            else:
+                await app.backend.request(f"set-option -pu -t {pane.id} @cosmos_viewer")
             return
         elif event.character == "?":
             app.push_screen(Help("Viewer", keymap.help_rows("viewer", app.settings)))

@@ -1,6 +1,7 @@
 """User-only, relocatable installation of a verified Cosmos release bundle."""
 import argparse
 import ctypes
+import fnmatch
 import hashlib
 import json
 import os
@@ -10,13 +11,50 @@ import ssl
 import subprocess
 import tarfile
 import tempfile
+import sys
+import time
 import urllib.request
 
 FEATURES = {"core", "agent", "assistant", "pdf", "rime"}
 
 
+class Progress:
+    """Plain progress lines work equally in SSH terminals and redirected logs."""
+    def __init__(self, label, total=0):
+        self.label, self.total, self.done = label, total, 0
+        self.last, self.percent = 0.0, -1
+        self.show(force=True)
+
+    def advance(self, amount):
+        self.done += amount
+        self.show()
+
+    def show(self, force=False):
+        percent = min(100, int(100 * self.done / self.total)) if self.total else None
+        now = time.monotonic()
+        if not force and (now - self.last < 0.25 or (percent is not None and percent // 10 == self.percent // 10)):
+            return
+        self.last, self.percent = now, percent if percent is not None else -1
+        def size(value):
+            return f"{value / 1024**2:.1f} MiB" if value >= 1024**2 else f"{value / 1024:.1f} KiB"
+        detail = size(self.done)
+        if self.total:
+            detail += f" / {size(self.total)} ({percent}%)"
+        print(f"{self.label}: {detail}", file=sys.stderr, flush=True)
+
+    def finish(self):
+        self.show(force=True)
+        print(self.label + ": done", file=sys.stderr, flush=True)
+
+
 def verify(folder):
-    for line in (folder / "SHA256SUMS").read_text().splitlines():
+    lines = (folder / "SHA256SUMS").read_text().splitlines()
+    for line in lines:
+        path = folder / line.split("  ", 1)[1]
+        if path.is_symlink() or not path.resolve().is_relative_to(folder.resolve()):
+            raise ValueError("Unsafe checksum path")
+    progress = Progress("Verify core", sum((folder / line.split("  ", 1)[1]).stat().st_size for line in lines))
+    for line in lines:
         checksum, name = line.split("  ", 1)
         path = folder / name
         if path.is_symlink() or not path.resolve().is_relative_to(folder.resolve()):
@@ -24,6 +62,8 @@ def verify(folder):
         with path.open("rb") as source:
             if hashlib.file_digest(source, "sha256").hexdigest() != checksum:
                 raise ValueError("Checksum mismatch: " + name)
+        progress.advance(path.stat().st_size)
+    progress.finish()
 
 
 def extract(archive, destination, maximum=1024**3):
@@ -39,18 +79,59 @@ def extract(archive, destination, maximum=1024**3):
                 raise ValueError("Privileged archive member")
             if item.isfile() and path.exists():
                 raise ValueError("Component would overwrite an existing file")
-        tar.extractall(destination, members=members, filter="data")
+        progress = Progress("Extract " + archive.name, sum(item.size for item in members))
+        for item in members:
+            tar.extract(item, destination, filter="data")
+            progress.advance(item.size)
+        progress.finish()
 
 
 def download(url, path, limit):
     request = urllib.request.Request(url, headers={"User-Agent": "Cosmos-installer"})
     with urllib.request.urlopen(request, timeout=60, context=ssl.create_default_context()) as response, path.open("wb") as output:
+        length = response.headers.get("Content-Length")
+        progress = Progress("Download " + path.name, int(length) if length and length.isdigit() else 0)
         total = 0
         while chunk := response.read(1024 * 1024):
             total += len(chunk)
             if total > limit:
                 raise ValueError("Component exceeds download budget")
             output.write(chunk)
+            progress.advance(len(chunk))
+        progress.finish()
+
+
+COMPONENT_ROOTS = {
+    "agent": ("bin/cosmos-agent", "licenses/opencode"),
+    "pdf": ("vendor/pdf", "licenses/pdf"),
+    "rime": ("vendor/rime", "licenses/rime"),
+}
+
+
+def payload_digest(records):
+    return hashlib.sha256(json.dumps(sorted(records), separators=(",", ":")).encode()).hexdigest()
+
+
+def installed_payload(folder, name):
+    records, paths = [], []
+    for relative in COMPONENT_ROOTS[name]:
+        root = folder / relative
+        if not root.exists() or root.is_symlink():
+            return None, []
+        for path in ([root] if root.is_file() else sorted(root.rglob("*"))):
+            if path.is_symlink():
+                return None, []
+            if path.is_file():
+                with path.open("rb") as source:
+                    digest = hashlib.file_digest(source, "sha256").hexdigest()
+                records.append((path.relative_to(folder).as_posix(), path.stat().st_mode & 0o777, digest))
+                paths.append(path.relative_to(folder))
+    return payload_digest(records), paths
+
+
+class ReusedComponent:
+    def __init__(self, folder, paths):
+        self.folder, self.paths = folder, paths
 
 
 def select_component(manifest, name, arch, glibc, flags):
@@ -62,7 +143,7 @@ def select_component(manifest, name, arch, glibc, flags):
     return max(matches, key=lambda item: tuple(map(int, item["glibc_min"].split("."))))
 
 
-def component(bundle, name, version, temporary, manifest):
+def component(bundle, name, version, temporary, manifest, reuse_from=None):
     actual_glibc = tuple(map(int, os.confstr("CS_GNU_LIBC_VERSION").split()[-1].split(".")))
     processors = [set(line.partition(":")[2].split()) for line in Path("/proc/cpuinfo").read_text().splitlines() if line.startswith("flags")]
     flags = set.intersection(*processors) if processors else set()
@@ -70,11 +151,17 @@ def component(bundle, name, version, temporary, manifest):
     filename = entry["filename"]
     if Path(filename).name != filename or entry["url"] != f"https://github.com/WilliamMarci/cosmos/releases/download/v{version}/{filename}":
         raise ValueError("Invalid component URL or filename")
+    if reuse_from and entry.get("payload_sha256"):
+        digest, paths = installed_payload(reuse_from, name)
+        if digest == entry["payload_sha256"]:
+            print("Reuse unchanged component: " + name, file=sys.stderr, flush=True)
+            return ReusedComponent(reuse_from, paths), entry
     archive = bundle / filename
     if not archive.is_file():
         archive = temporary / filename
         print("Downloading optional component:", name, flush=True)
         download(entry["url"], archive, entry["size"])
+    print("Verify component: " + name, file=sys.stderr, flush=True)
     with archive.open("rb") as source:
         actual = hashlib.file_digest(source, "sha256").hexdigest()
     if actual != entry["sha256"] or archive.stat().st_size != entry["size"]:
@@ -92,6 +179,7 @@ def main(argv=None):
     parser.add_argument("--bin-dir", type=Path, default=Path.home() / ".local/bin")
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--reuse-from", type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if os.getuid() == 0:
         parser.error("Run as your normal user; sudo/root installation is not supported")
@@ -151,15 +239,44 @@ def main(argv=None):
             manifest = json.loads(manifest_path.read_text())
             if manifest["version"] != version:
                 raise ValueError("Component manifest version mismatch")
-        additions = {name: component(bundle, name, version, temporary, manifest) for name in sorted(selected & {"agent", "pdf", "rime"})}
+        additions = {name: component(bundle, name, version, temporary, manifest, args.reuse_from) for name in sorted(selected & {"agent", "pdf", "rime"})}
         prefix.parent.mkdir(parents=True, exist_ok=True)
         # The final path is fixed before venv creation; no relocated shebangs.
         try:
-            shutil.copytree(bundle, prefix, ignore=shutil.ignore_patterns("cosmos-*.tar.gz", "cosmos-*.tar.gz.sha256", "__pycache__"), symlinks=True)
+            ignored = ("cosmos-*.tar.gz", "cosmos-*.tar.gz.sha256")
+            copy_size = sum(
+                p.stat().st_size for p in bundle.rglob("*")
+                if p.is_file() and not p.is_symlink()
+                and not any(fnmatch.fnmatchcase(p.name, pattern) for pattern in ignored)
+                and "__pycache__" not in p.parts
+            )
+            progress = Progress("Copy core", copy_size)
+            def copy_file(source, destination):
+                result = shutil.copy2(source, destination)
+                progress.advance(Path(source).stat().st_size)
+                return result
+            shutil.copytree(bundle, prefix, copy_function=copy_file, ignore=shutil.ignore_patterns("cosmos-*.tar.gz", "cosmos-*.tar.gz.sha256", "__pycache__"), symlinks=True)
+            progress.finish()
             for name, (archive, component_entry) in additions.items():
                 # Extract checked components directly into the new install tree;
                 # do not keep a second unpacked copy on a quota-limited server.
-                extract(archive, prefix, component_entry["unpacked_size"])
+                if isinstance(archive, ReusedComponent):
+                    progress = Progress(
+                        "Copy reused " + name,
+                        sum((archive.folder / p).stat().st_size for p in archive.paths),
+                    )
+                    for relative in archive.paths:
+                        destination = prefix / relative
+                        if destination.exists() or destination.is_symlink():
+                            raise ValueError("Reused component would overwrite a file")
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(archive.folder / relative, destination)
+                        progress.advance(destination.stat().st_size)
+                    progress.finish()
+                    if installed_payload(prefix, name)[0] != component_entry["payload_sha256"]:
+                        raise ValueError("Reused component changed during copying: " + name)
+                else:
+                    extract(archive, prefix, component_entry["unpacked_size"])
             if "assistant" not in selected:
                 shutil.rmtree(prefix / "terminal_agent/.build", ignore_errors=True)
             for name in selected & {"pdf", "rime"}:
@@ -170,9 +287,10 @@ def main(argv=None):
                 else:
                     if not (prefix / "vendor/rime/share/rime-data/build/rime_ice.schema.yaml").is_file():
                         raise ValueError("Compiled rime_ice data missing")
+            print("Configure Python environment and command entry", file=sys.stderr, flush=True)
             python = prefix / "runtime/bin/python3"
             subprocess.run([str(python), "-I", "-m", "venv", "--without-pip", str(prefix / ".venv")], check=True)
-            (prefix / "installed-features.json").write_text(json.dumps(dict(version=version, features=sorted(selected)), indent=2) + "\n")
+            (prefix / "installed-features.json").write_text(json.dumps(dict(version=version, features=sorted(selected), bin_dir=str(bindir)), indent=2) + "\n")
             subprocess.run([str(prefix / "cosmos"), "--version"], check=True)
             bindir.mkdir(parents=True, exist_ok=True)
             pending = bindir / (".cosmos-link-" + str(os.getpid()))

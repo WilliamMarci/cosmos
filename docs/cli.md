@@ -27,7 +27,8 @@ Management commands, all with `--help`:
 - `mod list`, `mod add MANIFEST`, `mod start ID`, `mod stop ID`, `mod remove ID`.
 - `action ID`: launch a registered Mod action.
 - `rpc METHOD [JSON]`: call an existing coordinator without starting one.
-- `open FILE`: request the integrated viewer in the current Cosmos pane.
+- `open FILE`: open Reader directly outside Cosmos; inside a Cosmos backend pane, use that pane’s integrated Reader. No workspace or shell session is created for standalone reading.
+- `update`: update a release installation from GitHub while retaining selected features and reusing content-identical optional components. `--bin-dir DIR` identifies older custom command entries.
 - `cache-clear`: clear the persistent reader disk cache.
 - `completion bash`: print completion code without starting services.
 

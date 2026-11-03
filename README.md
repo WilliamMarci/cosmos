@@ -46,7 +46,7 @@ source <(cosmos completion bash)
 
 默认 Leader 为 Ctrl+B；`Leader p` 打开设置，`Leader m` 打开开始菜单，`Leader s` 切换窗口/会话，`Leader ?` 查看上下文快捷键。输入法通过 `Leader i` 切换。Leader2/3、具体动作及别名可在设置中调整。默认静默，不常驻显示全部按键。
 
-在 Cosmos Bash 中使用 `open FILE` 或 `cosmos open FILE` 打开 PNG/JPEG/WebP/PDF/EPUB/Markdown/HTML。Kitty 与 Ghostty 支持图形输出，其他终端可字符降级。阅读详情见 [Reader](docs/viewer.md)。
+在 Cosmos 外使用 `cosmos open FILE` 可直接打开独立 Reader；在 Cosmos Bash 中使用 `open FILE` 或 `cosmos open FILE` 在当前 pane 打开 PNG/JPEG/WebP/PDF/EPUB/Markdown/HTML。Kitty 与 Ghostty 支持图形输出，其他终端可字符降级。阅读详情见 [Reader](docs/viewer.md)。
 
 ## 配置与扩展
 

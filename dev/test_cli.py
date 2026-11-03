@@ -6,6 +6,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "python")]
@@ -19,6 +20,21 @@ from cosmos_tui.core.cli import (  # noqa: E402
 
 
 class CLITests(unittest.TestCase):
+    def test_open_routes_outside_to_reader_and_inside_to_existing_bridge(self):
+        from cosmos_tui.core.cli import main
+        for integrated in (False, True):
+            with self.subTest(integrated=integrated), patch('cosmos_tui.terminal.tmux.in_cosmos_pane', return_value=integrated), patch('cosmos_tui.features.reader.standalone.run') as reader, patch('cosmos_tui.core.cli.subprocess.call', return_value=0) as bridge:
+                if integrated:
+                    with self.assertRaises(SystemExit) as result:
+                        main(['open', '/tmp/fixture.md'])
+                    self.assertEqual(result.exception.code, 0)
+                    reader.assert_not_called()
+                    self.assertEqual(bridge.call_args.args[0][1:], ['open','/tmp/fixture.md'])
+                else:
+                    self.assertEqual(main(['open', '/tmp/fixture.md']), 0)
+                    reader.assert_called_once_with('/tmp/fixture.md', mouse_mode='auto')
+                    bridge.assert_not_called()
+
     def test_arche_development_version(self):
         result = subprocess.run(
             [str(ROOT / "cosmos"), "--version"], text=True, capture_output=True
@@ -131,7 +147,6 @@ class CLITests(unittest.TestCase):
                 (["da"], ["daemon"]),
                 (["con"], ["config"]),
                 (["ac", "demo"], ["action", "demo"]),
-                (["o", "file"], ["open", "file"]),
             ):
                 result = subprocess.run(
                     [str(ROOT / "cosmos"), *arguments],

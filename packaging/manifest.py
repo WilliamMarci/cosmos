@@ -7,6 +7,8 @@ import re
 import subprocess
 import tarfile
 
+from installer import payload_digest
+
 root = Path(__file__).resolve().parents[1]
 version = runpy.run_path(str(root / "python/cosmos_tui/core/metadata.py"))["VERSION"]
 entries = []
@@ -19,7 +21,14 @@ for tier in ("2.28", "2.34"):
             sha = hashlib.file_digest(file, "sha256").hexdigest()
         with tarfile.open(path) as tar:
             size = sum(item.size for item in tar.getmembers() if item.isfile())
-        entries.append(dict(name=name, version=version, arch="x86_64", os="linux", glibc_min=tier, cpu_flags=flags, filename=filename, size=path.stat().st_size, unpacked_size=size, url=f"https://github.com/WilliamMarci/cosmos/releases/download/v{version}/{filename}", sha256=sha))
+        records = []
+        if name != "core":
+            with tarfile.open(path) as tar:
+                for item in tar:
+                    if item.isfile():
+                        with tar.extractfile(item) as stream:
+                            records.append((Path(item.name).as_posix(), item.mode & 0o777, hashlib.file_digest(stream, "sha256").hexdigest()))
+        entries.append(dict(name=name, version=version, arch="x86_64", os="linux", glibc_min=tier, cpu_flags=flags, filename=filename, size=path.stat().st_size, unpacked_size=size, url=f"https://github.com/WilliamMarci/cosmos/releases/download/v{version}/{filename}", sha256=sha, **({"payload_sha256": payload_digest(records)} if records else {})))
 for path in sorted((root / "dist").glob("*-sources.tar.gz")):
     with path.open("rb") as source:
         digest = hashlib.file_digest(source, "sha256").hexdigest()

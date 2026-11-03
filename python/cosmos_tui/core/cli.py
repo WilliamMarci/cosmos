@@ -97,8 +97,9 @@ TOP_LEVEL_COMMANDS = SESSION_COMMANDS + (
     CommandSpec("action", "[ac]tion", (), "invoke a registered Mod action"),
     CommandSpec("rpc", "[rp]c", (), "call an existing coordinator RPC method"),
     CommandSpec(
-        "open", "[o]pen", (), "open a file or directory in the current Cosmos pane"
+        "open", "[o]pen", (), "open a file in Reader, or in the current Cosmos pane"
     ),
+    CommandSpec("update", "[u]pdate", (), "update from GitHub, reusing unchanged components"),
     CommandSpec("completion", "[com]pletion", (), "print shell completion code"),
     CommandSpec("help", "[he]lp", (), "show general or command help"),
 )
@@ -319,6 +320,8 @@ def add_management_arguments(target, operation):
         )
     elif operation == "open":
         target.add_argument("file")
+    elif operation == "update":
+        target.add_argument("--bin-dir", help="command directory for older/custom installations")
     elif operation == "completion":
         target.add_argument(
             "shell",
@@ -528,6 +531,11 @@ def main(argv=None):
 
             run(args)
             return 0
+        if operation == "update":
+            from cosmos_tui.core.updater import update
+
+            update(bin_dir=args.bin_dir)
+            return 0
         if operation == "cache-clear":
             from cosmos_tui.features.reader.disk import DiskCache
 
@@ -548,6 +556,14 @@ def main(argv=None):
             suspend_tasks(os.getenv("COSMOS_TMUX_SOCKET", "cosmos"))
             print("Cosmos is stopping · terminal sessions retained")
             return 0
+        if operation == "open" and not Path(args.file).expanduser().is_dir():
+            from cosmos_tui.terminal.tmux import in_cosmos_pane
+
+            if not in_cosmos_pane():
+                from cosmos_tui.features.reader.standalone import run
+
+                run(args.file, mouse_mode=getattr(args, "mouse_mode", "auto"))
+                return 0
         if operation == "open" and Path(args.file).expanduser().is_dir():
             from cosmos_tui.features.files.opener import open_directory
 
@@ -557,6 +573,6 @@ def main(argv=None):
             os.environ.get("COSMOS_BINARY", PROJECT_ROOT / "target/release/cosmos")
         )
         raise SystemExit(subprocess.call([str(binary), operation, *original[1:]]))
-    except (OSError, RuntimeError, TimeoutError, ValueError) as error:
+    except (OSError, RuntimeError, TimeoutError, ValueError, subprocess.CalledProcessError) as error:
         cli.exit(1, f"cosmos: {error}\n")
         return 1
