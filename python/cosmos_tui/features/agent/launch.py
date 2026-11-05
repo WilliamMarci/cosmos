@@ -8,7 +8,7 @@ import shutil
 import secrets
 import sys
 
-from cosmos_tui.core.paths import PROJECT_ROOT
+from cosmos_tui.core.paths import PROJECT_ROOT, python_command
 from cosmos_tui.core.hints import unavailable
 from cosmos_tui.features.agent.configuration import configuration
 from cosmos_tui.features.agent.profile import (
@@ -22,8 +22,7 @@ def arguments(backend, source_pane, prompt=""):
     executable, workdir = runtime()
     if not native_runtime(executable, workdir):
         return executable + (["--prompt", prompt] if prompt else [])
-    args = [
-        sys.executable,
+    args = python_command(
         "-m",
         "cosmos_tui.features.agent",
         "launch",
@@ -31,7 +30,7 @@ def arguments(backend, source_pane, prompt=""):
         backend.argv[2],
         "--source-pane",
         source_pane,
-    ]
+    )
     if prompt:
         args += ["--prompt", prompt]
     return args
@@ -127,6 +126,11 @@ def environment(socket, source_pane):
     ):
         env[variable] = str(root / subdir)
     env["TMPDIR"] = str(root / "tmp")
+    # The standalone TUI talks to its own loopback HTTP server. Keep external
+    # provider proxies, but never send private server traffic through them.
+    bypass = [value.strip() for key in ("NO_PROXY", "no_proxy") for value in env.get(key, "").split(",") if value.strip()]
+    bypass.extend(("localhost", "127.0.0.1", "::1"))
+    env["NO_PROXY"] = env["no_proxy"] = ",".join(dict.fromkeys(bypass))
     return env
 
 

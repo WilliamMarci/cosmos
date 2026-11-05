@@ -6,6 +6,14 @@ _TERMINAL_AGENT_ROOT=$(CDPATH= builtin cd -- "$(dirname -- "$_TERMINAL_AGENT_SOU
 unset _TERMINAL_AGENT_SOURCE
 _terminal_agent_python() {
     local agent_python=${TERMINAL_AGENT_PYTHON:-}
+    local -a agent_python_flags=()
+    if [[ -f ${_TERMINAL_AGENT_ROOT%/*}/installed-features.json ]]; then
+        agent_python="${_TERMINAL_AGENT_ROOT%/*}/.venv/bin/python"
+        agent_python_flags=(-I)
+        export TERMINAL_AGENT_ISOLATED=1
+    else
+        unset TERMINAL_AGENT_ISOLATED
+    fi
     if [[ -z $agent_python ]]; then
         if [[ -x $_TERMINAL_AGENT_ROOT/.venv/bin/python ]]; then
             agent_python=$_TERMINAL_AGENT_ROOT/.venv/bin/python
@@ -24,8 +32,8 @@ _terminal_agent_python() {
         printf 'terminal-agent: Python interpreter not executable: %s (unset TERMINAL_AGENT_PYTHON to auto-detect)\n' "$agent_python" >&2
         return 1
     fi
-    if ! "$agent_python" -c 'import prompt_toolkit' >/dev/null 2>&1; then
-        printf 'terminal-agent: prompt_toolkit missing from %s\n' "$agent_python" >&2
+    if ! "$agent_python" "${agent_python_flags[@]}" -c 'import prompt_toolkit' >/dev/null; then
+        printf 'terminal-agent: dependency import failed with %s (actual exception above)\n' "$agent_python" >&2
         return 1
     fi
     TERMINAL_AGENT_PYTHON=$agent_python

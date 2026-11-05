@@ -69,7 +69,7 @@ class AssistantLauncher(Controller):
         command = arguments(app.backend, pane.id, self.prompt) if pane else None
         self.prompt = ""
         if pane:
-            await app.session_windows.split(pane.id, command)
+            await app.session_windows.split(pane.id, command, retain_failure=True)
         app.panes = await app.backend.snapshot()
         return
 

@@ -48,6 +48,11 @@ if [[ -d $cosmos_root/vendor/rime/share/rime-data ]]; then
     export COSMOS_RIME_LIBRARY="${COSMOS_RIME_LIBRARY:-$cosmos_root/vendor/rime/lib/librime.so.1}"
 fi
 export PYTHONPYCACHEPREFIX="${XDG_CACHE_HOME:-$HOME/.cache}/cosmos/python"
-export PYTHONPATH="$cosmos_root/python:$cosmos_root/terminal_agent:$cosmos_root/python-deps"
-export TERMINAL_AGENT_PYTHON="${TERMINAL_AGENT_PYTHON:-$cosmos_root/.venv/bin/python}"
+if [[ -f $cosmos_root/installed-features.json ]]; then
+    # Installed modules are provided by the private venv, including -I clients.
+    export TERMINAL_AGENT_PYTHON="$cosmos_root/.venv/bin/python"
+else
+    export PYTHONPATH="$cosmos_root/python:$cosmos_root/terminal_agent:$cosmos_root/python-deps"
+    export TERMINAL_AGENT_PYTHON="${TERMINAL_AGENT_PYTHON:-$cosmos_root/.venv/bin/python}"
+fi
 exec "$cosmos_root/.venv/bin/python" -m cosmos_tui "$@"

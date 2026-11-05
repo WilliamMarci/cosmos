@@ -2,7 +2,11 @@
 # Override with COSMOS_RC=/absolute/path/cosmosrc before starting Cosmos.
 _cosmos_config_root=$(CDPATH= builtin cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && builtin pwd -P)
 export COSMOS_ROOT="$_cosmos_config_root"
-export COSMOS_PYTHON="${COSMOS_PYTHON:-$COSMOS_ROOT/.venv/bin/python}"
+if [[ -f $COSMOS_ROOT/installed-features.json ]]; then
+    export COSMOS_PYTHON="$COSMOS_ROOT/.venv/bin/python"
+else
+    export COSMOS_PYTHON="${COSMOS_PYTHON:-$COSMOS_ROOT/.venv/bin/python}"
+fi
 export TERMINAL_AGENT_PYTHON="$COSMOS_PYTHON"
 export COSMOS_AGENT_PROMPT="${COSMOS_AGENT_PROMPT:-$COSMOS_ROOT/config/terminal-agent-prompt.md}"
 if [[ -z ${COSMOS_BINARY:-} ]]; then

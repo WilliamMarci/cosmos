@@ -1,7 +1,7 @@
 """OpenCode configuration assembled from Cosmos-owned modules."""
 
 import sys
-from cosmos_tui.core.paths import PROJECT_ROOT
+from cosmos_tui.core.paths import PROJECT_ROOT, python_command
 from cosmos_tui.features.agent.profile import provider_config
 
 
@@ -28,21 +28,19 @@ def configuration(socket, source_pane):
                 "cosmos_terminal": {
                     "type": "local",
                     "codemode": False,
-                    "command": [
-                        sys.executable,
+                    "command": python_command(
                         "-m",
                         "cosmos_tui.features.agent",
                         "mcp",
                         "--socket",
                         socket,
-                    ],
-                    "environment": {"PYTHONPATH": str(PROJECT_ROOT / "python")},
+                    ),
+                    "environment": {} if (PROJECT_ROOT / "installed-features.json").is_file() else {"PYTHONPATH": str(PROJECT_ROOT / "python")},
                 },
                 "cosmos_actions": {
                     "type": "local",
                     "codemode": False,
-                    "command": [
-                        sys.executable,
+                    "command": python_command(
                         "-m",
                         "cosmos_tui.features.agent",
                         "mcp",
@@ -50,8 +48,8 @@ def configuration(socket, source_pane):
                         socket,
                         "--toolset",
                         "actions",
-                    ],
-                    "environment": {"PYTHONPATH": str(PROJECT_ROOT / "python")},
+                    ),
+                    "environment": {} if (PROJECT_ROOT / "installed-features.json").is_file() else {"PYTHONPATH": str(PROJECT_ROOT / "python")},
                 },
             }
         },

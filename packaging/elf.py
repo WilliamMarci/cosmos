@@ -28,5 +28,10 @@ def patch_private_elfs(stage):
             if library.is_dir():
                 relative = os.path.relpath(library, path.parent)
                 paths.append('$ORIGIN' if relative == '.' else '$ORIGIN/' + relative)
+        if path.is_relative_to(stage / 'python-deps') and (stage / 'lib').is_dir():
+            # Wheels move three directory levels deeper when installed in the
+            # private venv. Support both the transport and installed layouts.
+            installed = stage / '.venv/lib/python3.12/site-packages' / path.relative_to(stage / 'python-deps')
+            paths.append('$ORIGIN/' + os.path.relpath(stage / 'lib', installed.parent))
         # DT_RPATH keeps host Conda/ROOT paths from overriding bundled dependencies.
         subprocess.run(['patchelf', '--force-rpath', '--set-rpath', ':'.join(dict.fromkeys(paths)), str(path)], check=True)

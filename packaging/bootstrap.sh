@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Optional single-file entry: select -> download -> checksum -> extract -> TUI.
 set -euo pipefail
-version=0.2.3
+version=0.2.4
 if [[ ${1:-} == --help || ${1:-} == -h ]]; then
     echo 'Cosmos installer bootstrap: requires Linux, Bash, curl/wget, tar, sha256sum, getconf.'
     echo 'Downloads the highest compatible core from the release manifest, then opens the multi-select installer.'

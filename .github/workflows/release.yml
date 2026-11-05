@@ -102,7 +102,8 @@ jobs:
           cargo test --locked
           export UV_PYTHON_INSTALL_DIR="$PWD/.build/release-python"
           python_runtime=$(uv python find --managed-python 3.12)
-          PYTHONPATH=python:python-deps:.build/release-deps:dev "$python_runtime" -m unittest dev.test_deployment dev.test_backend_lifecycle dev.test_installation dev.test_installer_tui dev.test_release_reuse dev.test_update dev.test_standalone_reader dev.test_release_cache dev.test_terminal_tabs dev.test_status_identity dev.test_status dev.test_cli
+          PYTHONPATH=python:python-deps:.build/release-deps:dev "$python_runtime" -m unittest dev.test_release_python dev.test_deployment dev.test_backend_lifecycle dev.test_installation dev.test_installer_tui dev.test_release_reuse dev.test_update dev.test_standalone_reader dev.test_release_cache dev.test_terminal_tabs dev.test_status_identity dev.test_status dev.test_cli
+          COSMOS_TEST_TMUX=1 PYTHONPATH=python:python-deps:.build/release-deps:dev "$python_runtime" -m unittest dev.test_release_python.AgentPaneTests
           mkdir .build/install-smoke
           tar -xzf dist/cosmos-*-core-linux-x86_64-glibc${{ matrix.tier }}.tar.gz -C .build/install-smoke
           installer=$(find .build/install-smoke -name install.sh -print -quit)
@@ -112,6 +113,7 @@ jobs:
           su cosmos-test -s /bin/bash -c "bash '$PWD/$installer' --yes --features core,assistant --prefix /home/cosmos-test/app --bin-dir /home/cosmos-test/bin"
           su cosmos-test -s /bin/bash -c '/home/cosmos-test/bin/cosmos --version && /home/cosmos-test/bin/cosmos --help'
           test ! -d /home/cosmos-test/app/__pycache__
+          su cosmos-test -s /bin/bash -c "env -u PYTHONPATH -u PYTHONHOME /home/cosmos-test/app/.venv/bin/python -I '$PWD/dev/smoke_release_agent.py' /home/cosmos-test/app"
           # Test the packaged binary's actual role title, not just its filename.
           su cosmos-test -s /bin/bash -c '/home/cosmos-test/app/bin/cosmos-tmux -L cosmos-release-title -f /dev/null new-session -d -s title "sleep 60"'
           server_pid=$(su cosmos-test -s /bin/bash -c '/home/cosmos-test/app/bin/cosmos-tmux -L cosmos-release-title display-message -p "#{pid}"')

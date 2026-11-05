@@ -196,6 +196,48 @@ def component(bundle, name, version, temporary, manifest, reuse_from=None, packa
 
 
 
+
+def install_python_dependencies(prefix):
+    """Move offline wheels into the final venv, then validate without PYTHON* overrides."""
+    script = r"""
+import hashlib, pathlib, shutil, sys, sysconfig
+root = pathlib.Path(sys.argv[1])
+source = root / 'python-deps'
+site = pathlib.Path(sysconfig.get_path('purelib'))
+if not site.resolve().is_relative_to((root / '.venv').resolve()):
+    raise RuntimeError('Python site-packages escaped the installation venv')
+site.mkdir(parents=True, exist_ok=True)
+for item in source.iterdir():
+    target = site / item.name
+    if target.exists() or target.is_symlink():
+        raise RuntimeError('Dependency collision: ' + item.name)
+    shutil.move(str(item), target)
+source.rmdir()
+notice = root / 'licenses/PYTHON.txt'
+if notice.is_file():
+    notice.write_text(notice.read_text().replace('python-deps/', str(site.resolve().relative_to(root.resolve())) + '/'))
+(site / 'cosmos-local.pth').write_text(str(root / 'python') + '\n' + str(root / 'terminal_agent') + '\n')
+checksums = root / 'SHA256SUMS'
+if checksums.is_file():
+    records = []
+    for line in checksums.read_text().splitlines():
+        digest, _, relative = line.partition('  ')
+        if relative.startswith('python-deps/'):
+            relative = str(site.resolve().relative_to(root.resolve()) / relative[len('python-deps/'):])
+        if relative == 'licenses/PYTHON.txt':
+            digest = hashlib.sha256((root / relative).read_bytes()).hexdigest()
+        records.append(digest + '  ' + relative)
+    relative = str(site.resolve().relative_to(root.resolve()) / 'cosmos-local.pth')
+    records.append(hashlib.sha256((root / relative).read_bytes()).hexdigest() + '  ' + relative)
+    checksums.write_text('\n'.join(records) + '\n')
+"""
+    python = prefix / '.venv/bin/python'
+    subprocess.run([str(python), '-I', '-c', script, str(prefix)], check=True)
+    # A new interpreter processes the newly installed .pth file and imports real
+    # wheels; neither the build environment nor PYTHONPATH can satisfy this check.
+    subprocess.run([str(python), '-I', '-c',
+        'import prompt_toolkit, textual, rich, PIL, yaml, regex, wcwidth, pypdf, bs4, lxml, markdown_it; import cosmos_tui.features.agent.launch, terminal_agent.cli'], check=True)
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle", type=Path, required=True)
@@ -321,6 +363,7 @@ def main(argv=None):
             print("Configure Python environment and command entry", file=sys.stderr, flush=True)
             python = prefix / "runtime/bin/python3"
             subprocess.run([str(python), "-I", "-m", "venv", "--without-pip", str(prefix / ".venv")], check=True)
+            install_python_dependencies(prefix)
             (prefix / "installed-features.json").write_text(json.dumps(dict(version=version, features=sorted(selected), bin_dir=str(bindir)), indent=2) + "\n")
             subprocess.run([str(prefix / "cosmos"), "--version"], check=True)
             bindir.mkdir(parents=True, exist_ok=True)

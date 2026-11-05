@@ -1,20 +1,11 @@
-# Cosmos Arche · 0.2.3
+# Cosmos Arche · 0.2.4
 
-Deployment and backend lifecycle improvements for Linux x86_64 / x86-64-v2, packaged separately for glibc ≥ 2.28 (AlmaLinux 8) and ≥ 2.34 (AlmaLinux 9).
+Fixes release installation of Python dependencies and Agent startup behind a host proxy.
 
-- Installation announces connections before waiting, retries transient failures and supports explicit offline installation. Local compatible archives can be selected across glibc tiers.
-- Core includes terminfo data and terminal fallback; SSH truecolor settings are propagated.
-- Private native libraries are isolated from host ROOT/Conda library paths. Internal Bash restores the host environment and deduplicates paths.
-- Private Rime avoids incompatible host plugins; Kitty Reader exits flush image cleanup without accessing destroyed screens.
-- HOME display follows the current user, directory boundaries and symlink aliases.
-- The bundled backend is `cosmos-tmux`, with independent sockets and verified process ownership. `cosmos stop --all` previews sessions/tasks before closing owned backends; plain `stop` retains terminal sessions.
-- Each installation includes `uninstall.sh` with process checks and confirmation. User configuration/cache/state are retained.
-- Concise English and Chinese READMEs link to detailed documentation.
+- Offline Python wheels are moved into the final private venv site-packages. The staging dependency directory is removed; runtime imports no longer rely on `PYTHONPATH`.
+- The Bash assistant and Agent/MCP subprocesses use the installed interpreter in isolated mode. Host Conda and Python settings remain available to the host shell.
+- Agent private loopback traffic bypasses HTTP proxies; external provider traffic retains the configured proxy.
+- Failed Agent panes retain their error output and exit status. Assistant import failures report the actual exception.
+- Release checks include isolated imports, a real Bash assistant pane and terminal/actions MCP handshakes.
 
-Download a core binary archive, extract it and run `./install.sh`. Select optional Agent, PDF and Rime＋雾凇 components as needed. Offline preparation, compatibility, installation paths and update behavior are documented in [the installation guide](docs/installation.md).
-
-Existing backends retain their original name and environment until stopped and restarted. Replacing installation files does not restart running sessions. Review the `cosmos stop --all` preview carefully: confirming it ends the listed terminal applications and pending work.
-
-This is a development/prerelease build. It does not claim complete delivery of all planned features. Cosmos is MIT licensed; bundled dependencies retain their own licenses and applicable source archives.
-
-Validation: both AlmaLinux compatibility tiers passed core build, regression and clean-install checks, including the actual `cosmos-tmux: server` title and uninstallation. On CERN lxplus8, the final package passed offline bootstrap installation, unknown-TERM fallback and truecolor Reader PTY checks. Separate isolated checks covered host ROOT/Conda path restoration, owned-backend shutdown and active-backend uninstall; measured CERN test usage was approximately 399 MiB. PDF rendering and Rime＋雾凇 composition were verified with an incompatible host `libstdc++` present.
+Core is rebuilt for glibc ≥ 2.28 and ≥ 2.34. Agent, PDF and Rime native payloads are unchanged and reused from 0.2.3; compatible existing installations can reuse them during update. See [installation](docs/installation.md) for online/offline setup and custom paths. This remains a development/prerelease build.

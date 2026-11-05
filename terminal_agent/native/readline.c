@@ -281,7 +281,8 @@ static int cosmos_available(void) {
         close(channel[1]);
         int null = open("/dev/null", O_RDWR);
         if (null >= 0) { dup2(null, STDIN_FILENO); dup2(null, STDERR_FILENO); close(null); }
-        execlp("tmux", "tmux", "-S", socket_path, "show-options", "-pqv", "-t", pane, "@cosmos_agent_socket", (char *)NULL);
+        const char *backend = variable("COSMOS_TMUX", "tmux");
+        execlp(backend, backend, "-S", socket_path, "show-options", "-pqv", "-t", pane, "@cosmos_agent_socket", (char *)NULL);
         _exit(127);
     }
     free(socket_path);
@@ -355,6 +356,13 @@ static int helper(int cursor) {
             "--output", output, "--state", state, "--shell-line", rl_line_buffer,
             "--shell-point", point, NULL};
         int argc = 13;
+        if (!strcmp(variable("TERMINAL_AGENT_ISOLATED", "0"), "1")) {
+            memmove(args + 2, args + 1, (size_t)(argc - 1) * sizeof(*args));
+            args[1] = "-I";
+            unsetenv("LD_LIBRARY_PATH");
+            unsetenv("LD_PRELOAD");
+            argc++;
+        }
         if (demo) args[argc++] = "--demo";
         if (cosmos_ui) {
             args[argc++] = "--cosmos-ui";

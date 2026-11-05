@@ -178,6 +178,7 @@ async def handle(manager, event, pane, state, items, cursor):
             arguments(app.backend, pane.id) if char == "g" else (),
             name="agent" if char == "g" else None,
             cwd=state["path"],
+            retain_failure=char == "g",
         )
     elif key == "ctrl+r":
         manager.snapshots.clear()

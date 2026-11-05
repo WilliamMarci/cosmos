@@ -13,17 +13,23 @@ class SessionWindows:
     def __init__(self, backend):
         self.backend = backend
 
-    async def open(self, argv=(), *, name=None, cwd=None):
+    async def open(self, argv=(), *, name=None, cwd=None, retain_failure=False):
         command = 'new-window -P -F "#{window_id}"'
         if name:
             command += " -n " + self.backend.quote(name)
         if cwd:
             command += " -c " + self.backend.quote(cwd)
+        if argv and retain_failure:
+            command = command.replace('#{window_id}', '#{window_id}\t#{pane_id}')
+            row = (await self.backend.request(command + " 'sleep 30'"))[0]
+            window, pane = row.split('\t')
+            await self._spawn_retained(pane, argv)
+            return window
         if argv:
             command += " " + self.backend.quote(shlex.join(argv))
         return (await self.backend.request(command))[0]
 
-    async def split(self, pane, argv=(), *, horizontal=True):
+    async def split(self, pane, argv=(), *, horizontal=True, retain_failure=False):
         if not pane.startswith("%") or not pane[1:].isdigit():
             raise ValueError("expected a stable pane id")
         command = (
@@ -32,9 +38,19 @@ class SessionWindows:
             + (" -h" if horizontal else " -v")
             + ' -c "#{pane_current_path}"'
         )
+        if argv and retain_failure:
+            pane = (await self.backend.request(command + " -P -F '#{pane_id}' 'sleep 30'"))[0]
+            await self._spawn_retained(pane, argv)
+            return []
         if argv:
             command += " " + self.backend.quote(shlex.join(argv))
         return await self.backend.request(command)
+
+    async def _spawn_retained(self, pane, argv):
+        if not pane.startswith('%') or not pane[1:].isdigit():
+            raise ValueError('Invalid Agent pane ID')
+        await self.backend.request(f'set-option -p -t {pane} remain-on-exit failed')
+        await self.backend.request(f'respawn-pane -k -t {pane} ' + self.backend.quote(shlex.join(argv)))
 
     async def focus(self, window):
         # IDs come from backend inventory, never a display label.

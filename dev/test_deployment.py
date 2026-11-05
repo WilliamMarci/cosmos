@@ -56,7 +56,7 @@ class DeploymentTests(unittest.TestCase):
             root = Path(folder); tools = root/'tools'; tools.mkdir()
             for name, script in {'getconf':'echo "glibc 2.34"', 'curl':'exit 97', 'wget':'exit 98'}.items():
                 path=tools/name;path.write_text('#!/bin/sh\n'+script+'\n');path.chmod(0o755)
-            name='cosmos-0.2.3-core-linux-x86_64-glibc2.28'
+            name='cosmos-0.2.4-core-linux-x86_64-glibc2.28'
             archive=root/(name+'.tar.gz')
             payload=b'#!/bin/bash\nprintf "local-core-228\\n"\n'
             with tarfile.open(archive,'w:gz') as tar:
@@ -65,8 +65,8 @@ class DeploymentTests(unittest.TestCase):
             digest=hashlib.sha256(archive.read_bytes()).hexdigest()
             lines=[]
             for tier in ('2.28','2.34'):
-                filename=f'cosmos-0.2.3-core-linux-x86_64-glibc{tier}.tar.gz'
-                lines.append('\t'.join(['core','0.2.3','x86_64',tier,'sse4_2',filename,'https://github.com/WilliamMarci/cosmos/releases/download/v0.2.3/'+filename,digest,'1','1']))
+                filename=f'cosmos-0.2.4-core-linux-x86_64-glibc{tier}.tar.gz'
+                lines.append('\t'.join(['core','0.2.4','x86_64',tier,'sse4_2',filename,'https://github.com/WilliamMarci/cosmos/releases/download/v0.2.4/'+filename,digest,'1','1']))
             (root/'components.tsv').write_text('\n'.join(lines)+'\n')
             env={**os.environ,'PATH':str(tools)+':'+os.environ['PATH'],'XDG_CACHE_HOME':str(root/'cache')}
             result=subprocess.run(['bash',str(ROOT/'packaging/bootstrap.sh'),'--offline','--package-dir',str(root),'--yes'],env=env,capture_output=True,text=True,timeout=10)
@@ -148,3 +148,22 @@ class DeploymentTests(unittest.TestCase):
             env={**os.environ,'HOME':str(root),'TERMINFO':str(root/'missing'),'TERMINFO_DIRS':str(root/'share/terminfo')}
             result=subprocess.run([str(root/'bin/infocmp'),'-x','xterm-256color'],env=env,text=True,capture_output=True)
             self.assertEqual(result.returncode,0,result.stderr)
+
+class RelocatedWheelTests(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('cc') and shutil.which('patchelf'),'ELF tools unavailable')
+    def test_private_library_lookup_survives_move_to_venv(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);stage=root/'app';host=root/'host'
+            for path in (stage/'lib',stage/'python-deps/package',host):path.mkdir(parents=True)
+            source=root/'value.c';main=root/'main.c'
+            main.write_text('#include <stdio.h>\nint value(void);int main(void){printf("%d\\n",value());}\n')
+            for destination,value in ((stage/'lib',42),(host,99)):
+                source.write_text(f'int value(void){{return {value};}}')
+                subprocess.run(['cc','-shared','-fPIC',str(source),'-o',str(destination/'librelocated.so')],check=True)
+            binary=stage/'python-deps/package/probe'
+            subprocess.run(['cc',str(main),'-L'+str(stage/'lib'),'-lrelocated','-o',str(binary)],check=True)
+            patch_private_elfs(stage)
+            site=stage/'.venv/lib/python3.12/site-packages';site.parent.mkdir(parents=True)
+            shutil.move(str(stage/'python-deps'),str(site))
+            result=subprocess.check_output([str(site/'package/probe')],env={**os.environ,'LD_LIBRARY_PATH':str(host)},text=True)
+            self.assertEqual(result.strip(),'42')

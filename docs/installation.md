@@ -9,20 +9,20 @@ The line-based Bash TUI supports multi-selection with numeric toggles, `p` to ed
 ```bash
 ./install.sh
 ./install.sh --yes --features core,assistant,pdf,rime \
-  --prefix "$HOME/apps/cosmos-0.2.3" --bin-dir "$HOME/.local/bin"
+  --prefix "$HOME/apps/cosmos-0.2.4" --bin-dir "$HOME/.local/bin"
 ./install.sh --check --features core
 ```
 
 Defaults:
 
-- Software: `${XDG_DATA_HOME:-~/.local/share}/cosmos/0.2.3`.
+- Software: `${XDG_DATA_HOME:-~/.local/share}/cosmos/0.2.4`.
 - Command: `~/.local/bin/cosmos` symlink; `--bin-dir` overrides it. Existing unmanaged commands are never overwritten.
 - Configuration: `${XDG_CONFIG_HOME:-~/.config}/cosmos`.
 - Cache: `${XDG_CACHE_HOME:-~/.cache}/cosmos` (including Python bytecode).
 - Logs/Rime mutable state: `${XDG_STATE_HOME:-~/.local/state}/cosmos`.
 - Native optional components: installation `vendor/pdf` and `vendor/rime`, with `rime_ice` selected by default. Explicit `COSMOS_RIME_*` overrides remain supported.
 
-Core includes a relocatable CPython 3.12 runtime, pinned Python wheel dependencies, Tmux, coordinator and precompiled file/Bash integrations. Rust, uv, CMake, compilers and Bun/npm are build dependencies only. Agent is compiled for the baseline CPU tier, without requiring AVX2. PDF includes private Poppler utilities; Rime includes private librime/Lua and compiled 雾凇 data. Third-party licenses and corresponding optional-component sources are published alongside the binaries; Cosmos's own code is MIT.
+Core includes a relocatable CPython 3.12 runtime, pinned Python wheel dependencies, Tmux, coordinator and precompiled file/Bash integrations. Installation moves the offline wheels into the private `.venv` site-packages and removes the staging `python-deps` directory. Application modules are registered with a private `.pth` file; installed helpers and Agent/MCP subprocesses use this venv with `-I`, independently of host Python/Conda settings. The installer validates imports with a fresh isolated interpreter. Rust, uv, CMake, compilers and Bun/npm are build dependencies only. Agent is compiled for the baseline CPU tier, without requiring AVX2. PDF includes private Poppler utilities; Rime includes private librime/Lua and compiled 雾凇 data. Third-party licenses and corresponding optional-component sources are published alongside the binaries; Cosmos's own code is MIT.
 
 ## Offline installation
 
@@ -47,6 +47,8 @@ Online requests announce their target **before connecting**, show bounded retry 
 Install upgrades to a new versioned directory. Older installations/configuration are preserved. Detach clients and run the previous `cosmos stop` before reopening the new version; terminal applications remain running. To end all verified Cosmos backend sessions and pending work, use `cosmos stop --all`: it previews the affected sessions/tasks and asks for confirmation. Plain `cosmos stop` retains terminal applications. Bundled backends are named `cosmos-tmux`, use the default independent socket `cosmos`, and have private ownership records checked against the process UID, executable and start time before shutdown. `COSMOS_TMUX` remains an executable override; source checkouts can use system `tmux`. Already running old backends keep their old process title until explicitly stopped and restarted.
 
 Run `INSTALL_DIR/uninstall.sh` to remove that installation. It previews affected backend sessions and processes using that installation, asks for confirmation, checks for residual processes, and removes only its own command symlink and software tree. User configuration/cache/state are retained. `--yes` confirms non-interactively.
+
+Agent child processes preserve external HTTP proxies while adding localhost/loopback to `NO_PROXY` and `no_proxy`, so their private local server is reachable. Failed Agent panes retain error output and exit status instead of immediately disappearing. The Bash assistant prints its actual import exception when dependencies cannot load.
 
 ## Terminal and host environment
 

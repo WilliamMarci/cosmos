@@ -1,4 +1,4 @@
-VERSION = "0.2.3"
+VERSION = "0.2.4"
 CODENAME = "Arche"
 CHANNEL = "development"
 DISPLAY_VERSION = f"Cosmos {CODENAME} {VERSION} ({CHANNEL})"

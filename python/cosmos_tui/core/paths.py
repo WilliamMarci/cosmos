@@ -31,3 +31,12 @@ def display_path(value):
         except (ValueError, OSError, RuntimeError):
             return value
     return "~" if relative == Path(".") else "~/" + relative.as_posix()
+
+
+def python_command(*arguments):
+    """Installed subprocesses use their venv and ignore host Python overrides."""
+    import sys
+
+    if (PROJECT_ROOT / 'installed-features.json').is_file():
+        return [str(PROJECT_ROOT / '.venv/bin/python'), '-I', *arguments]
+    return [sys.executable, *arguments]
