@@ -48,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix="cosmos-agent-roundtrip-") as tmp:
 
     def tmux(*args):
         return subprocess.check_output(
-            ["tmux", "-L", env["COSMOS_TMUX_SOCKET"], *args],
+            [os.getenv("COSMOS_TMUX", "tmux"), "-L", env["COSMOS_TMUX_SOCKET"], *args],
             env=env,
             text=True,
             stderr=subprocess.DEVNULL,
@@ -133,7 +133,7 @@ with tempfile.TemporaryDirectory(prefix="cosmos-agent-roundtrip-") as tmp:
             process.terminate()
             process.wait(timeout=5)
         subprocess.run(
-            ["tmux", "-L", env["COSMOS_TMUX_SOCKET"], "kill-server"],
+            [os.getenv("COSMOS_TMUX", "tmux"), "-L", env["COSMOS_TMUX_SOCKET"], "kill-server"],
             env=env,
             capture_output=True,
         )

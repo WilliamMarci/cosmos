@@ -320,6 +320,9 @@ def add_management_arguments(target, operation):
         )
     elif operation == "open":
         target.add_argument("file")
+    elif operation == "stop":
+        target.add_argument("--all", action="store_true", help="preview and end all verified Cosmos backend sessions and tasks")
+        target.add_argument("--yes", action="store_true", help="confirm the displayed stop --all preview")
     elif operation == "update":
         target.add_argument("--bin-dir", help="command directory for older/custom installations")
     elif operation == "completion":
@@ -427,6 +430,16 @@ def print_help(cli, commands, session_commands, topic):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "_uninstall":
+        from cosmos_tui.core.uninstall import uninstall
+
+        uninstall_parser = argparse.ArgumentParser(prog="uninstall.sh")
+        uninstall_parser.add_argument("--yes", action="store_true")
+        try:
+            uninstall(uninstall_parser.parse_args(argv[1:]).yes)
+        except (OSError, ValueError, RuntimeError) as error:
+            uninstall_parser.exit(1, f"uninstall: {error}\n")
+        return 0
     cli, commands, session_commands = parser()
     mouse_option = []
     if argv and argv[0].startswith("--mouse-mode="):
@@ -545,6 +558,13 @@ def main(argv=None):
             )
             return 0
         if operation == "stop":
+            if args.all:
+                from cosmos_tui.core.lifecycle import stop_all
+
+                stop_all(args.yes)
+                return 0
+            if args.yes:
+                raise ValueError("--yes requires stop --all")
             from cosmos_tui.core import rpc
 
             asyncio.run(rpc.call("daemon.shutdown", {}))

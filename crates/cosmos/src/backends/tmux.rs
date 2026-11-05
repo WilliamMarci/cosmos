@@ -3,7 +3,15 @@ use std::{env, process::Command};
 
 pub const SOCKET: &str = "cosmos";
 fn executable() -> String {
-    env::var("COSMOS_TMUX").unwrap_or_else(|_| "tmux".into())
+    env::var("COSMOS_TMUX").unwrap_or_else(|_| {
+        let bundled = env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|d| d.join("cosmos-tmux")));
+        bundled
+            .filter(|p| p.is_file())
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "tmux".into())
+    })
 }
 pub fn command() -> Command {
     let mut cmd = Command::new(executable());

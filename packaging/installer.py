@@ -14,6 +14,7 @@ import tempfile
 import sys
 import time
 import urllib.request
+import urllib.error
 
 FEATURES = {"core", "agent", "assistant", "pdf", "rime"}
 
@@ -86,19 +87,36 @@ def extract(archive, destination, maximum=1024**3):
         progress.finish()
 
 
-def download(url, path, limit):
+def download(url, path, limit, *, attempts=3, timeout=15):
+    """Report connection attempts before waiting for headers; never keep partial files."""
     request = urllib.request.Request(url, headers={"User-Agent": "Cosmos-installer"})
-    with urllib.request.urlopen(request, timeout=60, context=ssl.create_default_context()) as response, path.open("wb") as output:
-        length = response.headers.get("Content-Length")
-        progress = Progress("Download " + path.name, int(length) if length and length.isdigit() else 0)
-        total = 0
-        while chunk := response.read(1024 * 1024):
-            total += len(chunk)
-            if total > limit:
-                raise ValueError("Component exceeds download budget")
-            output.write(chunk)
-            progress.advance(len(chunk))
-        progress.finish()
+    for attempt in range(1, attempts + 1):
+        print(f"Connect {attempt}/{attempts}: {url} (connect/read timeout {timeout}s)", file=sys.stderr, flush=True)
+        try:
+            with urllib.request.urlopen(request, timeout=timeout, context=ssl.create_default_context()) as response, path.open("wb") as output:
+                length = response.headers.get("Content-Length")
+                progress = Progress("Download " + path.name, int(length) if length and length.isdigit() else 0)
+                total = 0
+                while chunk := response.read(1024 * 1024):
+                    total += len(chunk)
+                    if total > limit:
+                        raise ValueError("Component exceeds download budget")
+                    output.write(chunk)
+                    progress.advance(len(chunk))
+                if length and length.isdigit() and total != int(length):
+                    raise OSError("Incomplete download")
+                progress.finish()
+                return
+        except (OSError, urllib.error.URLError) as error:
+            path.unlink(missing_ok=True)
+            retryable = not isinstance(error, urllib.error.HTTPError) or error.code in {408, 429, 500, 502, 503, 504}
+            if not retryable or attempt == attempts:
+                raise OSError(f"Download failed: {url}: {error}. Offline: copy components.json and compatible selected archives next to the extracted core's install.sh, then run ./install.sh --offline --package-dir DIR.") from error
+            print(f"Connection/download failed: {error}; retrying in {attempt}s", file=sys.stderr, flush=True)
+            time.sleep(attempt)
+        except ValueError:
+            path.unlink(missing_ok=True)
+            raise
 
 
 COMPONENT_ROOTS = {
@@ -134,20 +152,26 @@ class ReusedComponent:
         self.folder, self.paths = folder, paths
 
 
-def select_component(manifest, name, arch, glibc, flags):
+def select_component(manifest, name, arch, glibc, flags, package_dir=None, offline=False):
     matches = [item for item in manifest["components"] if item["name"] == name and item["arch"] == arch
                and tuple(map(int, item["glibc_min"].split("."))) <= glibc
                and set(item["cpu_flags"]).issubset(flags)]
     if not matches:
         raise ValueError("No compatible component: " + name)
+    if package_dir:
+        local = [item for item in matches if Path(item["filename"]).name == item["filename"] and (package_dir / item["filename"]).is_file()]
+        if local:
+            matches = local
+        elif offline:
+            raise ValueError("Offline package missing for " + name + "; copy a compatible archive listed in components.json to " + str(package_dir))
     return max(matches, key=lambda item: tuple(map(int, item["glibc_min"].split("."))))
 
 
-def component(bundle, name, version, temporary, manifest, reuse_from=None):
+def component(bundle, name, version, temporary, manifest, reuse_from=None, package_dir=None, offline=False):
     actual_glibc = tuple(map(int, os.confstr("CS_GNU_LIBC_VERSION").split()[-1].split(".")))
     processors = [set(line.partition(":")[2].split()) for line in Path("/proc/cpuinfo").read_text().splitlines() if line.startswith("flags")]
     flags = set.intersection(*processors) if processors else set()
-    entry = select_component(manifest, name, os.uname().machine, actual_glibc, flags)
+    entry = select_component(manifest, name, os.uname().machine, actual_glibc, flags, package_dir or bundle, False)
     filename = entry["filename"]
     if Path(filename).name != filename or entry["url"] != f"https://github.com/WilliamMarci/cosmos/releases/download/v{version}/{filename}":
         raise ValueError("Invalid component URL or filename")
@@ -156,8 +180,10 @@ def component(bundle, name, version, temporary, manifest, reuse_from=None):
         if digest == entry["payload_sha256"]:
             print("Reuse unchanged component: " + name, file=sys.stderr, flush=True)
             return ReusedComponent(reuse_from, paths), entry
-    archive = bundle / filename
+    archive = (package_dir or bundle) / filename
     if not archive.is_file():
+        if offline:
+            raise ValueError("Offline package missing: " + filename + "; copy it to " + str(package_dir or bundle))
         archive = temporary / filename
         print("Downloading optional component:", name, flush=True)
         download(entry["url"], archive, entry["size"])
@@ -179,11 +205,14 @@ def main(argv=None):
     parser.add_argument("--bin-dir", type=Path, default=Path.home() / ".local/bin")
     parser.add_argument("--yes", action="store_true")
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--offline", action="store_true", help="never access the network")
+    parser.add_argument("--package-dir", type=Path, help="directory containing local manifests and component archives")
     parser.add_argument("--reuse-from", type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args(argv)
     if os.getuid() == 0:
         parser.error("Run as your normal user; sudo/root installation is not supported")
     bundle = args.bundle.resolve()
+    package_dir = (args.package_dir or bundle).expanduser().resolve()
     metadata = json.loads((bundle / "bundle.json").read_text())
     version = metadata["version"]
     actual_glibc = os.confstr("CS_GNU_LIBC_VERSION").split()[-1]
@@ -232,14 +261,16 @@ def main(argv=None):
         temporary = Path(temp)
         manifest = {"components": []}
         if selected & {"agent", "pdf", "rime"}:
-            manifest_path = bundle / "components.json"
+            manifest_path = package_dir / "components.json"
             if not manifest_path.exists():
+                if args.offline:
+                    raise ValueError("Offline manifest missing: " + str(manifest_path) + "; copy components.json from the same release")
                 manifest_path = temporary / "components.json"
                 download(f"https://github.com/WilliamMarci/cosmos/releases/download/v{version}/components.json", manifest_path, 128 * 1024)
             manifest = json.loads(manifest_path.read_text())
             if manifest["version"] != version:
                 raise ValueError("Component manifest version mismatch")
-        additions = {name: component(bundle, name, version, temporary, manifest, args.reuse_from) for name in sorted(selected & {"agent", "pdf", "rime"})}
+        additions = {name: component(bundle, name, version, temporary, manifest, args.reuse_from, package_dir, args.offline) for name in sorted(selected & {"agent", "pdf", "rime"})}
         prefix.parent.mkdir(parents=True, exist_ok=True)
         # The final path is fixed before venv creation; no relocated shebangs.
         try:

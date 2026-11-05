@@ -9,6 +9,7 @@ case "$component" in
         if [[ ! -x .build/tmux-install/bin/tmux ]]; then
             git clone https://github.com/tmux/tmux.git .build/tmux-source
             git -C .build/tmux-source checkout --detach 0dac7fe434d029a4f0b819cba8eb7963df291990
+            python3 packaging/patches/tmux-process-title.py .build/tmux-source
             (cd .build/tmux-source && sh autogen.sh && ./configure --prefix="$root/.build/tmux-install" && make -j2 && make install)
         fi
         cargo build --release --locked

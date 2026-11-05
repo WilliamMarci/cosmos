@@ -31,6 +31,9 @@ async def listing():
 async def create(name, cwd=None):
     Tmux.validate_name(name)
     backend = Tmux(name)
+    from cosmos_tui.terminal.backend import probe, record
+
+    server_existed = probe(backend.argv) is not None
     arguments = [
         "-f",
         "/dev/null",
@@ -50,6 +53,7 @@ async def create(name, cwd=None):
     await backend.cli(
         "set-option", "-t", session_id, "default-command", backend.shell_command()
     )
+    record(created_server=not server_existed)
     return session_id
 
 

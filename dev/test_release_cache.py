@@ -15,7 +15,7 @@ class ReleaseCacheTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / 'packaging').mkdir()
-            for name in ('build_optional.sh', 'assemble.py'):
+            for name in ('build_optional.sh', 'assemble.py', 'elf.py'):
                 shutil.copy2(ROOT / 'packaging' / name, root / 'packaging' / name)
             metadata = root / 'python/cosmos_tui/core/metadata.py'
             metadata.parent.mkdir(parents=True)

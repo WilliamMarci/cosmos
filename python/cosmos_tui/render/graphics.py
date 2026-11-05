@@ -86,7 +86,7 @@ class Batch(CompositorUpdate):
 class Graphics:
     def __init__(self):
         mode = os.getenv("COSMOS_GRAPHICS", "")
-        term = os.getenv("TERM", "").lower()
+        term = os.getenv("COSMOS_OUTER_TERM", os.getenv("TERM", "")).lower()
         self.enabled = mode == "kitty" or (
             mode != "text" and ("kitty" in term or term == "xterm-ghostty")
         )

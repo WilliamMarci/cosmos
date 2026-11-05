@@ -22,6 +22,7 @@ Management commands, all with `--help`:
 
 - `daemon`: foreground coordinator.
 - `stop`: stop the coordinator and its Mods; retain tmux applications.
+- `stop --all`: preview sessions, panes and pending Agent tasks/watches, then confirm and stop verified Cosmos backends as well. `--yes` accepts the preview non-interactively. Ordinary system Tmux servers are not adopted by name.
 - `doctor`, `config`: diagnostic JSON and effective configuration.
 - `events`: stream service events until interrupted.
 - `mod list`, `mod add MANIFEST`, `mod start ID`, `mod stop ID`, `mod remove ID`.

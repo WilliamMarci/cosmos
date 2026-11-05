@@ -9,13 +9,13 @@ The line-based Bash TUI supports multi-selection with numeric toggles, `p` to ed
 ```bash
 ./install.sh
 ./install.sh --yes --features core,assistant,pdf,rime \
-  --prefix "$HOME/apps/cosmos-0.2.2" --bin-dir "$HOME/.local/bin"
+  --prefix "$HOME/apps/cosmos-0.2.3" --bin-dir "$HOME/.local/bin"
 ./install.sh --check --features core
 ```
 
 Defaults:
 
-- Software: `${XDG_DATA_HOME:-~/.local/share}/cosmos/0.2.2`.
+- Software: `${XDG_DATA_HOME:-~/.local/share}/cosmos/0.2.3`.
 - Command: `~/.local/bin/cosmos` symlink; `--bin-dir` overrides it. Existing unmanaged commands are never overwritten.
 - Configuration: `${XDG_CONFIG_HOME:-~/.config}/cosmos`.
 - Cache: `${XDG_CACHE_HOME:-~/.cache}/cosmos` (including Python bytecode).
@@ -24,9 +24,36 @@ Defaults:
 
 Core includes a relocatable CPython 3.12 runtime, pinned Python wheel dependencies, Tmux, coordinator and precompiled file/Bash integrations. Rust, uv, CMake, compilers and Bun/npm are build dependencies only. Agent is compiled for the baseline CPU tier, without requiring AVX2. PDF includes private Poppler utilities; Rime includes private librime/Lua and compiled 雾凇 data. Third-party licenses and corresponding optional-component sources are published alongside the binaries; Cosmos's own code is MIT.
 
-For offline installation, place the selected component archives and published `components.json` beside the extracted `install.sh`; downloads are then unnecessary. The installer never edits PATH, shell rc files, desktop Rime settings or global environments. If `~/.local/bin` is not on PATH, it prints the full command path.
+## Offline installation
 
-Install upgrades to a new versioned directory. Older installations/configuration are preserved. Detach clients and run the previous `cosmos stop` before reopening the new version; terminal applications remain running. Removing an installation directory and its command symlink removes the application; user configuration/cache/state are intentionally retained.
+On a connected machine, download assets from the **same release**: the core archive for a compatible glibc tier, `components.json`, and the selected Agent/PDF/Rime archives. Copy them to the server. For AlmaLinux 8 use the 2.28 tier; AlmaLinux 9 can use either tier. Extract the core archive and run its installer:
+
+```bash
+./install.sh --offline --package-dir /path/to/downloaded-assets
+```
+
+`--offline` forbids network access. A compatible archive already present in `--package-dir` is preferred, including a lower glibc tier when the highest compatible tier is absent. Missing selected archives produce a clear error. Hash/CPU/glibc checks still apply. Select only the components downloaded; core-only installation needs no optional archive.
+
+Alternatively, the single-file release `install.sh` can bootstrap offline if that directory also contains `components.tsv`, `components.json` and the compatible core archive:
+
+```bash
+bash install.sh --offline --package-dir /path/to/downloaded-assets
+```
+
+Online requests announce their target **before connecting**, show bounded retry attempts and timeouts, and report offline instructions on failure. No installer can bypass a server's GitHub network restrictions.
+
+ The installer never edits PATH, shell rc files, desktop Rime settings or global environments. If `~/.local/bin` is not on PATH, it prints the full command path.
+
+Install upgrades to a new versioned directory. Older installations/configuration are preserved. Detach clients and run the previous `cosmos stop` before reopening the new version; terminal applications remain running. To end all verified Cosmos backend sessions and pending work, use `cosmos stop --all`: it previews the affected sessions/tasks and asks for confirmation. Plain `cosmos stop` retains terminal applications. Bundled backends are named `cosmos-tmux`, use the default independent socket `cosmos`, and have private ownership records checked against the process UID, executable and start time before shutdown. `COSMOS_TMUX` remains an executable override; source checkouts can use system `tmux`. Already running old backends keep their old process title until explicitly stopped and restarted.
+
+Run `INSTALL_DIR/uninstall.sh` to remove that installation. It previews affected backend sessions and processes using that installation, asks for confirmation, checks for residual processes, and removes only its own command symlink and software tree. User configuration/cache/state are retained. `--yes` confirms non-interactively.
+
+## Terminal and host environment
+
+Core packages include a private terminfo database and inspector. Unsupported terminal names fall back to `xterm-256color` when available; the original terminal name remains available for graphics detection. Known truecolor terminal names and SSH's common `xterm-256color` default to truecolor; explicit `TEXTUAL_COLOR_SYSTEM=256` is respected for limited terminals.
+
+Native Cosmos libraries use private ELF search paths. The launcher isolates its own runtime from host `LD_LIBRARY_PATH`/`LD_PRELOAD` and Python overrides, while internal Bash restores the original host environment before user initialization and removes duplicate path entries. System applications are not given Cosmos's private library directory. Flatpak is not a Cosmos dependency.
+
 
 # Building releases
 

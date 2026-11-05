@@ -45,7 +45,7 @@ with tempfile.TemporaryDirectory(prefix="cosmos-textual-") as tmp:
 
     def tmux(*args):
         return subprocess.run(
-            ["tmux", "-L", env["COSMOS_TMUX_SOCKET"], *args],
+            [os.getenv("COSMOS_TMUX", "tmux"), "-L", env["COSMOS_TMUX_SOCKET"], *args],
             env=env,
             check=True,
             capture_output=True,
@@ -433,7 +433,7 @@ with tempfile.TemporaryDirectory(prefix="cosmos-textual-") as tmp:
                 p.kill()
                 p.wait()
         subprocess.run(
-            ["tmux", "-L", env["COSMOS_TMUX_SOCKET"], "kill-server"],
+            [os.getenv("COSMOS_TMUX", "tmux"), "-L", env["COSMOS_TMUX_SOCKET"], "kill-server"],
             env=env,
             capture_output=True,
         )

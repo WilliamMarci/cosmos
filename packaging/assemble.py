@@ -10,6 +10,9 @@ import subprocess
 import sys
 import tarfile
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from elf import patch_private_elfs
+
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = runpy.run_path(str(ROOT / "python/cosmos_tui/core/metadata.py"))["VERSION"]
 DIST = ROOT / "dist"
@@ -61,6 +64,35 @@ def archive(stage, name, rooted=False):
     print(target)
 
 
+def bundle_terminfo(stage):
+    """Ship ncurses-readable base entries; unknown terminal names can fall back."""
+    compiler = shutil.which("tic")
+    inspector = shutil.which("infocmp")
+    if not compiler or not inspector:
+        raise RuntimeError("Release builder requires tic and infocmp")
+    definitions = []
+    for name in ("xterm-256color", "screen-256color", "tmux-256color", "xterm", "screen", "linux", "dumb", "xterm-kitty", "xterm-ghostty"):
+        result = subprocess.run([inspector, "-x", name], capture_output=True, text=True)
+        if result.returncode == 0:
+            definitions.append(result.stdout)
+        elif name in {"xterm-256color", "screen-256color", "dumb"}:
+            raise RuntimeError("Missing required terminfo: " + name)
+    output = stage / "share/terminfo"
+    output.mkdir(parents=True, exist_ok=True)
+    source = stage / ".terminfo.src"
+    source.write_text("\n".join(definitions))
+    try:
+        subprocess.run([compiler, "-x", "-o", str(output), str(source)], check=True)
+    finally:
+        source.unlink()
+    for name in ("ncurses", "ncurses-libs"):
+        notice = Path("/usr/share/licenses") / name
+        if notice.is_dir():
+            copy(notice, stage / "licenses" / name)
+    copy(Path(inspector), stage / "bin/infocmp")
+    closure(stage / "bin/infocmp", stage / "lib")
+
+
 def check_abi(binary, maximum=None):
     maximum = maximum or TIER
     import re
@@ -78,9 +110,10 @@ def main(kind, source):
     if kind == "core":
         for name in ("python/cosmos_tui", "terminal_agent/terminal_agent", "terminal_agent/shell", "terminal_agent/native", "shell", "config", "themes", "mods", "skills", "docs", "sdk/python"):
             copy(ROOT / name, stage / name)
-        for name in ("cosmos", "README.md", "RELEASE.md", "LICENSE"):
+        for name in ("cosmos", "README.md", "README.zh-CN.md", "RELEASE.md", "LICENSE", "vendor/README.md", "vendor/sources.json"):
             copy(ROOT / name, stage / name)
         copy(ROOT / "packaging/install.sh", stage / "install.sh")
+        copy(ROOT / "packaging/uninstall.sh", stage / "uninstall.sh")
         copy(ROOT / "packaging/installer.py", stage / "installer.py")
         copy(ROOT / "packaging/requirements.lock", stage / "python/requirements.lock")
         copy(ROOT / "target/release/cosmos", stage / "bin/cosmos")
@@ -92,7 +125,7 @@ def main(kind, source):
         for relative in ("runtime/include", "runtime/lib/python3.12/test", "runtime/lib/python3.12/ensurepip"):
             shutil.rmtree(stage / relative, ignore_errors=True)
         tmux = ROOT / ".build/tmux-install/bin/tmux"
-        copy(tmux, stage / "bin/tmux")
+        copy(tmux, stage / "bin/cosmos-tmux")
         closure(tmux, stage / "lib")
         closure(stage / "bin/cosmos", stage / "lib")
         closure(stage / ".build/libcosmos_files.so", stage / "lib")
@@ -106,9 +139,11 @@ def main(kind, source):
             copy(tmux_notice, stage / "licenses/tmux-COPYING")
         else:
             raise RuntimeError("Missing tmux copyright notice")
+        bundle_terminfo(stage)
+        patch_private_elfs(stage)
         glibc = TIER
         # Reject accidentally building a public compatibility tier on a newer host.
-        for binary in [stage / "bin/cosmos", stage / "bin/tmux", stage / ".build/libcosmos_files.so", stage / "terminal_agent/.build/terminal-agent-readline.so"]:
+        for binary in [stage / "bin/cosmos", stage / "bin/cosmos-tmux", stage / ".build/libcosmos_files.so", stage / "terminal_agent/.build/terminal-agent-readline.so"]:
             check_abi(binary, glibc)
         (stage / "bundle.json").write_text(json.dumps(dict(version=VERSION, platform="linux-x86_64", glibc=glibc, cpu_flags=["sse4_1", "sse4_2", "ssse3", "popcnt", "cx16", "lahf_lm"], python="3.12", features=["core", "assistant"]), indent=2) + "\n")
         checksums = []
@@ -120,6 +155,7 @@ def main(kind, source):
         (stage / "SHA256SUMS").write_text("\n".join(checksums) + "\n")
     else:
         copy(source, stage)
+        patch_private_elfs(stage)
     archive(stage, f"cosmos-{VERSION}-{kind}-linux-x86_64-glibc{TIER}", rooted=kind == "core")
 
 

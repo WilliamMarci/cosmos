@@ -5,10 +5,12 @@ bundle=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)
 if [[ ${1:-} == --help || ${1:-} == -h ]]; then
     cat <<'HELP'
 Usage: ./install.sh [--prefix DIR] [--bin-dir DIR]
-                    [--features core,agent,assistant,pdf,rime] [--yes] [--check]
+                    [--features core,agent,assistant,pdf,rime] [--yes] [--check] [--offline] [--package-dir DIR]
 Default installation: ~/.local/share/cosmos/VERSION; command: ~/.local/bin/cosmos
 No sudo, shell startup edits, system package installation or global environment changes.
-Feature archives can be placed beside install.sh for offline installation.
+Offline: place components.json and selected compatible archives beside this script,
+or use --offline --package-dir DIR. This extracted-core installer needs no network
+when all selected files are present; --offline forbids all downloads.
 HELP
     exit 0
 fi

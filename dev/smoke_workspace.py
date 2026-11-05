@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory(prefix='cosmos-workspace-') as temp:
                                 check=True, capture_output=True, text=True)
         return json.loads(result.stdout)
     def tmux(*args):
-        return subprocess.run(['tmux', '-L', env['COSMOS_TMUX_SOCKET'], *args], check=True,
+        return subprocess.run([os.getenv('COSMOS_TMUX', 'tmux'), '-L', env['COSMOS_TMUX_SOCKET'], *args], check=True,
                               capture_output=True, text=True, env=env).stdout
     clients = []
     handles = []
@@ -151,7 +151,7 @@ with tempfile.TemporaryDirectory(prefix='cosmos-workspace-') as temp:
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait()
-        subprocess.run(['tmux', '-L', env['COSMOS_TMUX_SOCKET'], 'kill-server'], env=env, capture_output=True)
+        subprocess.run([os.getenv('COSMOS_TMUX', 'tmux'), '-L', env['COSMOS_TMUX_SOCKET'], 'kill-server'], env=env, capture_output=True)
         if daemon.poll() is None:
             daemon.terminate()
             daemon.wait(timeout=5)

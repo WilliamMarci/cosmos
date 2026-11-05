@@ -1,75 +1,46 @@
-# Cosmos — Arche 0.2.2
+# Cosmos
 
-**Arche · 2026-11-03 · Author: William Marci**
+[English](README.md) · [简体中文](README.zh-CN.md)
 
-Cosmos 是运行在工作主机上的终端工作壳。通过普通 SSH 登录后运行 Cosmos，即可创建或重连持续会话；连接电脑无需安装配套 Cosmos。首个开发版 Arche 0.1.0 已保留为本地 v0.1.0 标签；当前为下一版开发分支，不表示原定完整首版已经交付。版本范围与依赖见 [发布说明](RELEASE.md)。
+Cosmos is a terminal workspace for local machines and SSH servers. Reconnect to persistent sessions, work across panes, read documents, and use an AI agent without installing a companion client on your laptop.
 
-## 运行
+## Features
 
-唯一 UI 入口为根目录 `./cosmos`，使用 Python + Textual 与 Cosmos 自绘接口；隔离 Tmux 服务负责持续会话和终端解析。Rust 保留协调服务与管理 CLI，旧 Rust UI 已停用。`dev/cosmos-textual` 仅为兼容跳转。
+- Persistent sessions, windows and split panes, with scrollback and search.
+- An integrated Reader for images, PDF, EPUB, Markdown and HTML; `cosmos open FILE` also opens Reader on its own.
+- An optional AI Agent with terminal observation and interaction tools, plus a Bash command assistant.
+- Optional Rime input with the 雾凇 configuration, themes, notifications and extensions.
 
-**安装 release**：下载 [GitHub Release](https://github.com/WilliamMarci/cosmos/releases) 的 core 包，解压后运行 `./install.sh`。简单多选界面可选择 Agent、Bash 助手、PDF、Rime＋雾凇；只下载选中的组件。默认用户态安装，不改全局环境。提供 AlmaLinux 8 构建的 glibc ≥ 2.28 档及 AlmaLinux 9 构建的 glibc ≥ 2.34 档，均为 Linux x86_64 / x86-64-v2；不匹配的平台会明确拒绝。完整布局、离线安装和参数见 [安装说明](docs/installation.md)。
+Cosmos is under active development. See the [release notes](RELEASE.md) for the current scope.
 
-源码开发需要 Python 3.11+、Tmux 和构建工具：
+## Install
 
-```bash
-cargo build --locked --offline --release
-uv venv .venv
-uv pip install --python .venv/bin/python -r python/requirements.txt
-./cosmos --version
-./cosmos
-```
-
-Release core 包包含 Python 运行时、wheel 依赖、Tmux 和预编译原生模块，不需要用户准备 venv、CMake 或编译器。PDF、Rime＋雾凇和 Agent 是独立组件包，系统目录保持不变。
+Download a **core binary archive** from [Releases](https://github.com/WilliamMarci/cosmos/releases), extract it, and run:
 
 ```bash
-cosmos attach -s work
-cosmos new -s research
-cosmos list
-cosmos history -s work --output history.txt
-source <(cosmos completion bash)
+./install.sh
 ```
 
-会话命令支持唯一前缀和兼容别名，完整用法见 [CLI 文档](docs/cli.md)。`Leader d` 分离客户端，应用继续运行；`cosmos stop` 停止协调服务及其管理的 Mod，保留 Tmux 应用。请从外层 Shell 连接，避免在同一会话中捕获客户端自身。
+The installer lets you choose the installation directory and optional Agent, PDF and Rime components. It installs as your user; Python and native runtime dependencies are bundled, so no compiler or system package installation is needed.
 
-## 已实现的开发版能力
-
-- 持续会话、窗口/窗格切换、分屏、调整大小、焦点分割线、历史回滚与单窗格搜索。
-- Settings、Ctrl+P 上下文 Actions、COSMOS 开始菜单、分组键位编辑和可视键盘预览。
-- 图片/PDF 阅读、缩略图、缩放平移、搜索高亮、跳页、大纲、内存/磁盘缓存与相邻页预读；大 PDF 页自适应降低栅格分辨率。
-- EPUB/Markdown/HTML 富文本阅读，复用 ZhihuViewer 解析器，支持本地内嵌图片、逻辑页和大纲。
-- 可移动 UI Mod 包；calendar 注册日期点击弹窗，启用和通知权限在 Settings → Mods 分别管理。
-- terminal_agent 命令生成助手及 Cosmos 自绘输入；分屏启动基于 OpenCode 的 [Cosmos Agent](docs/agent.md)，提供终端 TUI 操作工具。
-- librime 输入法、逐输入目标组字、候选与全半角；命令助手自绘编辑器也支持 IME。
-- 分级通知、来源会话标记、重复计数、终端响铃通知，以及可配置状态栏。
-- 可信 Mod 注册和生命周期、事件回放、公开 RPC/SDK 与部分 UI 扩展接口。
-
-默认 Leader 为 Ctrl+B；`Leader p` 打开设置，`Leader m` 打开开始菜单，`Leader s` 切换窗口/会话，`Leader ?` 查看上下文快捷键。输入法通过 `Leader i` 切换。Leader2/3、具体动作及别名可在设置中调整。默认静默，不常驻显示全部按键。
-
-在 Cosmos 外使用 `cosmos open FILE` 可直接打开独立 Reader；在 Cosmos Bash 中使用 `open FILE` 或 `cosmos open FILE` 在当前 pane 打开 PNG/JPEG/WebP/PDF/EPUB/Markdown/HTML。Kitty 与 Ghostty 支持图形输出，其他终端可字符降级。阅读详情见 [Reader](docs/viewer.md)。
-
-## 配置与扩展
-
-配置位于 `${XDG_CONFIG_HOME:-~/.config}/cosmos/config.toml`，运行状态位于 `${XDG_STATE_HOME:-~/.local/state}/cosmos/`。配置样例在 config/；内置主题在 `themes/`，用户主题放在 `${XDG_CONFIG_HOME:-~/.config}/cosmos/themes/`，模板见 `themes/templates/` 和 [主题说明](docs/themes.md)。设置保存后即时读回，不需要旧界面的 Apply 操作。启动时核对实际后台服务的能力与配置字段；升级服务需分离客户端后停止并重新启动，打开新终端不会替换常驻服务。
+Packages currently target **Linux x86_64 / x86-64-v2**, with **glibc ≥ 2.28** or **≥ 2.34** compatibility tiers. Use the core binary archive rather than GitHub’s generated source archive. For offline installation, custom paths and compatibility details, see the [installation guide](docs/installation.md).
 
 ```bash
-cosmos mod add examples/demo.mod.toml
-cosmos mod start demo
-cosmos mod list
+cosmos                    # open or reconnect to the main workspace
+cosmos attach work        # open a named session
+cosmos open document.pdf  # open Reader directly outside Cosmos
+cosmos update             # update a release installation
 ```
 
-Mod 注册持久保存，显式启动或配置 autostart；能力声明不构成系统沙箱。通过 UI 的 Settings → Mods 管理已注册程序，Mod 视图由当前 Python 宿主呈现，不使用旧 `cosmos panel` 入口。
+## Documentation
 
-正式文档：[框架 RPC](docs/framework.md)、[UI 接口](docs/ui-api.md)、[架构](docs/architecture.md)、[设置](docs/settings.md)、[状态栏](docs/status-bar.md)、[输入法](docs/input-method.md)、[富文本阅读](docs/rich-reader.md)、[UI Mod 包](docs/ui-mods.md)、[鼠标](docs/mouse.md)、[通知](docs/notifications.md)、[Shell 集成](docs/shell.md)。
+- [Commands and sessions](docs/cli.md) · [Settings](docs/settings.md) · [Shell integration](docs/shell.md)
+- [Reader](docs/viewer.md) · [Agent](docs/agent.md) · [Input method](docs/input-method.md)
+- [Themes](docs/themes.md) · [Notifications](docs/notifications.md) · [Extensions](docs/ui-mods.md)
+- [Development](docs/development.md) · [Architecture](docs/architecture.md) · [RPC](docs/framework.md)
 
-未完成范围包括 Yazi 文件管理/左面板、跨所有窗格搜索、全局 Agent 工具与权限桥和自包含分发。规划保留在 [design 当前状态](design/当前实施状态.md)，不将接口或外部程序启动等同于完整模块交付。
+## Upstream projects
 
-## 验证与构建
+Cosmos builds on [Tmux](https://github.com/tmux/tmux), [Textual](https://github.com/Textualize/textual), [OpenCode](https://github.com/anomalyco/opencode), [librime](https://github.com/rime/librime), [雾凇](https://github.com/iDvel/rime-ice) and [Poppler](https://poppler.freedesktop.org/). Additional design references and pinned source revisions are listed in the [upstream registry](vendor/README.md) and [source manifest](vendor/sources.json).
 
-```bash
-.venv/bin/python -m unittest discover -s dev -p 'test_*.py'
-COSMOS_TEST_TMUX=1 cargo test --locked --offline
-./packaging/build.sh
-```
-
-按变更范围执行检查；真实 PTY、图形与 SSH 验收不能由静态测试代替。构建产物为 `dist/cosmos-0.2.2-core-linux-x86_64-glibc2.28.tar.gz`，附校验值、许可证与依赖说明。开发流程见 [Git 管理](docs/development.md)。
+Cosmos is [MIT licensed](LICENSE). Bundled third-party components retain their own licenses; notices and applicable source archives accompany release packages.

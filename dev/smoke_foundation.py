@@ -75,7 +75,7 @@ with tempfile.TemporaryDirectory(prefix='cosmos-smoke-') as temp:
         print(json.dumps({'attach': 'passed', 'detach': 'passed',
                           'reattach_shell_state': 'retained', 'pane_inventory': 'passed'}))
     finally:
-        subprocess.run(['tmux', '-L', env['COSMOS_TMUX_SOCKET'], 'kill-server'],
+        subprocess.run([os.getenv('COSMOS_TMUX', 'tmux'), '-L', env['COSMOS_TMUX_SOCKET'], 'kill-server'],
                        capture_output=True, env=env)
         daemon.terminate()
         daemon.wait(timeout=5)

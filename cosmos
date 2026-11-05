@@ -5,21 +5,49 @@ cosmos_root=$(cd -- "$(dirname -- "$cosmos_script")" && pwd)
 if [[ -x "$cosmos_root/bin/cosmos" ]]; then
     export COSMOS_BINARY="${COSMOS_BINARY:-$cosmos_root/bin/cosmos}"
 fi
-if [[ -d "$cosmos_root/lib" ]]; then
-    export LD_LIBRARY_PATH="$cosmos_root/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# Keep the caller environment for interactive shells, not for Cosmos loaders.
+if [[ ${COSMOS_HOST_ENV_ACTIVE:-0} != 1 ]]; then
+    for cosmos_name in PATH LD_LIBRARY_PATH LD_PRELOAD PYTHONPATH PYTHONHOME; do
+        cosmos_key=COSMOS_HOST_$cosmos_name
+        if [[ -v $cosmos_name ]]; then
+            printf -v "$cosmos_key" '%s' "${!cosmos_name}"
+            export "$cosmos_key" "${cosmos_key}_SET=1"
+        else
+            unset "$cosmos_key"
+            export "${cosmos_key}_SET=0"
+        fi
+    done
+    export COSMOS_HOST_ENV_ACTIVE=1
 fi
+unset LD_LIBRARY_PATH LD_PRELOAD PYTHONHOME PYTHONPATH
 export PATH="$cosmos_root/bin:$cosmos_root/vendor/pdf/bin:$PATH"
-for cosmos_lib in "$cosmos_root/vendor/pdf/lib" "$cosmos_root/vendor/rime/lib"; do
-    if [[ -d $cosmos_lib ]]; then
-        export LD_LIBRARY_PATH="$cosmos_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+if [[ -x $cosmos_root/bin/cosmos-tmux ]]; then export COSMOS_TMUX="${COSMOS_TMUX:-$cosmos_root/bin/cosmos-tmux}"; fi
+if [[ -d $cosmos_root/share/terminfo ]]; then
+    export TERMINFO_DIRS="$cosmos_root/share/terminfo${TERMINFO_DIRS:+:$TERMINFO_DIRS}:"
+fi
+export COSMOS_OUTER_TERM="${COSMOS_OUTER_TERM:-${TERM:-dumb}}"
+cosmos_inspector=$cosmos_root/bin/infocmp
+[[ -x $cosmos_inspector ]] || cosmos_inspector=$(command -v infocmp || true)
+if [[ -n $cosmos_inspector ]] && ! "$cosmos_inspector" -x "${TERM:-dumb}" >/dev/null 2>&1; then
+    if "$cosmos_inspector" -x xterm-256color >/dev/null 2>&1; then
+        printf 'Cosmos: terminfo for %s unavailable; using xterm-256color compatibility.\n' "${TERM:-dumb}" >&2
+        export TERM=xterm-256color
     fi
-done
+fi
+# Modern SSH clients often forward TERM but omit COLORTERM. Respect an explicit
+# Textual override; use RGB for known modern terminals, including xterm SSH.
+if [[ -z ${TEXTUAL_COLOR_SYSTEM:-} ]]; then
+    case "$COSMOS_OUTER_TERM:${COLORTERM:-}" in
+        *kitty*|*ghostty*|*direct*|*truecolor*|*24bit*|xterm-256color:*) export TEXTUAL_COLOR_SYSTEM=truecolor ;;
+    esac
+fi
+if [[ ${TEXTUAL_COLOR_SYSTEM:-} == truecolor ]]; then export COLORTERM=truecolor; fi
 if [[ -d $cosmos_root/vendor/rime/share/rime-data ]]; then
     export COSMOS_RIME_DATA="${COSMOS_RIME_DATA:-$cosmos_root/vendor/rime/share/rime-data}"
     export COSMOS_RIME_SCHEMA="${COSMOS_RIME_SCHEMA:-rime_ice}"
     export COSMOS_RIME_LIBRARY="${COSMOS_RIME_LIBRARY:-$cosmos_root/vendor/rime/lib/librime.so.1}"
 fi
 export PYTHONPYCACHEPREFIX="${XDG_CACHE_HOME:-$HOME/.cache}/cosmos/python"
-export PYTHONPATH="$cosmos_root/python:$cosmos_root/terminal_agent:$cosmos_root/python-deps${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH="$cosmos_root/python:$cosmos_root/terminal_agent:$cosmos_root/python-deps"
 export TERMINAL_AGENT_PYTHON="${TERMINAL_AGENT_PYTHON:-$cosmos_root/.venv/bin/python}"
 exec "$cosmos_root/.venv/bin/python" -m cosmos_tui "$@"

@@ -104,9 +104,9 @@ class StatusController(Controller):
             mode, label = "agent", "AGENT"
         elif Path(program).name == "yazi":
             mode, label = "files", "FILES"
-        home = str(Path.home())
-        if path == home or path.startswith(home + "/"):
-            path = "~" + path[len(home) :]
+        from cosmos_tui.core.paths import display_path
+
+        path = display_path(path)
         index, name = 0, app.backend.session
         for _, tab_index, active, tab_name in app.backend.tabs:
             if active == "1":

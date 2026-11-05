@@ -104,7 +104,7 @@ with tempfile.TemporaryDirectory(prefix="cosmos-idle-") as tmp:
             process.terminate()
             process.wait(timeout=5)
         subprocess.run(
-            ["tmux", "-L", env["COSMOS_TMUX_SOCKET"], "kill-server"],
+            [os.getenv("COSMOS_TMUX", "tmux"), "-L", env["COSMOS_TMUX_SOCKET"], "kill-server"],
             env=env,
             capture_output=True,
         )

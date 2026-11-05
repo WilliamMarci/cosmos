@@ -25,11 +25,9 @@ def open_directory(path):
     if not re.fullmatch(r"%\d+", pane) or not os.getenv("TMUX"):
         raise RuntimeError("Open directories from a Cosmos shell")
     # Use the configured Cosmos backend socket, never an unrelated Tmux server.
-    argv = [
-        os.getenv("COSMOS_TMUX", "tmux"),
-        "-L",
-        os.getenv("COSMOS_TMUX_SOCKET", "cosmos"),
-    ]
+    from cosmos_tui.terminal.backend import command
+
+    argv = command()
     socket = _run([*argv, "display-message", "-p", "#{socket_path}"]).stdout.strip()
     if os.path.realpath(os.environ["TMUX"].split(",")[0]) != os.path.realpath(socket):
         raise RuntimeError("Directory opening requires a Cosmos backend pane")

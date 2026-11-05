@@ -41,7 +41,7 @@ def main():
         )
         subprocess.run(
             [
-                "tmux",
+                os.getenv("COSMOS_TMUX", "tmux"),
                 "-L",
                 socket,
                 "-f",
@@ -64,7 +64,7 @@ def main():
         env = {}
         try:
             pane = subprocess.check_output(
-                ["tmux", "-L", socket, "list-panes", "-F", "#{pane_id}"], text=True
+                [os.getenv("COSMOS_TMUX", "tmux"), "-L", socket, "list-panes", "-F", "#{pane_id}"], text=True
             ).strip()
             with patch.dict(
                 os.environ,
@@ -151,7 +151,7 @@ def main():
                 }
                 actual = {r["tool"] for r in tools if r["status"] == "completed"}
                 screen = subprocess.check_output(
-                    ["tmux", "-L", socket, "capture-pane", "-p", "-t", pane], text=True
+                    [os.getenv("COSMOS_TMUX", "tmux"), "-L", socket, "capture-pane", "-p", "-t", pane], text=True
                 )
                 terminal_marker = "COSMOS_REAL_TOOL_OK" in screen
                 native_read_marker = any(
@@ -207,7 +207,7 @@ def main():
                                 break
                             except BlockingIOError:
                                 time.sleep(0.1)
-            subprocess.run(["tmux", "-L", socket, "kill-server"], capture_output=True)
+            subprocess.run([os.getenv("COSMOS_TMUX", "tmux"), "-L", socket, "kill-server"], capture_output=True)
 
 
 if __name__ == "__main__":

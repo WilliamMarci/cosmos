@@ -173,7 +173,7 @@ class ChildGraphicsControlModeTests(unittest.IsolatedAsyncioTestCase):
                 finally:
                     await backend.close()
                     subprocess.run(
-                        ["tmux", "-L", socket, "kill-server"],
+                        [os.getenv("COSMOS_TMUX", "tmux"), "-L", socket, "kill-server"],
                         env=env,
                         capture_output=True,
                     )

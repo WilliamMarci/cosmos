@@ -174,7 +174,7 @@ class ConnectTests(unittest.IsolatedAsyncioTestCase):
             with patch.dict(os.environ, env, clear=False):
                 def tmux(*args):
                     return subprocess.run(
-                        ["tmux", "-L", socket, *args],
+                        [os.getenv("COSMOS_TMUX", "tmux"), "-L", socket, *args],
                         env=env,
                         text=True,
                         capture_output=True,

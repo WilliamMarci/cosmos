@@ -33,7 +33,7 @@ jobs:
         run: |
           dnf install -y dnf-plugins-core epel-release git tar gzip xz which findutils procps-ng
           if [[ $COSMOS_GLIBC_TIER == 2.28 ]]; then dnf config-manager --set-enabled powertools; else dnf config-manager --set-enabled crb; fi
-          dnf install -y gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ make autoconf automake libtool bison cmake pkgconfig libevent-devel ncurses-devel readline-devel openssl-devel python3 rpm-build cpio boost-devel yaml-cpp-devel leveldb-devel lua-devel fontconfig-devel freetype-devel libjpeg-turbo-devel openjpeg2-devel libpng-devel libtiff-devel nss-devel patchelf
+          dnf install -y gcc-toolset-12-gcc gcc-toolset-12-gcc-c++ make autoconf automake libtool bison cmake pkgconfig libevent-devel ncurses ncurses-devel readline-devel openssl-devel python3 rpm-build cpio boost-devel yaml-cpp-devel leveldb-devel lua-devel fontconfig-devel freetype-devel libjpeg-turbo-devel openjpeg2-devel libpng-devel libtiff-devel nss-devel patchelf
           if [[ $COSMOS_GLIBC_TIER == 2.28 ]]; then dnf install -y marisa-devel opencc-devel; fi
           echo /opt/rh/gcc-toolset-12/root/usr/bin >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
@@ -98,7 +98,7 @@ jobs:
           cargo test --locked
           export UV_PYTHON_INSTALL_DIR="$PWD/.build/release-python"
           python_runtime=$(uv python find --managed-python 3.12)
-          PYTHONPATH=python:python-deps:.build/release-deps:dev "$python_runtime" -m unittest dev.test_installation dev.test_installer_tui dev.test_release_reuse dev.test_update dev.test_standalone_reader dev.test_release_cache dev.test_terminal_tabs dev.test_status_identity dev.test_status dev.test_cli
+          PYTHONPATH=python:python-deps:.build/release-deps:dev "$python_runtime" -m unittest dev.test_deployment dev.test_backend_lifecycle dev.test_installation dev.test_installer_tui dev.test_release_reuse dev.test_update dev.test_standalone_reader dev.test_release_cache dev.test_terminal_tabs dev.test_status_identity dev.test_status dev.test_cli
           mkdir .build/install-smoke
           tar -xzf dist/cosmos-*-core-linux-x86_64-glibc${{ matrix.tier }}.tar.gz -C .build/install-smoke
           installer=$(find .build/install-smoke -name install.sh -print -quit)
@@ -108,6 +108,15 @@ jobs:
           su cosmos-test -s /bin/bash -c "bash '$PWD/$installer' --yes --features core,assistant --prefix /home/cosmos-test/app --bin-dir /home/cosmos-test/bin"
           su cosmos-test -s /bin/bash -c '/home/cosmos-test/bin/cosmos --version && /home/cosmos-test/bin/cosmos --help'
           test ! -d /home/cosmos-test/app/__pycache__
+          # Test the packaged binary's actual role title, not just its filename.
+          su cosmos-test -s /bin/bash -c '/home/cosmos-test/app/bin/cosmos-tmux -L cosmos-release-title -f /dev/null new-session -d -s title "sleep 60"'
+          server_pid=$(su cosmos-test -s /bin/bash -c '/home/cosmos-test/app/bin/cosmos-tmux -L cosmos-release-title display-message -p "#{pid}"')
+          ps -p "$server_pid" -o args= | grep -F 'cosmos-tmux: server'
+          su cosmos-test -s /bin/bash -c '/home/cosmos-test/app/bin/cosmos-tmux -L cosmos-release-title kill-server'
+          su cosmos-test -s /bin/bash -c '/home/cosmos-test/app/uninstall.sh --yes'
+          test ! -e /home/cosmos-test/app
+          test ! -L /home/cosmos-test/bin/cosmos
+
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.component }}-${{ matrix.tier }}

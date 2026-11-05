@@ -13,6 +13,7 @@ from pathlib import Path
 from dataclasses import dataclass
 
 from cosmos_tui.core.paths import PROJECT_ROOT
+from cosmos_tui.terminal.backend import command, record
 from cosmos_tui.terminal.child_graphics import KittyStream, unescape_output
 
 
@@ -55,11 +56,7 @@ class Tmux:
         self.session = session
         self.session_id = None
         self.created = False
-        self.argv = [
-            os.getenv("COSMOS_TMUX", "tmux"),
-            "-L",
-            os.getenv("COSMOS_TMUX_SOCKET", "cosmos"),
-        ]
+        self.argv = command()
         self.lock = asyncio.Lock()
         self.process = None
         self.reader_task = None
@@ -130,7 +127,23 @@ class Tmux:
                 return session_id
         return None
 
+    async def sync_host_environment(self):
+        if os.getenv("COSMOS_HOST_ENV_ACTIVE") != "1":
+            return
+        names = {"COSMOS_HOST_ENV_ACTIVE", "TERMINFO_DIRS", "COLORTERM", "TEXTUAL_COLOR_SYSTEM", "COSMOS_TMUX"}
+        for name in ("PATH", "LD_LIBRARY_PATH", "LD_PRELOAD", "PYTHONPATH", "PYTHONHOME"):
+            names.update({name, "COSMOS_HOST_" + name, "COSMOS_HOST_" + name + "_SET"})
+        for name in sorted(names):
+            if name in os.environ:
+                await self.cli("set-environment", "-t", self.session_id, name, os.environ[name])
+            else:
+                # Mark removed instead of inheriting a stale server-global value.
+                await self.cli("set-environment", "-r", "-t", self.session_id, name)
+
     async def connect(self):
+        from cosmos_tui.terminal.backend import probe
+
+        server_existed = probe(self.argv) is not None
         self.created = False
         self.reader_error = None
         self.session_id = await self.resolve_session_id()
@@ -175,6 +188,8 @@ class Tmux:
             "default-command",
             self.shell_command(),
         )
+        record(created_server=not server_existed)
+        await self.sync_host_environment()
         # Refuse capturing our own physical client from its backend pane.
         if os.getenv("TMUX_PANE"):
             socket = (await self.cli("display-message", "-p", "#{socket_path}")).strip()
@@ -641,7 +656,7 @@ def in_cosmos_pane():
     if not actual or not re.fullmatch(r"%[0-9]+", os.getenv("TMUX_PANE", "")):
         return False
     try:
-        result = subprocess.run([os.getenv("COSMOS_TMUX", "tmux"), "-L", os.getenv("COSMOS_TMUX_SOCKET", "cosmos"), "display-message", "-p", "#{socket_path}"], capture_output=True, text=True, timeout=3)
+        result = subprocess.run([*command(), "display-message", "-p", "#{socket_path}"], capture_output=True, text=True, timeout=3)
         return result.returncode == 0 and bool(result.stdout.strip()) and os.path.realpath(actual) == os.path.realpath(result.stdout.strip())
     except (OSError, subprocess.TimeoutExpired):
         return False
