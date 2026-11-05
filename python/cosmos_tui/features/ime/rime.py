@@ -95,7 +95,10 @@ class Rime:
 
         if not enabled("rime"):
             raise RuntimeError("Rime was not selected during installation")
-        bundled = PROJECT_ROOT / "lib/librime.so.1"
+        bundled = PROJECT_ROOT / "vendor/rime/lib/librime.so.1"
+        if not bundled.exists():
+            bundled = PROJECT_ROOT / "lib/librime.so.1"
+        private_library = bool(os.getenv("COSMOS_RIME_LIBRARY")) or bundled.exists()
         library = os.getenv("COSMOS_RIME_LIBRARY") or (
             str(bundled) if bundled.exists() else find_library("rime")
         )
@@ -105,9 +108,9 @@ class Rime:
             )
         self.library = C.CDLL(library, mode=C.RTLD_GLOBAL)
         plugin_dir = Path(
-            os.getenv("COSMOS_RIME_PLUGINS", str(PROJECT_ROOT / "lib/rime-plugins"))
+            os.getenv("COSMOS_RIME_PLUGINS", str(Path(library).parent / "rime-plugins" if private_library else PROJECT_ROOT / "lib/rime-plugins"))
         )
-        if not plugin_dir.is_dir():
+        if not plugin_dir.is_dir() and not private_library and "COSMOS_RIME_PLUGINS" not in os.environ:
             plugin_dir = (
                 Path("/usr/lib")
                 / sysconfig.get_config_var("MULTIARCH")

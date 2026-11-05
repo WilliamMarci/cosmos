@@ -69,6 +69,13 @@ class OutputController(Controller):
     def flush_graphics(self):
         app = self.app
         if app.graphics.pending and not app.is_headless:
+            if not app._running:
+                # Textual removes screens before Unmount, but closes its driver
+                # afterwards. Flush final image deletions through that same owner.
+                if app._driver is not None:
+                    app._driver.write(app.graphics.take())
+                    app._driver.flush()
+                return
             self._display(app.screen, Batch())
 
     def on_resize(self, event):

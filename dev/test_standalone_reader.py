@@ -2,7 +2,7 @@ import tempfile
 import os
 from pathlib import Path
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 from cosmos_tui.features.reader.standalone import ReaderApp
 
@@ -35,3 +35,17 @@ class StandaloneReaderTests(unittest.IsolatedAsyncioTestCase):
     async def test_missing_file_fails_before_ui(self):
         with self.assertRaises(FileNotFoundError):
             ReaderApp('/not-present/reader-fixture.pdf')
+
+
+class GraphicsShutdownTests(unittest.TestCase):
+    def test_final_graphics_cleanup_does_not_access_destroyed_screens(self):
+        from cosmos_tui.render.output import OutputController
+        from types import SimpleNamespace
+
+        graphics = SimpleNamespace(pending="delete-image", take=Mock(return_value="delete-image"))
+        driver = Mock()
+        app = SimpleNamespace(graphics=graphics, is_headless=False, _running=False, _driver=driver)
+        # Deliberately no screen: Textual has already emptied its screen stack.
+        OutputController(app).flush_graphics()
+        driver.write.assert_called_once_with("delete-image")
+        driver.flush.assert_called_once()

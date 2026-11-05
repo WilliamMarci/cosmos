@@ -5,6 +5,7 @@ Deployment and backend lifecycle improvements for Linux x86_64 / x86-64-v2, pack
 - Installation announces connections before waiting, retries transient failures and supports explicit offline installation. Local compatible archives can be selected across glibc tiers.
 - Core includes terminfo data and terminal fallback; SSH truecolor settings are propagated.
 - Private native libraries are isolated from host ROOT/Conda library paths. Internal Bash restores the host environment and deduplicates paths.
+- Private Rime avoids incompatible host plugins; Kitty Reader exits flush image cleanup without accessing destroyed screens.
 - HOME display follows the current user, directory boundaries and symlink aliases.
 - The bundled backend is `cosmos-tmux`, with independent sockets and verified process ownership. `cosmos stop --all` previews sessions/tasks before closing owned backends; plain `stop` retains terminal sessions.
 - Each installation includes `uninstall.sh` with process checks and confirmation. User configuration/cache/state are retained.
