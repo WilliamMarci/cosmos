@@ -16,3 +16,5 @@ Download a core binary archive, extract it and run `./install.sh`. Select option
 Existing backends retain their original name and environment until stopped and restarted. Replacing installation files does not restart running sessions. Review the `cosmos stop --all` preview carefully: confirming it ends the listed terminal applications and pending work.
 
 This is a development/prerelease build. It does not claim complete delivery of all planned features. Cosmos is MIT licensed; bundled dependencies retain their own licenses and applicable source archives.
+
+Validation: both AlmaLinux compatibility tiers passed core build, regression and clean-install checks, including the actual `cosmos-tmux: server` title and uninstallation. On CERN lxplus8, the final package passed offline bootstrap installation, unknown-TERM fallback and truecolor Reader PTY checks. Separate isolated checks covered host ROOT/Conda path restoration, owned-backend shutdown and active-backend uninstall; measured CERN test usage was approximately 399 MiB. PDF rendering and Rime＋雾凇 composition were verified with an incompatible host `libstdc++` present.

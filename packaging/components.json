@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "version": "0.2.2",
-  "source_commit": "9bf114613900144b3928d52502e5d76617e120d8",
+  "version": "0.2.3",
+  "source_commit": "eabaa54976554c7371fd6223855f664ceda27cb4",
   "components": [
     {
       "name": "core",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "arch": "x86_64",
       "os": "linux",
       "glibc_min": "2.28",
@@ -17,15 +17,15 @@
         "cx16",
         "lahf_lm"
       ],
-      "filename": "cosmos-0.2.2-core-linux-x86_64-glibc2.28.tar.gz",
-      "size": 52312141,
-      "unpacked_size": 158401451,
-      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.2/cosmos-0.2.2-core-linux-x86_64-glibc2.28.tar.gz",
-      "sha256": "48dee511efd823d87cffef496e4a042580a49acb9cabf0430b16e79fc62179d8"
+      "filename": "cosmos-0.2.3-core-linux-x86_64-glibc2.28.tar.gz",
+      "size": 52383753,
+      "unpacked_size": 159256801,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.3/cosmos-0.2.3-core-linux-x86_64-glibc2.28.tar.gz",
+      "sha256": "9912dba57cd78818179f8253f30da0e07fb1daa91c4261973e88254ca81dec57"
     },
     {
       "name": "agent",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "arch": "x86_64",
       "os": "linux",
       "glibc_min": "2.28",
@@ -37,16 +37,16 @@
         "cx16",
         "lahf_lm"
       ],
-      "filename": "cosmos-0.2.2-agent-linux-x86_64-glibc2.28.tar.gz",
-      "size": 75268412,
+      "filename": "cosmos-0.2.3-agent-linux-x86_64-glibc2.28.tar.gz",
+      "size": 75268427,
       "unpacked_size": 190530707,
-      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.2/cosmos-0.2.2-agent-linux-x86_64-glibc2.28.tar.gz",
-      "sha256": "15a61eb0032dcc223fcdee5f8e24978b07dba56753198986a92e71dd3e03d0b8",
-      "payload_sha256": "9770087a327020c0a2447d6a2feeb19d133f644f176d2bfc6a2c954bce57289c"
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.3/cosmos-0.2.3-agent-linux-x86_64-glibc2.28.tar.gz",
+      "sha256": "3fc518ff183230478f7b5727b20069f07f20d38f858ad0edd53d73a7f81bbb66",
+      "payload_sha256": "79fb3e5cbb3f96f1a515013eab009b1009251a61bdf7d0751795fa52ce4a4f96"
     },
     {
       "name": "pdf",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "arch": "x86_64",
       "os": "linux",
       "glibc_min": "2.28",
@@ -58,16 +58,16 @@
         "cx16",
         "lahf_lm"
       ],
-      "filename": "cosmos-0.2.2-pdf-linux-x86_64-glibc2.28.tar.gz",
-      "size": 5647940,
-      "unpacked_size": 16344074,
-      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.2/cosmos-0.2.2-pdf-linux-x86_64-glibc2.28.tar.gz",
-      "sha256": "2d64722fa55d87806179cc7be24c6f295dff58d989af34c64ebbd785d69766e5",
-      "payload_sha256": "5cca924a2ce8c54ddc94dd971aae5f4f012342faa56fccb699b9a0383e41bcf8"
+      "filename": "cosmos-0.2.3-pdf-linux-x86_64-glibc2.28.tar.gz",
+      "size": 5659830,
+      "unpacked_size": 17688378,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.3/cosmos-0.2.3-pdf-linux-x86_64-glibc2.28.tar.gz",
+      "sha256": "31e48363e0d7acea9955d460c82d9018287f8dfa1e54de7290447578fc46e5cb",
+      "payload_sha256": "d88fac15cbc05087f750cc2e187f6c5a53645dd4d15f0abd179922ccb1eefd00"
     },
     {
       "name": "rime",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "arch": "x86_64",
       "os": "linux",
       "glibc_min": "2.28",
@@ -79,16 +79,16 @@
         "cx16",
         "lahf_lm"
       ],
-      "filename": "cosmos-0.2.2-rime-linux-x86_64-glibc2.28.tar.gz",
-      "size": 51601114,
-      "unpacked_size": 140295296,
-      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.2/cosmos-0.2.2-rime-linux-x86_64-glibc2.28.tar.gz",
-      "sha256": "e95a1f0c787d4c5a3ba4c8ada5f0c444ca6c2911537ee798be2a7f7725e2bb51",
-      "payload_sha256": "70b6ab7f8a97b1da32112117aa282e30bc64cee39845a3b308ca24264918709f"
+      "filename": "cosmos-0.2.3-rime-linux-x86_64-glibc2.28.tar.gz",
+      "size": 51610566,
+      "unpacked_size": 142768912,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.3/cosmos-0.2.3-rime-linux-x86_64-glibc2.28.tar.gz",
+      "sha256": "8ebe2950246c1048834d37c7761627e882b26296e2cd5f09cab7d744ed40898b",
+      "payload_sha256": "24fe791696831141f05feb69f3142b97c80d6bebec0d84f9ef59f5661713429e"
     },
     {
       "name": "core",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "arch": "x86_64",
       "os": "linux",
       "glibc_min": "2.34",
@@ -100,15 +100,15 @@
         "cx16",
         "lahf_lm"
       ],
-      "filename": "cosmos-0.2.2-core-linux-x86_64-glibc2.34.tar.gz",
-      "size": 50859158,
-      "unpacked_size": 155221585,
-      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.2/cosmos-0.2.2-core-linux-x86_64-glibc2.34.tar.gz",
-      "sha256": "bc1c8586c0db1e55b73222d76700ed8159b91d53d9e4d0eba16e046328ad409e"
+      "filename": "cosmos-0.2.3-core-linux-x86_64-glibc2.34.tar.gz",
+      "size": 50921583,
+      "unpacked_size": 155948414,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.3/cosmos-0.2.3-core-linux-x86_64-glibc2.34.tar.gz",
+      "sha256": "4cfcfd36b2339bb4c5258b14ff73f97197f5d6cf8a60f269b520388026f4053e"
     },
     {
       "name": "agent",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "arch": "x86_64",
       "os": "linux",
       "glibc_min": "2.34",
@@ -120,16 +120,16 @@
         "cx16",
         "lahf_lm"
       ],
-      "filename": "cosmos-0.2.2-agent-linux-x86_64-glibc2.34.tar.gz",
-      "size": 75268410,
+      "filename": "cosmos-0.2.3-agent-linux-x86_64-glibc2.34.tar.gz",
+      "size": 75268453,
       "unpacked_size": 190530707,
-      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.2/cosmos-0.2.2-agent-linux-x86_64-glibc2.34.tar.gz",
-      "sha256": "93860c26357c757ce6c2a6d1de0ccf0797645b888eed7d269cf58079e06d718d",
-      "payload_sha256": "12df23113ec9b36b0022a6b863a63f3bc508274003552880598e29b3d83f4b50"
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.3/cosmos-0.2.3-agent-linux-x86_64-glibc2.34.tar.gz",
+      "sha256": "353f4eedee4ac3c0a371c0ae224c8a6c740def361c1927bed9627eab705b82d1",
+      "payload_sha256": "6ae2d74138b928193a8c79f268eac78ee6951e472b57a3cce969accc92f370e8"
     },
     {
       "name": "pdf",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "arch": "x86_64",
       "os": "linux",
       "glibc_min": "2.34",
@@ -141,16 +141,16 @@
         "cx16",
         "lahf_lm"
       ],
-      "filename": "cosmos-0.2.2-pdf-linux-x86_64-glibc2.34.tar.gz",
-      "size": 8663481,
-      "unpacked_size": 23067350,
-      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.2/cosmos-0.2.2-pdf-linux-x86_64-glibc2.34.tar.gz",
-      "sha256": "7b48387dc967bc3bf2991bd8538650b37e5aa27ea09f47615a12aece2061a559",
-      "payload_sha256": "6f39e2d6748f40160f17c13fba6cee53373a1157062d226335bddbf286a07d15"
+      "filename": "cosmos-0.2.3-pdf-linux-x86_64-glibc2.34.tar.gz",
+      "size": 8686478,
+      "unpacked_size": 24604022,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.3/cosmos-0.2.3-pdf-linux-x86_64-glibc2.34.tar.gz",
+      "sha256": "cc9be9be15176716777913ef6af1fb9e24220a7077501d95f4d05e0ff6b27dbd",
+      "payload_sha256": "faeecfde1d2c1b23bb1f23a572bca2d67bd74dad40cf43ee5c744e15f563339d"
     },
     {
       "name": "rime",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "arch": "x86_64",
       "os": "linux",
       "glibc_min": "2.34",
@@ -162,12 +162,12 @@
         "cx16",
         "lahf_lm"
       ],
-      "filename": "cosmos-0.2.2-rime-linux-x86_64-glibc2.34.tar.gz",
-      "size": 52406109,
-      "unpacked_size": 142068050,
-      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.2/cosmos-0.2.2-rime-linux-x86_64-glibc2.34.tar.gz",
-      "sha256": "afbb1148a0e48aef6462dceac3a645ede5d64a81d3e391a2d23ae839714faae8",
-      "payload_sha256": "0b9f370176297100d4619672f5f01d30439a06e9567b1ab5311856ad008ec7c9"
+      "filename": "cosmos-0.2.3-rime-linux-x86_64-glibc2.34.tar.gz",
+      "size": 52407432,
+      "unpacked_size": 144695146,
+      "url": "https://github.com/WilliamMarci/cosmos/releases/download/v0.2.3/cosmos-0.2.3-rime-linux-x86_64-glibc2.34.tar.gz",
+      "sha256": "8f387bb9eac485837972e98737e6761f78ad4387bbf10f6f9981d40cc998e998",
+      "payload_sha256": "5bcd048e6c0475008cd3be0c9030ca3d79c042a14d73c996198bc3ab0b4bd5f8"
     }
   ]
 }
