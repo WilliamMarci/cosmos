@@ -20,7 +20,7 @@ source = source.replace(needle, '''#if defined(__linux__) && !defined(HAVE_SETPR
 ''' + needle)
 main.write_text(source)
 compat = root / 'compat/setproctitle.c'
-source = compat.read_text()
+source = compat.read_text().replace('#include <stdarg.h>', '#include <stdarg.h>\n#include <errno.h>')
 source = source.replace('void\nsetproctitle(const char *fmt, ...)', '''static char *cosmos_title_start;
 static size_t cosmos_title_size;
 static const char *cosmos_program;
