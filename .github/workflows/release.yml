@@ -17,7 +17,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: cosmos-release
+  group: cosmos-release${{ inputs.core_only && '-core' || '' }}
   cancel-in-progress: false
 jobs:
   build:
