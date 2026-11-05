@@ -9,3 +9,5 @@ Fixes release installation of Python dependencies and Agent startup behind a hos
 - Release checks include isolated imports, a real Bash assistant pane and terminal/actions MCP handshakes.
 
 Core is rebuilt for glibc ≥ 2.28 and ≥ 2.34. Agent, PDF and Rime native payloads are unchanged and reused from 0.2.3; compatible existing installations can reuse them during update. See [installation](docs/installation.md) for online/offline setup and custom paths. This remains a development/prerelease build.
+
+Validation: both compatibility builds passed fresh-install checks. The final glibc 2.28 package also passed an offline temporary installation on PKU, reusing the existing Agent component: isolated Python imports, the Bash assistant, both MCP handshakes and the Agent interface worked with conflicting host Python settings and proxy variables. No model requests were made, and the existing PKU installation was left unchanged.
