@@ -11,15 +11,17 @@ case "$command" in
     build)
         ref=$(git branch --show-current)
         rebuild=false
+        core_only=false
         while (($#)); do
             case "$1" in
                 --ref) ref=${2:?missing ref}; shift 2 ;;
                 --rebuild-optional) rebuild=true; shift ;;
+                --core-only) core_only=true; shift ;;
                 *) echo "Unknown option: $1" >&2; exit 2 ;;
             esac
         done
         git diff --quiet && git diff --cached --quiet || { echo 'Commit tracked changes before building a release.' >&2; exit 1; }
-        gh workflow run release.yml --repo "$repo" --ref "$ref" -f rebuild_optional="$rebuild"
+        gh workflow run release.yml --repo "$repo" --ref "$ref" -f rebuild_optional="$rebuild" -f core_only="$core_only"
         echo "Build dispatched: https://github.com/$repo/actions/workflows/release.yml"
         ;;
     watch)
@@ -50,7 +52,7 @@ PY
         ;;
     *)
         echo 'Developer release automation (requires gh authentication):'
-        echo '  dev/release.sh build [--ref main] [--rebuild-optional]'
+        echo '  dev/release.sh build [--ref main] [--rebuild-optional] [--core-only]'
         echo '  dev/release.sh watch RUN_ID'
         echo '  dev/release.sh publish vVERSION   # after target-server acceptance'
         ;;

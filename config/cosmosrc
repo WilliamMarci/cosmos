@@ -19,7 +19,10 @@ function open {
     PYTHONPATH="$COSMOS_ROOT/python:$COSMOS_ROOT/terminal_agent${PYTHONPATH:+:$PYTHONPATH}" \
         "$COSMOS_PYTHON" -m cosmos_tui.open_file -- "$@"
 }
-source "$COSMOS_ROOT/terminal_agent/shell/agent.bash"
+# A release without the optional assistant must not attempt native compilation.
+if [[ ! -f $COSMOS_ROOT/installed-features.json || -f $COSMOS_ROOT/terminal_agent/.build/terminal-agent-readline.so ]]; then
+    source "$COSMOS_ROOT/terminal_agent/shell/agent.bash"
+fi
 unset _cosmos_config_root
 
 # An explicit Bash prompt event, never inferred from a quiet screen/cursor.
@@ -27,7 +30,7 @@ _cosmos_prompt_event() {
     local cosmos_previous_status=$?
     _COSMOS_PROMPT_SEQUENCE=$((${_COSMOS_PROMPT_SEQUENCE:-0} + 1))
     if [[ -n ${TMUX:-} && -n ${TMUX_PANE:-} ]]; then
-        tmux -S "${TMUX%%,*}" set-option -p -t "$TMUX_PANE" \
+        "${COSMOS_TMUX:-tmux}" -S "${TMUX%%,*}" set-option -p -t "$TMUX_PANE" \
             @cosmos_prompt_stamp "$$:$_COSMOS_PROMPT_SEQUENCE" 2>/dev/null || true
     fi
     return "$cosmos_previous_status"

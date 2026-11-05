@@ -50,9 +50,20 @@ class LifecycleTests(unittest.TestCase):
                     run(own,'-f','/dev/null','new-session','-d','-s','owned','sleep 60')
                     run(other,'-f','/dev/null','new-session','-d','-s','unrelated','sleep 60')
                     backend.record(created_server=True)
+                    from cosmos_tui.features.agent.tasks.storage import Tasks
+                    from cosmos_tui.features.agent.monitor.storage import Watches
+
+                    tasks = Tasks(root.name)
+                    task = tasks.create('conversation', 'runtime', dict(pane_id='%0', pid=backend.probe(own)['pid'], session_id='$0'), 'Pending work', next_run=9999999999)
+                    watches = Watches(root.name)
+                    watch = watches.create('%0', 'text', 'finished', 60, {})
                     with contextlib.redirect_stdout(io.StringIO()) as output:
                         lifecycle.stop_all(yes=True, coordinator=False)
                     self.assertIn('owned',output.getvalue())
+                    self.assertIn(task['id'],output.getvalue())
+                    self.assertIn(watch,output.getvalue())
+                    self.assertEqual(tasks.get(task['id'])['state'],'cancelled')
+                    self.assertEqual(watches.list()[0]['state'],'invalidated')
                     self.assertIsNone(backend.probe(own))
                     self.assertIsNotNone(backend.probe(other))
                     self.assertFalse(list(backend.records_dir().glob('*.json')))

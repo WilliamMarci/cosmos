@@ -6,6 +6,10 @@ on:
         description: Ignore PDF/Rime build caches for this run
         type: boolean
         default: false
+      core_only:
+        description: Build only core archives; do not create a release
+        type: boolean
+        default: false
       repair_rime9:
         description: Rebuild only the AlmaLinux 9 Rime component
         type: boolean
@@ -27,7 +31,7 @@ jobs:
     timeout-minutes: 75
     strategy:
       fail-fast: false
-      matrix: ${{ fromJSON(inputs.repair_rime9 && '{"include":[{"component":"rime","tier":"2.34"}]}' || '{"component":["core","agent","pdf","rime"],"tier":["2.28","2.34"]}') }}
+      matrix: ${{ fromJSON(inputs.repair_rime9 && '{"include":[{"component":"rime","tier":"2.34"}]}' || inputs.core_only && '{"component":["core"],"tier":["2.28","2.34"]}' || '{"component":["core","agent","pdf","rime"],"tier":["2.28","2.34"]}') }}
     steps:
       - name: Build dependencies (ephemeral AlmaLinux container only)
         run: |
@@ -123,7 +127,7 @@ jobs:
           path: dist/*
           compression-level: 0
   publish:
-    if: ${{ !inputs.repair_rime9 }}
+    if: ${{ !inputs.repair_rime9 && !inputs.core_only }}
     needs: build
     runs-on: ubuntu-22.04
     permissions:

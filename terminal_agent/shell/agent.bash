@@ -76,5 +76,5 @@ fi
 
 # Advertise the native Readline adapter to the optional Cosmos presenter.
 if [[ -n ${TMUX:-} && -n ${TMUX_PANE:-} ]]; then
-    tmux -S "${TMUX%%,*}" set-option -p -t "$TMUX_PANE" @cosmos_terminal_agent 1
+    "${COSMOS_TMUX:-tmux}" -S "${TMUX%%,*}" set-option -p -t "$TMUX_PANE" @cosmos_terminal_agent 1
 fi
